@@ -5,10 +5,10 @@ The system follows a classic **Client-Server** architecture optimized for locati
 
 ```mermaid
 graph TD
-    Client[📱 Mobile App (React Native)]
-    Server[⚙️ Backend API (Node.js)]
-    DB[(🗄️ Database (PostgreSQL))]
-    Google[🌍 Google Places API]
+    Client["📱 Mobile App (React Native)"]
+    Server["⚙️ Backend API (Node.js)"]
+    DB[("🗄️ Database (PostgreSQL)")]
+    Google["🌍 Google Places API"]
 
     Client -- "1. User Requests (Search/Join)" --> Server
     Server -- "2. Query Locations" --> Google
@@ -54,8 +54,8 @@ erDiagram
     }
 
     PARTICIPANTS {
-        int event_id PK, FK
-        int user_id PK, FK
+        int event_id PK "FK"
+        int user_id PK "FK"
         datetime joined_at
     }
 ```
