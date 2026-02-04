@@ -6,7 +6,6 @@
     <a href="#about">About</a> •
     <a href="#tech-stack">Tech Stack</a> •
     <a href="#roadmap">Roadmap</a> •
-    <a href="docs/PROJECT_CHARTER.md">Research & Vision</a>
   </p>
 </div>
 
