@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/banner.jpeg" alt="SportLink Banner" width="100%">
+  <img src="assets/banner.png" alt="SportLink Banner" width="100%">
 
   <p>
     <a href="#about">About</a> •
