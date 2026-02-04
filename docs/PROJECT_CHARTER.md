@@ -1,28 +1,27 @@
-# SportLink - Project Charter & Research
+# SportLink - Project Charter
 
-## 🚀 The Vision (Think Big)
-To enable anyone to find sports partners easily, without relying on their existing social circle.
-We aim for SportLink to be the essential app for anyone moving to a new city, looking to build their athletic community.
+## 🚀 The Vision
+To enable anyone to find sports partners easily, instantly, and locally.
+We aim to break the reliance on closed social circles (WhatsApp groups) and transform the city into an open athletic community. SportLink is the essential app for anyone moving to a new city looking to build their sports network from scratch.
 
-## 🎯 MVP Scope (Start Small)
-For the current development phase (ending September 2026), we are focusing on:
-* **Core Value**: Finding people to play with, easily and quickly.
-* **Features**: Create/Join nearby games, filter by time/location/skill level, and real-time connection.
-* **Target**: Single city deployment with a limited number of sports to validate user engagement.
+## 🎯 MVP Scope (Phase 1)
+**Timeline:** Jan 2026 - Sep 2026
+**Target Market:** Tel Aviv (North/Center)
 
-## 🧪 Technical Validation (Phase 1)
-*Date: Jan 11, 2026*
+### Core Value Proposition
+* **Immediacy:** "I want to play football tonight" -> Find a game in 3 clicks.
+* **Relevance:** Only see games that match my location and skill level.
+* **Trust:** Verified profiles and rating systems to ensure safety and quality.
 
-We have successfully validated the core technical requirement: fetching real-time athletic facility data using Google Places API.
+### Key Features
+1.  **Interactive Map:** Visual discovery of nearby courts (Sportek, Parks).
+2.  **Game Lobbies:** Create a "Event" with time, sport type, and max players.
+3.  **Skill Matchmaking:** Self-reported skill levels (1-5) to prevent mismatches.
 
-### The Challenge
-Initial tests using the specific `stadium` place type returned `ZERO_RESULTS` in our target area, failing to identify community courts.
-
-### The Solution
-We pivoted to a flexible search strategy using `keyword` query parameters (e.g., `keyword=sport+court`). This successfully identified local hubs like **Sportek Tel Aviv** and **"New" Sport Centre**.
-
-### Status
-✅ **PASSED** - API communication, coordinate extraction, and location data retrieval are fully functional.
+## 👥 Target Audience
+* **The Newcomer:** Students or professionals who moved to Tel Aviv and don't know anyone.
+* **The Freelancer:** People with flexible schedules looking for pickup games during the day.
+* **The Organizer:** Someone who has a ball but needs 3 more players to close a team.
 
 ---
-*Documented for the MTA Computer Science School - Software Entrepreneurship Workshop 2025*
+*MTA Computer Science Workshop 2025*
