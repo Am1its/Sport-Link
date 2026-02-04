@@ -15,7 +15,7 @@
 ## <a id="about"></a>📖 About
 **SportLink** is a location-based social platform designed to transform fragmented sports communities into a single, efficient ecosystem.
 
-Instead of relying on scattered WhatsApp groups, SportLink enables users to instantly create or join games—ranging from football to yoga—based on:
+Instead of relying on scattered WhatsApp groups, SportLink enables users to instantly create or join games ranging from football to yoga based on:
 * 📍 **Precise Location** (Google Maps Integration)
 * 🕒 **Real-Time Availability**
 * ⚖️ **Verified Skill Levels**
