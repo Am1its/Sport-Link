@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/banner.jpeg" alt="SportLink Banner" width="100%">
+  <img src="assets/banner.png" alt="SportLink Banner" width="100%">
   <br>
   <h1>SportLink</h1>
   <h3>Find Your Match. Play Your Game.</h3>
@@ -45,7 +45,7 @@ We rely on a robust, scalable stack optimized for location-based services:
 
 ## 👥 The Team
 * **Amit Oved** - [GitHub](https://github.com/Am1its)
-* **Gal Libal**
+* **Gal Libal** - [GitHub](https://github.com/gallibal)
 
 ---
 *Developed as part of the MTA Computer Science School - Software Entrepreneurship Workshop 2025*
