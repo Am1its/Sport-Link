@@ -1,5 +1,6 @@
 <div align="center">
   <img src="assets/banner.png" alt="SportLink Banner" width="50%">
+  
 
   <p>
     <a href="#about">About</a> •
@@ -13,7 +14,7 @@
 ## <a id="about"></a>📖 About
 **SportLink** is a location-based social platform designed to transform fragmented sports communities into a single, efficient ecosystem.
 
-Instead of relying on scattered WhatsApp groups, SportLink enables users to instantly create or join games, ranging from football to yoga based on:
+Instead of relying on scattered WhatsApp groups, SportLink enables users to instantly create or join games—ranging from football to yoga—based on:
 * 📍 **Precise Location** (Google Maps Integration)
 * 🕒 **Real-Time Availability**
 * ⚖️ **Verified Skill Levels**
@@ -34,7 +35,8 @@ We rely on a robust, scalable stack optimized for location-based services. Click
 | Date | Milestone | Status |
 | :--- | :--- | :--- |
 | Jan 11, 2026 | [**Tech Validation (Maps API)**](docs/TECHNICAL_VALIDATION.md) | ✅ Completed |
-| Jan 18, 2026 | [**High-Level Design (HLD)**](docs/HLD.md) | ✅ Ready |
+| Jan 18, 2026 | [**High-Level Design (HLD)**](docs/HLD.md) | ✅ Completed |
+| --- | [**Product Definitions (Personas)**](docs/PRODUCT_DEFINITIONS.md) | ✅ Completed |
 | Mar 15, 2026 | **Proof of Concept (PoC)** | ⏳ Pending |
 | May 10, 2026 | **Full Prototype** | ⏳ Pending |
 | Sep 08, 2026 | **Final Submission** | ⏳ Pending |

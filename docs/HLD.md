@@ -1,5 +1,7 @@
 # High-Level Design (HLD) - SportLink
 
+> **Note:** This technical design is derived from the User Personas and Stories defined in the [Product Definitions](PRODUCT_DEFINITIONS.md). The architecture is optimized to support location-based discovery (Persona: "Newcomer") and real-time event management (Persona: "Organizer").
+
 ## 1. System Architecture
 The system follows a classic **Client-Server** architecture optimized for location-based services.
 
