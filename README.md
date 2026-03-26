@@ -1,7 +1,6 @@
 <div align="center">
   <img src="assets/banner.png" alt="SportLink Banner" width="50%">
   
-
   <p>
     <a href="#about">About</a> •
     <a href="#tech-stack">Tech Stack</a> •
@@ -36,8 +35,9 @@ We rely on a robust, scalable stack optimized for location-based services. Click
 | :--- | :--- | :--- |
 | Jan 11, 2026 | [**Tech Validation (Maps API)**](docs/TECHNICAL_VALIDATION.md) | ✅ Completed |
 | Jan 18, 2026 | [**High-Level Design (HLD)**](docs/HLD.md) | ✅ Completed |
-| --- | [**Product Definitions (Personas)**](docs/PRODUCT_DEFINITIONS.md) | ✅ Completed |
-| Mar 15, 2026 | **Proof of Concept (PoC)** | ✅ Completed |
+| Jan 25, 2026 | [**Product Definitions (Personas)**](docs/PRODUCT_DEFINITIONS.md) | ✅ Completed |
+| Mar 15, 2026 | [**Proof of Concept (PoC)**](docs/POC.md) | ✅ Completed |
+| Mar 26, 2026 | [**App Flow & Core Features**](docs/APP_FLOW.md) | ✅ Completed |
 | May 10, 2026 | **Full Prototype** | ⏳ Pending |
 | Sep 08, 2026 | **Final Submission** | ⏳ Pending |
 
