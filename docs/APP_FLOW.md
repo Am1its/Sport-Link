@@ -38,3 +38,11 @@ Beyond basic scheduling, SportLink introduces features designed to solve real-wo
 * **Emergency Radar (The "Missing Player" Alert):** If a booked game is missing a player 2 hours before tip-off, the host can send a push notification to all relevant users within a 2km radius to fill the spot instantly.
 * **Equipment Tags:** Game creators can specify missing equipment ("We have a court, need someone with a Size 5 Football").
 * **Local Leaderboards:** Gamification rewarding the most active organizers in specific public parks (e.g., "The Mayor of Charles Clore Park").
+
+---
+
+## 📸 Application Screenshot
+
+<div align="center">
+  <img src="../assets/app_screenshot.png" alt="SportLink App Screenshot" width="40%">
+</div>

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+
 const app = express();
 app.use(cors());
 
@@ -21,6 +22,7 @@ app.get('/api/courts/nearby', (req, res) => {
         {
             place_id: "mock_sportek_01",
             name: "ספורטק תל אביב - מגרשי כדורסל",
+            sport_type: "basketball", // סוג ספורט
             geometry: { location: { lat: 32.09668, lng: 34.78685 } },
             vicinity: "שדרות רוקח, תל אביב-יפו",
             rating: 4.6
@@ -28,6 +30,7 @@ app.get('/api/courts/nearby', (req, res) => {
         {
             place_id: "mock_charles_02",
             name: "פארק צ'ארלס קלור - מתחם כושר",
+            sport_type: "tennis", // סוג ספורט
             geometry: { location: { lat: 32.06450, lng: 34.76120 } },
             vicinity: "פרופ' יחזקאל קויפמן, תל אביב-יפו",
             rating: 4.8
@@ -35,6 +38,7 @@ app.get('/api/courts/nearby', (req, res) => {
         {
             place_id: "mock_gordon_03",
             name: "מגרשי כדורעף חופים - חוף גורדון",
+            sport_type: "volleyball", // סוג ספורט
             geometry: { location: { lat: 32.08370, lng: 34.76810 } },
             vicinity: "חוף גורדון, תל אביב-יפו",
             rating: 4.7
