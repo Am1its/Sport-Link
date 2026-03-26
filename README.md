@@ -37,7 +37,7 @@ We rely on a robust, scalable stack optimized for location-based services. Click
 | Jan 11, 2026 | [**Tech Validation (Maps API)**](docs/TECHNICAL_VALIDATION.md) | ✅ Completed |
 | Jan 18, 2026 | [**High-Level Design (HLD)**](docs/HLD.md) | ✅ Completed |
 | --- | [**Product Definitions (Personas)**](docs/PRODUCT_DEFINITIONS.md) | ✅ Completed |
-| Mar 15, 2026 | **Proof of Concept (PoC)** | ⏳ Pending |
+| Mar 15, 2026 | **Proof of Concept (PoC)** | ✅ Completed |
 | May 10, 2026 | **Full Prototype** | ⏳ Pending |
 | Sep 08, 2026 | **Final Submission** | ⏳ Pending |
 
