@@ -31,7 +31,7 @@ export default function HomeScreen() {
     const fetchCourts = async () => {
       try {
         // ודא שה-IP הזה מעודכן ל-IP של המחשב שלך ברשת הביתית
-        const response = await fetch('http://192.168.2.102:3000/api/courts/nearby');
+        const response = await fetch('http://10.0.0.11:3000/api/courts/nearby');
         const data = await response.json();
         
         if (data.success) {
