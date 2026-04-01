@@ -8,7 +8,7 @@ While several platforms facilitate group gatherings, SportLink focuses specifica
 | Competitor | Their Focus | SportLink's Advantage (Our Edge) |
 | :--- | :--- | :--- |
 | **Meetup** | Broad social gatherings planned weeks in advance. | **Spontaneity:** SportLink is for "tonight" or "now." Meetup is too slow and generic for a spontaneous pickup game at the local park. |
-| **Playtomic / SportyHQ** | Booking paid private venues (Tennis/Padel). | **Public Spaces:** We focus on free, public community courts (like Sportek) which are currently unmapped by booking apps. |
+| **Playtomic / SportyHQ** | Booking paid private venues (Tennis/Padel). | **Public Spaces:** We also provide on free public community courts which are currently unmapped by booking apps. |
 | **WhatsApp / Facebook** | Closed communities and private networks. | **Open Ecosystem:** Newcomers to a city can't find a private WhatsApp group link. SportLink democratizes access based on location, not social connections. |
 
 ---
@@ -16,7 +16,7 @@ While several platforms facilitate group gatherings, SportLink focuses specifica
 ## 🌱 2. Go-to-Market & The "Cold Start" Problem
 A social sports app is useless without active games. To solve the "Chicken and Egg" (Cold Start) problem, we will implement the following initial growth strategy:
 
-1. **Hyper-Local Launch (Geo-Fencing):** We will NOT launch nationwide. We will exclusively launch in **North Tel Aviv (Sportek area)** to artificially inflate user density. 
+1. **Hyper-Local Launch (Geo-Fencing):** We will NOT launch nationwide. We will exclusively launch in **Tel Aviv District** to artificially inflate user density. 
 2. **"Seeding" via Partnerships:** Partnering with MTA student union and existing local league captains to migrate their regular weekly games onto the app. This guarantees the app is populated with real events from Day 1.
 3. **Event Aggregation (Initial Phase):** Manually scraping/importing public sports events from Facebook groups into the app so the map is never completely empty for a new user.
 
@@ -42,3 +42,5 @@ SportLink will operate on a **Freemium** and **B2B2C** model:
    * Taking a commission for facilitating bookings at private, paid sports complexes directly through the app.
 3. **Hyper-Local Advertising:**
    * Targeted ads for sports gear. (e.g., Displaying a 10% discount for a nearby sports store when a user joins a tennis match).
+4. **Professionals & Studios (Lead Generation):**
+   * Personal trainers, yoga instructors, and boutique fitness studios can pay for premium visibility, sponsored events, or targeted promotions to recruit active, hyper-local athletes directly from our user base.
