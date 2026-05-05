@@ -21,6 +21,17 @@ export default function CreateGameModal() {
   const handleCreateGame = async () => {
     if (!token) return Alert.alert('Error', 'You must be logged in to create a game');
 
+    if (time.trim()) {
+      const parsed = new Date(time.trim());
+      if (isNaN(parsed.getTime()))
+        return Alert.alert('Invalid Time', 'Use format: YYYY-MM-DD HH:MM (e.g. 2026-05-10 19:00)');
+      if (parsed <= new Date())
+        return Alert.alert('Invalid Time', 'Scheduled time must be in the future');
+    }
+
+    if (maxPlayers && parseInt(maxPlayers) < 2)
+      return Alert.alert('Invalid Players', 'Max players must be at least 2');
+
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/games`, {
@@ -90,10 +101,10 @@ export default function CreateGameModal() {
           <TextInput style={styles.input} placeholder="Add a short description" placeholderTextColor="#8E8E93" value={locationDesc} onChangeText={setLocationDesc} />
         </View>
 
-        <Text style={styles.label}>When does it start? (e.g. 19:00)</Text>
+        <Text style={styles.label}>When does it start?</Text>
         <View style={styles.inputContainer}>
           <Ionicons name="time-outline" size={20} color="#8E8E93" style={styles.inputIcon} />
-          <TextInput style={styles.input} placeholder="Time and date" placeholderTextColor="#8E8E93" value={time} onChangeText={setTime} />
+          <TextInput style={styles.input} placeholder="YYYY-MM-DD HH:MM (e.g. 2026-05-10 19:00)" placeholderTextColor="#8E8E93" value={time} onChangeText={setTime} />
         </View>
 
         <Text style={styles.label}>Max Players</Text>

@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList,
-  TouchableOpacity, ActivityIndicator, Alert,
+  TouchableOpacity, ActivityIndicator, Alert, Animated,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
@@ -46,6 +47,7 @@ function GameCard({
   onJoined: (id: number, newCount: number) => void;
 }) {
   const [joining, setJoining] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const color = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
   const isOwn = game.host_id === userId;
@@ -54,7 +56,12 @@ function GameCard({
     ? `${game.participant_count} / ${game.max_players}`
     : `${game.participant_count}`;
 
+  const springBack = () =>
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
+
   const handleJoin = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
     setJoining(true);
     try {
       const res = await fetch(`${API_BASE}/api/games/${game.id}/join`, {
@@ -62,10 +69,16 @@ function GameCard({
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!data.success) return Alert.alert('Error', data.message);
+      if (!data.success) {
+        springBack();
+        return Alert.alert('Error', data.message);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onJoined(game.id, data.participant_count);
+      springBack();
       Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
     } catch {
+      springBack();
       Alert.alert('Error', 'Could not connect to server');
     } finally {
       setJoining(false);
@@ -111,11 +124,13 @@ function GameCard({
           <Text style={[styles.joinBtnText, { color: '#FF453A' }]}>Full</Text>
         </View>
       ) : (
-        <TouchableOpacity style={styles.joinBtn} onPress={handleJoin} disabled={joining}>
-          {joining
-            ? <ActivityIndicator color="#1C1C1E" size="small" />
-            : <Text style={styles.joinBtnText}>Join Game</Text>}
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <TouchableOpacity style={styles.joinBtn} onPress={handleJoin} disabled={joining}>
+            {joining
+              ? <ActivityIndicator color="#1C1C1E" size="small" />
+              : <Text style={styles.joinBtnText}>Join Game</Text>}
+          </TouchableOpacity>
+        </Animated.View>
       )}
     </View>
   );

@@ -3,10 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 
-const authRoutes  = require('./routes/auth');
-const gamesRoutes = require('./routes/games');
-const chatsRoutes = require('./routes/chats');
-const usersRoutes = require('./routes/users');
+const authRoutes    = require('./routes/auth');
+const gamesRoutes   = require('./routes/games');
+const chatsRoutes   = require('./routes/chats');
+const usersRoutes   = require('./routes/users');
+const ratingsRoutes = require('./routes/ratings');
 
 const app = express();
 app.use(cors());
@@ -78,10 +79,11 @@ app.get('/api/courts/nearby', async (req, res) => {
   }
 });
 
-app.use('/api/auth',  authRoutes);
-app.use('/api/games', gamesRoutes);
-app.use('/api/chats', chatsRoutes);
-app.use('/api/users', usersRoutes);
+app.use('/api/auth',    authRoutes);
+app.use('/api/games',   gamesRoutes);
+app.use('/api/chats',   chatsRoutes);
+app.use('/api/users',   usersRoutes);
+app.use('/api/ratings', ratingsRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 SportLink Backend running on http://localhost:${PORT}`);

@@ -5,6 +5,7 @@
     <a href="#about">About</a> •
     <a href="#tech-stack">Tech Stack</a> •
     <a href="#roadmap">Roadmap</a> •
+    <a href="docs/CHANGELOG.md">Changelog</a>
   </p>
 </div>
 
@@ -27,7 +28,7 @@ We rely on a robust, scalable stack optimized for location-based services. Click
 | :--- | :--- | :--- |
 | **Frontend** | [**React Native**](docs/frontend_decision.md) | Cross-platform mobile performance with native map integration. |
 | **Backend** | [**Node.js**](docs/backend_decision.md) | Scalable API handling and real-time capabilities. |
-| **Database** | [**PostgreSQL**](docs/database_decision.md) | Relational integrity with **PostGIS** for advanced geospatial queries. |
+| **Database** | [**MySQL / MariaDB**](docs/database_decision.md) | Relational integrity with raw SQL — no ORM, full query control. |
 | **Maps** | [**Google Places API**](docs/maps_decision.md) | Validated solution for retrieving courts and facility data. |
 
 ## <a id="roadmap"></a>📅 Roadmap

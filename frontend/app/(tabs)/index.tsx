@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, ComponentProps } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback, ComponentProps, useRef } from 'react';
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -43,13 +44,20 @@ function BottomCard({ court, userId, token, onJoined }: {
   onJoined: (newCount: number) => void;
 }) {
   const [joining, setJoining] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const isOwnGame = court.isLocalGame && court.host_id === userId;
+  const isFull = court.max_players != null && (court.participant_count ?? 0) >= court.max_players;
   const playersLabel = court.max_players
     ? `${court.participant_count ?? 0} / ${court.max_players} players`
     : null;
 
+  const springBack = () =>
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
+
   const handleJoin = async () => {
     if (!court.id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
     setJoining(true);
     try {
       const res = await fetch(`${API_BASE}/api/games/${court.id}/join`, {
@@ -57,10 +65,16 @@ function BottomCard({ court, userId, token, onJoined }: {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!data.success) return Alert.alert('Error', data.message);
+      if (!data.success) {
+        springBack();
+        return Alert.alert('Error', data.message);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onJoined(data.participant_count);
+      springBack();
       Alert.alert('You\'re in! 🎉', 'Game added to My Schedule.');
     } catch {
+      springBack();
       Alert.alert('Error', 'Could not connect to server');
     } finally {
       setJoining(false);
@@ -94,12 +108,18 @@ function BottomCard({ court, userId, token, onJoined }: {
           <View style={[styles.joinButton, { backgroundColor: '#2C2C2E' }]}>
             <Text style={[styles.joinButtonText, { color: '#0FEA95' }]}>Your Game</Text>
           </View>
+        ) : isFull ? (
+          <View style={[styles.joinButton, { backgroundColor: '#2C2C2E' }]}>
+            <Text style={[styles.joinButtonText, { color: '#FF453A' }]}>Full</Text>
+          </View>
         ) : (
-          <TouchableOpacity style={styles.joinButton} onPress={handleJoin} disabled={joining}>
-            {joining
-              ? <ActivityIndicator color="#1C1C1E" />
-              : <Text style={styles.joinButtonText}>Join Game</Text>}
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <TouchableOpacity style={styles.joinButton} onPress={handleJoin} disabled={joining}>
+              {joining
+                ? <ActivityIndicator color="#1C1C1E" />
+                : <Text style={styles.joinButtonText}>Join Game</Text>}
+            </TouchableOpacity>
+          </Animated.View>
         )
       ) : (
         <View style={[styles.joinButton, { backgroundColor: '#2C2C2E' }]}>

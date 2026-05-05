@@ -117,6 +117,22 @@ router.post('/', authMiddleware, async (req, res) => {
   if (!sport_type || !level || latitude == null || longitude == null)
     return res.status(400).json({ success: false, message: 'sport_type, level, latitude, longitude are required' });
 
+  const levelNum = parseInt(level);
+  if (isNaN(levelNum) || levelNum < 1 || levelNum > 5)
+    return res.status(400).json({ success: false, message: 'level must be between 1 and 5' });
+
+  if (max_players != null) {
+    const mp = parseInt(max_players);
+    if (isNaN(mp) || mp < 2)
+      return res.status(400).json({ success: false, message: 'max_players must be at least 2' });
+  }
+
+  if (scheduled_time) {
+    const parsed = new Date(scheduled_time);
+    if (!isNaN(parsed.getTime()) && parsed <= new Date())
+      return res.status(400).json({ success: false, message: 'scheduled_time must be in the future' });
+  }
+
   try {
     const [result] = await pool.execute(
       `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players)

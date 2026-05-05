@@ -5,6 +5,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE } from '../../constants/api';
 
+const isPastGame = (scheduledTime: string | null): boolean => {
+  if (!scheduledTime) return false;
+  const d = new Date(scheduledTime);
+  return !isNaN(d.getTime()) && d < new Date();
+};
+
 type Game = {
   id: number;
   sport_type: string;
@@ -31,12 +37,13 @@ const SPORT_ICONS: Record<string, string> = {
   football:   'soccer',
 };
 
-function GameCard({ game }: { game: Game }) {
+function GameCard({ game, onRatePlayers }: { game: Game; onRatePlayers: () => void }) {
   const color = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
   const playersLabel = game.max_players
     ? `${game.participant_count} / ${game.max_players} players`
     : `${game.participant_count} player${game.participant_count !== 1 ? 's' : ''}`;
+  const past = isPastGame(game.scheduled_time);
 
   return (
     <View style={styles.card}>
@@ -74,6 +81,13 @@ function GameCard({ game }: { game: Game }) {
             <Text style={styles.metaText}>Level {game.level}</Text>
           </View>
         </View>
+
+        {past && (
+          <TouchableOpacity style={styles.rateBtn} onPress={onRatePlayers}>
+            <Ionicons name="star-outline" size={15} color="#1C1C1E" />
+            <Text style={styles.rateBtnText}>Rate Players</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -126,7 +140,21 @@ export default function GamesScreen() {
         <FlatList
           data={games}
           keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => <GameCard game={item} />}
+          renderItem={({ item }) => (
+            <GameCard
+              game={item}
+              onRatePlayers={() =>
+                router.push({
+                  pathname: '/rate-players',
+                  params: {
+                    gameId: item.id,
+                    sport: item.sport_type,
+                    scheduledTime: item.scheduled_time ?? '',
+                  },
+                })
+              }
+            />
+          )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
         />
@@ -155,6 +183,9 @@ const styles = StyleSheet.create({
   cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { fontSize: 12, color: '#8E8E93' },
+
+  rateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, backgroundColor: '#0FEA95', height: 36, borderRadius: 10 },
+  rateBtnText: { color: '#1C1C1E', fontWeight: '800', fontSize: 13 },
 
   emptyTitle: { color: '#FFFFFF', fontSize: 18, marginTop: 15, fontWeight: 'bold' },
   emptySubtitle: { color: '#8E8E93', fontSize: 14, marginTop: 5, textAlign: 'center' },
