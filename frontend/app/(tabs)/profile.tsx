@@ -225,7 +225,19 @@ export default function ProfileScreen() {
 
       {/* ── Menu ── */}
       <View style={styles.menuContainer}>
-        <Text style={styles.menuSection}>Account</Text>
+        <Text style={styles.menuSection}>Community</Text>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/leaderboard' as any)}>
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.menuIconWrap, { backgroundColor: '#FFD70022' }]}>
+              <Ionicons name="trophy-outline" size={20} color="#FFD700" />
+            </View>
+            <Text style={styles.menuText}>Leaderboard</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#48484A" />
+        </TouchableOpacity>
+
+        <Text style={[styles.menuSection, { marginTop: 24 }]}>Account</Text>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/sport-preferences' as any)}>
           <View style={styles.menuItemLeft}>

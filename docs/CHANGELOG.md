@@ -4,6 +4,109 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 3.1] — May 2026 — Ratings v2, Avatars, Leaderboard & Profile Polish
+
+### Peer Ratings System (host attendance + player category ratings)
+**Database**
+- `backend/migrations/005_add_peer_ratings.sql` — new `PeerRatings` table: `(game_id, rater_id, ratee_id, sportsmanship TINYINT 0/1, punctuality TINYINT 0/1, communication TINYINT 0/1, skill TINYINT 1-5, created_at)`. Unique on `(game_id, rater_id, ratee_id)`.
+- `backend/migrations/006_add_skill_rating.sql` — `ALTER TABLE PeerRatings ADD COLUMN skill TINYINT` (added after initial table creation).
+
+**Backend (`backend/routes/ratings.js`)** — full rewrite
+- `GET /api/ratings/game/:gameId` now returns `is_host` flag and filters the player list differently per role: host gets participants not yet attendance-marked; non-host players get peers not yet peer-rated.
+- `POST /api/ratings/batch` — restricted to **host only**; marks attendance (Arrived / No-Show) for each participant.
+- `POST /api/ratings/peer` — **new endpoint** for non-host participants; accepts `{ game_id, ratings: [{ ratee_id, sportsmanship, punctuality, communication, skill }] }`.
+
+**Backend (`backend/routes/users.js`)**
+- Karma formula updated to include PeerRatings: attendance karma (±1 per Ratings row) + category karma (±1 per thumbs up/down for sportsmanship, punctuality, communication).
+
+**Frontend (`frontend/app/rate-players.tsx`)** — full rewrite
+- **Host view**: shows Arrived / No-Show buttons per player with a "Pending" badge until chosen. Blocks submission until all players are marked.
+- **Player view**: thumbs up/down for Sportsmanship, Punctuality, Communication; 1–5 star selector for Skill Level. Defaults to positive/3 stars.
+- Correct avatar (real photo or colored initial letter) shown per player.
+- Success/empty states are role-aware ("Attendance Saved" vs "Ratings Submitted").
+
+---
+
+### Avatar System
+**Database (`backend/migrations/004_add_user_profile.sql`)**
+- Added `bio VARCHAR(200)` and `avatar MEDIUMTEXT` (base64) columns to `Users`.
+
+**Backend (`backend/routes/users.js`)**
+- `PUT /api/users/me` — updates username, bio, and avatar (base64); checks username uniqueness.
+- `GET /api/users/avatars?ids=1,2,3` — new endpoint; returns `[{ id, avatar }]` for a set of user IDs (used for efficient chat avatar caching — fetched once per user, never re-fetched on polls).
+
+**Backend (`backend/routes/ratings.js`)**
+- `GET /api/ratings/game/:gameId` now returns `avatar` field on each player.
+
+**Backend (`backend/server.js`)**
+- Increased Express body-parser limit to `10mb` to support base64 avatar uploads.
+
+**Frontend (`frontend/app/(tabs)/profile.tsx`)** — avatar + full edit mode
+- Tapping the avatar in edit mode opens `expo-image-picker` (square crop, quality 0.35, base64 output).
+- Real avatar image rendered where available; falls back to deterministic colored initial letter.
+- Inline edit mode for username and bio with Save / Cancel buttons.
+
+**Frontend (`frontend/app/game-chat.tsx`)**
+- Avatars shown for all participants including own messages (own avatar appears on the right side).
+- Avatar cache keyed by user ID; a `seenUserIds` ref prevents re-fetching on each 3-second poll.
+- Layout: other users show `[avatar] [senderName + bubble + timestamp]`; own messages show `[bubble + timestamp] [avatar]`.
+
+---
+
+### Leaderboard
+**Backend (`backend/routes/users.js`)**
+- `GET /api/users/leaderboard` — computes full karma on the fly for all users and returns the top 20 with `username`, `avatar`, `karma`, `games_hosted`, `games_joined`.
+
+**Frontend (`frontend/app/leaderboard.tsx`)** — new screen
+- Podium section for ranks 1–3: 🥇🥈🥉 medals, gold/silver/bronze platform blocks, larger center avatar for 1st place.
+- Ranked list for positions 4–20 with avatar, username, game count, and karma score.
+- Current user's row highlighted in green with a "You" badge.
+- Accessible from Profile → Community → Leaderboard.
+
+---
+
+### Game Management (host controls)
+**Backend (`backend/routes/games.js`)**
+- `PUT /api/games/:id` — host-only edit; validates level, max_players, and future date.
+- `DELETE /api/games/:id` — host-only cancel (sets `status = 'cancelled'`).
+- `DELETE /api/games/:id/leave` — participant-only leave.
+- `GET /api/games` — now filters out past games using `STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i') > NOW()`.
+
+**Frontend (`frontend/app/(tabs)/games.tsx`)**
+- Upcoming / History sections with section headers.
+- Host upcoming games: Edit (navigates to `modal.tsx` in edit mode) + Delete (confirmation alert) buttons.
+- Joined upcoming games: Leave Game (confirmation alert) button.
+
+**Frontend (`frontend/app/modal.tsx`)** — full rewrite
+- Replaced free-text datetime input with native `@react-native-community/datetimepicker` (date picker + time picker).
+- Israel timezone fix: formats using `getFullYear()/getMonth()/getDate()/getHours()/getMinutes()` — never `toISOString()`.
+- Dual-mode: **create** (POST with lat/lng) vs **edit** (PUT, no lat/lng; pre-fills existing values).
+
+---
+
+### Court-based Game Creation
+**Frontend (`frontend/app/(tabs)/index.tsx`)**
+- FAB now opens an add menu with two options: **Drop Pin** (existing tap-to-place) and **Choose Court** (new).
+- Choose Court opens a bottom sheet listing all nearby courts; tapping one navigates to game creation with that court's name pre-filled as `location_desc`.
+
+---
+
+### Profile Settings Screens
+**Frontend (`frontend/app/sport-preferences.tsx`)** — new screen
+- Toggle switches per sport (Basketball, Tennis, Volleyball, Football).
+- Skill level chip selector (Beginner → Pro).
+- Preferences persisted in `AsyncStorage`.
+
+**Frontend (`frontend/app/notifications-settings.tsx`)** — new screen
+- Toggle switches for: Game Reminders, New Players Join, Chat Messages, Ratings Received.
+- Settings persisted in `AsyncStorage`.
+
+**Frontend (`frontend/app/(tabs)/profile.tsx`)**
+- Profile menu split into **Community** (Leaderboard) and **Account** (Sport Preferences, Notifications, Sign Out) sections.
+- Removed duplicate "Edit Profile" menu item (Edit button under bio is the primary entry point).
+
+---
+
 ## [Sprint 3] — May 2026 — QA, Karma & UI Polish
 
 ### QA & Edge Cases

@@ -54,6 +54,39 @@ router.get('/avatars', authMiddleware, async (req, res) => {
   res.json({ success: true, avatars: rows });
 });
 
+// GET /api/users/leaderboard — top 20 by karma
+router.get('/leaderboard', authMiddleware, async (req, res) => {
+  try {
+    const [rows] = await pool.execute(`
+      SELECT
+        u.id,
+        u.username,
+        u.avatar,
+        (SELECT COUNT(*) FROM Games            WHERE host_id = u.id) AS games_hosted,
+        (SELECT COUNT(*) FROM GameParticipants WHERE user_id = u.id) AS games_joined,
+        COALESCE((
+          SELECT SUM(CASE WHEN attended = 1 THEN 1 ELSE -1 END)
+          FROM Ratings WHERE ratee_id = u.id
+        ), 0) +
+        COALESCE((
+          SELECT SUM(
+            CASE WHEN sportsmanship = 1 THEN 1 WHEN sportsmanship = 0 THEN -1 ELSE 0 END +
+            CASE WHEN punctuality   = 1 THEN 1 WHEN punctuality   = 0 THEN -1 ELSE 0 END +
+            CASE WHEN communication = 1 THEN 1 WHEN communication = 0 THEN -1 ELSE 0 END
+          )
+          FROM PeerRatings WHERE ratee_id = u.id
+        ), 0) AS karma
+      FROM Users u
+      ORDER BY karma DESC
+      LIMIT 20
+    `);
+    res.json({ success: true, leaderboard: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // PUT /api/users/me
 router.put('/me', authMiddleware, async (req, res) => {
   const { username, bio, avatar } = req.body;
