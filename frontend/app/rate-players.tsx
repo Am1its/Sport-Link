@@ -4,13 +4,10 @@ import {
   ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useGlobalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../constants/api';
-
-const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
-const getAvatarColor = (name: string) =>
-  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
+import { apiFetch, UnauthorizedError } from '../utils/api';
+import { getAvatarColor } from '../utils/avatar';
 
 type Player = { id: number; username: string; avatar: string | null };
 
@@ -49,7 +46,7 @@ function AvatarCircle({ player, onPress }: { player: Player; onPress?: () => voi
 
 export default function RatePlayersScreen() {
   const router = useRouter();
-  const { gameId, sport, scheduledTime } = useGlobalSearchParams();
+  const { gameId, sport, scheduledTime } = useLocalSearchParams();
   const { token } = useAuth();
 
   const [players, setPlayers]       = useState<Player[]>([]);
@@ -63,9 +60,7 @@ export default function RatePlayersScreen() {
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/ratings/game/${gameId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch(`/api/ratings/game/${gameId}`, { token });
         const data = await res.json();
         if (!data.success) return Alert.alert('Error', data.message);
 
@@ -83,7 +78,8 @@ export default function RatePlayersScreen() {
           });
           setPeerRatings(defaults);
         }
-      } catch {
+      } catch (err) {
+        if (err instanceof UnauthorizedError) return;
         Alert.alert('Error', 'Could not connect to server');
       } finally {
         setLoading(false);
@@ -110,9 +106,9 @@ export default function RatePlayersScreen() {
     setSubmitting(true);
     try {
       if (isHost) {
-        const res = await fetch(`${API_BASE}/api/ratings/batch`, {
+        const res = await apiFetch('/api/ratings/batch', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          token,
           body: JSON.stringify({
             game_id: parseInt(gameId as string),
             ratings: players.map(p => ({ ratee_id: p.id, attended: attendance[p.id] })),
@@ -121,9 +117,9 @@ export default function RatePlayersScreen() {
         const data = await res.json();
         if (!data.success) return Alert.alert('Error', data.message);
       } else {
-        const res = await fetch(`${API_BASE}/api/ratings/peer`, {
+        const res = await apiFetch('/api/ratings/peer', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          token,
           body: JSON.stringify({
             game_id: parseInt(gameId as string),
             ratings: players.map(p => ({
@@ -139,7 +135,8 @@ export default function RatePlayersScreen() {
         if (!data.success) return Alert.alert('Error', data.message);
       }
       setDone(true);
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return;
       Alert.alert('Error', 'Could not connect to server');
     } finally {
       setSubmitting(false);

@@ -17,10 +17,10 @@ router.post('/register', async (req, res) => {
   try {
     const password_hash = await bcrypt.hash(password, 10);
     const [result] = await pool.execute(
-      'INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)',
+      'INSERT INTO Users (username, email, password_hash, onboarding_complete) VALUES (?, ?, ?, FALSE)',
       [username, email, password_hash]
     );
-    const user = { id: result.insertId, username };
+    const user = { id: result.insertId, username, onboarding_complete: false };
     res.status(201).json({ success: true, token: signToken(user), user });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY')
@@ -38,13 +38,18 @@ router.post('/login', async (req, res) => {
 
   try {
     const [rows] = await pool.execute('SELECT * FROM Users WHERE email = ?', [email]);
-    const user = rows[0];
-    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    const dbUser = rows[0];
+    if (!dbUser) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    const match = await bcrypt.compare(password, user.password_hash);
+    const match = await bcrypt.compare(password, dbUser.password_hash);
     if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    res.json({ success: true, token: signToken(user), user: { id: user.id, username: user.username } });
+    const user = {
+      id: dbUser.id,
+      username: dbUser.username,
+      onboarding_complete: !!dbUser.onboarding_complete,
+    };
+    res.json({ success: true, token: signToken(user), user });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });

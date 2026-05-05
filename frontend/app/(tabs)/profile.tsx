@@ -7,7 +7,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../constants/api';
+import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { getAvatarColor } from '../../utils/avatar';
 
 type Stats = {
   id: number;
@@ -18,10 +19,6 @@ type Stats = {
   games_joined: number;
   karma: number;
 };
-
-const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
-const getAvatarColor = (name: string) =>
-  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
 
 function StatCard({ iconLib, icon, value, label, valueColor }: {
   iconLib: 'ion' | 'mci'; icon: string; value: string | number; label: string; valueColor: string;
@@ -52,9 +49,7 @@ export default function ProfileScreen() {
     useCallback(() => {
       const fetchStats = async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/users/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const res = await apiFetch('/api/users/me', { token });
           const data = await res.json();
           if (data.success) setStats(data.user);
         } catch (err) {
@@ -102,9 +97,9 @@ export default function ProfileScreen() {
       };
       if (editAvatar) body.avatar = editAvatar;
 
-      const res = await fetch(`${API_BASE}/api/users/me`, {
+      const res = await apiFetch('/api/users/me', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        token,
         body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -200,7 +195,9 @@ export default function ProfileScreen() {
         ) : (
           <>
             <Text style={styles.name}>{username}</Text>
-            <Text style={styles.bio}>{stats?.bio || 'Living and breathing sports'}</Text>
+            {stats?.bio
+              ? <Text style={styles.bio}>{stats.bio}</Text>
+              : <Text style={[styles.bio, { color: '#48484A', fontStyle: 'italic' }]}>No bio yet</Text>}
             <TouchableOpacity style={styles.editProfileBtn} onPress={enterEditMode}>
               <Ionicons name="pencil-outline" size={14} color="#0FEA95" />
               <Text style={styles.editProfileBtnText}>Edit Profile</Text>
@@ -233,6 +230,16 @@ export default function ProfileScreen() {
               <Ionicons name="trophy-outline" size={20} color="#FFD700" />
             </View>
             <Text style={styles.menuText}>Leaderboard</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#48484A" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/friends' as any)}>
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.menuIconWrap, { backgroundColor: '#4F9EFF22' }]}>
+              <Ionicons name="people-outline" size={20} color="#4F9EFF" />
+            </View>
+            <Text style={styles.menuText}>Friends</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#48484A" />
         </TouchableOpacity>

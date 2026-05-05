@@ -3,18 +3,15 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../constants/api';
-
-const isPastGame = (scheduledTime: string | null): boolean => {
-  if (!scheduledTime) return false;
-  const d = new Date(scheduledTime);
-  return !isNaN(d.getTime()) && d < new Date();
-};
+import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { isPastGame } from '../../utils/time';
+import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
 
 type Game = {
   id: number;
   sport_type: string;
   level: number;
+  title: string | null;
   scheduled_time: string | null;
   location_desc: string | null;
   equipment_notes: string | null;
@@ -23,20 +20,6 @@ type Game = {
   is_host: boolean;
   status: string;
   created_at: string;
-};
-
-const SPORT_COLORS: Record<string, string> = {
-  basketball: '#FF8C00',
-  tennis:     '#CCFF00',
-  volleyball: '#FFD700',
-  football:   '#FFFFFF',
-};
-
-const SPORT_ICONS: Record<string, string> = {
-  basketball: 'basketball',
-  tennis:     'tennis',
-  volleyball: 'volleyball',
-  football:   'soccer',
 };
 
 function GameCard({
@@ -52,9 +35,11 @@ function GameCard({
 }) {
   const color = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
+  // Host occupies one slot; display total = participants + host
+  const displayCount = game.participant_count + 1;
   const playersLabel = game.max_players
-    ? `${game.participant_count} / ${game.max_players} players`
-    : `${game.participant_count} player${game.participant_count !== 1 ? 's' : ''}`;
+    ? `${displayCount} / ${game.max_players} players`
+    : `${displayCount} player${displayCount !== 1 ? 's' : ''}`;
   const past = isPastGame(game.scheduled_time);
 
   return (
@@ -72,6 +57,10 @@ function GameCard({
             <Text style={styles.badgeText}>{game.is_host ? 'HOST' : 'JOINED'}</Text>
           </View>
         </View>
+
+        {game.title ? (
+          <Text style={styles.gameTitle}>{game.title}</Text>
+        ) : null}
 
         {game.location_desc ? (
           <Text style={styles.locationText}>{game.location_desc}</Text>
@@ -95,31 +84,29 @@ function GameCard({
         </View>
 
         {!past && (
-          <>
-            <View style={[styles.actionRow, { marginTop: 10 }]}>
-              <TouchableOpacity style={styles.chatBtn} onPress={onChat}>
-                <Ionicons name="chatbubble-outline" size={14} color="#4F9EFF" />
-                <Text style={styles.chatBtnText}>Chat</Text>
-              </TouchableOpacity>
-              {game.is_host ? (
-                <>
-                  <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-                    <Ionicons name="pencil-outline" size={14} color="#FFFFFF" />
-                    <Text style={styles.editBtnText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
-                    <Ionicons name="trash-outline" size={14} color="#FF453A" />
-                    <Text style={styles.deleteBtnText}>Delete</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity style={styles.leaveBtn} onPress={onLeave}>
-                  <Ionicons name="exit-outline" size={14} color="#FF8C00" />
-                  <Text style={styles.leaveBtnText}>Leave Game</Text>
+          <View style={[styles.actionRow, { marginTop: 10 }]}>
+            <TouchableOpacity style={styles.chatBtn} onPress={onChat}>
+              <Ionicons name="chatbubble-outline" size={14} color="#4F9EFF" />
+              <Text style={styles.chatBtnText}>Chat</Text>
+            </TouchableOpacity>
+            {game.is_host ? (
+              <>
+                <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+                  <Ionicons name="pencil-outline" size={14} color="#FFFFFF" />
+                  <Text style={styles.editBtnText}>Edit</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          </>
+                <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
+                  <Ionicons name="trash-outline" size={14} color="#FF453A" />
+                  <Text style={styles.deleteBtnText}>Delete</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.leaveBtn} onPress={onLeave}>
+                <Ionicons name="exit-outline" size={14} color="#FF8C00" />
+                <Text style={styles.leaveBtnText}>Leave Game</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
         {past && game.is_host && game.status === 'active' && (
           <View style={styles.actionRow}>
@@ -169,10 +156,7 @@ export default function GamesScreen() {
           text: 'Close & Rate',
           onPress: async () => {
             try {
-              const res = await fetch(`${API_BASE}/api/games/${game.id}/complete`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              const res = await apiFetch(`/api/games/${game.id}/complete`, { method: 'POST', token });
               const data = await res.json();
               if (!data.success) return Alert.alert('Error', data.message);
               markCompleted(game.id);
@@ -180,7 +164,8 @@ export default function GamesScreen() {
                 pathname: '/rate-players',
                 params: { gameId: game.id, sport: game.sport_type, scheduledTime: game.scheduled_time ?? '' },
               });
-            } catch {
+            } catch (err) {
+              if (err instanceof UnauthorizedError) return;
               Alert.alert('Error', 'Could not connect to server');
             }
           },
@@ -192,21 +177,19 @@ export default function GamesScreen() {
   const handleDelete = (game: Game) => {
     Alert.alert(
       'Delete Game',
-      'Are you sure? All participants will lose access to this game.',
+      'Are you sure? All participants will be notified and lose access to this game.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete', style: 'destructive',
           onPress: async () => {
             try {
-              const res = await fetch(`${API_BASE}/api/games/${game.id}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              const res = await apiFetch(`/api/games/${game.id}`, { method: 'DELETE', token });
               const data = await res.json();
               if (!data.success) return Alert.alert('Error', data.message);
               removeGame(game.id);
-            } catch {
+            } catch (err) {
+              if (err instanceof UnauthorizedError) return;
               Alert.alert('Error', 'Could not connect to server');
             }
           },
@@ -225,14 +208,12 @@ export default function GamesScreen() {
           text: 'Leave', style: 'destructive',
           onPress: async () => {
             try {
-              const res = await fetch(`${API_BASE}/api/games/${game.id}/leave`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              const res = await apiFetch(`/api/games/${game.id}/leave`, { method: 'DELETE', token });
               const data = await res.json();
               if (!data.success) return Alert.alert('Error', data.message);
               removeGame(game.id);
-            } catch {
+            } catch (err) {
+              if (err instanceof UnauthorizedError) return;
               Alert.alert('Error', 'Could not connect to server');
             }
           },
@@ -245,12 +226,11 @@ export default function GamesScreen() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/games/mine`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch('/api/games/mine', { token });
       const data = await res.json();
       if (data.success) setGames(data.games);
     } catch (err) {
+      if (err instanceof UnauthorizedError) return;
       console.error('My games fetch error:', err);
     } finally {
       setLoading(false);
@@ -259,9 +239,7 @@ export default function GamesScreen() {
   }, [token]);
 
   useFocusEffect(
-    useCallback(() => {
-      fetchMyGames();
-    }, [fetchMyGames])
+    useCallback(() => { fetchMyGames(); }, [fetchMyGames])
   );
 
   return (
@@ -303,6 +281,7 @@ export default function GamesScreen() {
                   gameId:               String(item.id),
                   existingSport:        item.sport_type,
                   existingLevel:        String(item.level),
+                  existingTitle:        item.title          ?? '',
                   existingLocationDesc: item.location_desc   ?? '',
                   existingTime:         item.scheduled_time  ?? '',
                   existingEquipment:    item.equipment_notes ?? '',
@@ -376,6 +355,7 @@ const styles = StyleSheet.create({
   badgeHost:   { backgroundColor: '#0FEA9533' },
   badgeJoined: { backgroundColor: '#FF8C0033' },
   badgeText: { fontSize: 11, fontWeight: '800', color: '#FFFFFF' },
+  gameTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 3 },
   locationText: { fontSize: 13, color: '#AEAEB2', marginBottom: 8 },
   cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -1,42 +1,28 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, FlatList,
+  View, Text, StyleSheet, TextInput, FlatList, ScrollView,
   TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../constants/api';
+import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { isPastGame } from '../../utils/time';
+import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/sports';
 
 type Game = {
   id: number;
   place_id: string;
   sport_type: string;
   level: number;
+  title: string | null;
   scheduled_time: string | null;
   location_desc: string | null;
   equipment_notes: string | null;
   max_players: number | null;
   participant_count: number;
   host_id: number;
-};
-
-const SPORT_COLORS: Record<string, string> = {
-  basketball: '#FF8C00',
-  tennis:     '#CCFF00',
-  volleyball: '#FFD700',
-  football:   '#FFFFFF',
-};
-const SPORT_ICONS: Record<string, string> = {
-  basketball: 'basketball',
-  tennis:     'tennis',
-  volleyball: 'volleyball',
-  football:   'soccer',
-};
-const SPORT_FILTERS = ['all', 'basketball', 'tennis', 'volleyball', 'football'] as const;
-const SPORT_LABELS: Record<string, string> = {
-  all: 'All', basketball: '🏀', tennis: '🎾', volleyball: '🏐', football: '⚽',
 };
 
 function GameCard({
@@ -52,12 +38,17 @@ function GameCard({
   const color = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
   const isOwn = game.host_id === userId;
-  const isFull = game.max_players != null && game.participant_count >= game.max_players;
-  const spotsLeft = game.max_players != null ? game.max_players - game.participant_count : null;
+  // Host takes one slot; remaining spots = max_players - 1 - participant_count
+  const spotsLeft = game.max_players != null
+    ? (game.max_players - 1) - game.participant_count
+    : null;
+  const isFull = spotsLeft != null && spotsLeft <= 0;
   const isUrgent = spotsLeft != null && spotsLeft <= 2 && spotsLeft > 0;
+  // Display: (participants + host) / max_players
+  const displayCount = game.participant_count + 1;
   const playersLabel = game.max_players
-    ? `${game.participant_count} / ${game.max_players}`
-    : `${game.participant_count}`;
+    ? `${displayCount} / ${game.max_players}`
+    : `${displayCount}`;
 
   const springBack = () =>
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
@@ -65,14 +56,15 @@ function GameCard({
   const handleJoin = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+    // Optimistic update
+    onJoined(game.id, game.participant_count + 1);
     setJoining(true);
     try {
-      const res = await fetch(`${API_BASE}/api/games/${game.id}/join`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/games/${game.id}/join`, { method: 'POST', token });
       const data = await res.json();
       if (!data.success) {
+        // Rollback optimistic update
+        onJoined(game.id, game.participant_count);
         springBack();
         return Alert.alert('Error', data.message);
       }
@@ -80,7 +72,9 @@ function GameCard({
       onJoined(game.id, data.participant_count);
       springBack();
       Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return;
+      onJoined(game.id, game.participant_count);
       springBack();
       Alert.alert('Error', 'Could not connect to server');
     } finally {
@@ -103,6 +97,9 @@ function GameCard({
               </View>
             )}
           </View>
+          {game.title ? (
+            <Text style={styles.gameTitle} numberOfLines={1}>{game.title}</Text>
+          ) : null}
           {game.location_desc ? (
             <Text style={styles.locationText} numberOfLines={1}>{game.location_desc}</Text>
           ) : null}
@@ -165,35 +162,34 @@ export default function DiscoverScreen() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/games`);
+      const res = await apiFetch('/api/games', { token });
       const data = await res.json();
       if (data.success) setGames(data.games);
     } catch (err) {
+      if (err instanceof UnauthorizedError) return;
       console.error('Discover fetch error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [token]);
 
   useFocusEffect(
-    useCallback(() => {
-      fetchGames();
-    }, [fetchGames])
+    useCallback(() => { fetchGames(); }, [fetchGames])
   );
 
   const handleJoined = (id: number, newCount: number) => {
     setGames((prev) => prev.map((g) => g.id === id ? { ...g, participant_count: newCount } : g));
   };
 
-  const isPastGame = (t: string | null) => { const d = new Date(t ?? ''); return !isNaN(d.getTime()) && d < new Date(); };
-
   const filtered = games.filter((g) => {
     if (isPastGame(g.scheduled_time)) return false;
     const matchSport = sportFilter === 'all' || g.sport_type === sportFilter;
-    const matchSearch = !search.trim() ||
-      g.sport_type.includes(search.toLowerCase()) ||
-      (g.location_desc ?? '').toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase().trim();
+    const matchSearch = !q ||
+      g.sport_type.includes(q) ||
+      (g.location_desc ?? '').toLowerCase().includes(q) ||
+      (g.title ?? '').toLowerCase().includes(q);
     return matchSport && matchSearch;
   });
 
@@ -205,7 +201,7 @@ export default function DiscoverScreen() {
         <Ionicons name="search" size={18} color="#8E8E93" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by sport or location..."
+          placeholder="Search by sport, location or title..."
           placeholderTextColor="#636366"
           value={search}
           onChangeText={setSearch}
@@ -217,19 +213,24 @@ export default function DiscoverScreen() {
         )}
       </View>
 
-      <View style={styles.filterRow}>
-        {SPORT_FILTERS.map((s) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterScroll}
+        style={styles.filterRow}
+      >
+        {SPORT_FILTER_ITEMS.map(({ key, label }) => (
           <TouchableOpacity
-            key={s}
-            style={[styles.filterChip, sportFilter === s && styles.filterChipActive]}
-            onPress={() => setSportFilter(s)}
+            key={key}
+            style={[styles.filterChip, sportFilter === key && styles.filterChipActive]}
+            onPress={() => setSportFilter(key)}
           >
-            <Text style={[styles.filterText, sportFilter === s && styles.filterTextActive]}>
-              {SPORT_LABELS[s]}
+            <Text style={[styles.filterText, sportFilter === key && styles.filterTextActive]}>
+              {label}
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {loading ? (
         <View style={styles.center}>
@@ -272,7 +273,8 @@ const styles = StyleSheet.create({
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, paddingHorizontal: 14, height: 48, marginBottom: 14, gap: 10 },
   searchInput: { flex: 1, color: '#FFFFFF', fontSize: 15 },
 
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  filterRow: { marginBottom: 18 },
+  filterScroll: { gap: 8, paddingRight: 4 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#2C2C2E', borderWidth: 1, borderColor: '#3A3A3C' },
   filterChipActive: { backgroundColor: '#0FEA95', borderColor: '#0FEA95' },
   filterText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
@@ -286,6 +288,7 @@ const styles = StyleSheet.create({
   sportLabel: { fontSize: 15, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 },
   urgencyBadge: { backgroundColor: '#FF9F0A22', borderRadius: 8, borderWidth: 1, borderColor: '#FF9F0A66', paddingHorizontal: 7, paddingVertical: 2 },
   urgencyText: { color: '#FF9F0A', fontSize: 11, fontWeight: '800' },
+  gameTitle: { fontSize: 14, fontWeight: '700', color: '#FFFFFF', marginBottom: 2 },
   locationText: { fontSize: 13, color: '#AEAEB2', marginBottom: 6 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },

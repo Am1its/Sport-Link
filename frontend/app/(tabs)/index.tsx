@@ -7,7 +7,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../constants/api';
+import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { SPORT_FILTER_ITEMS } from '../../constants/sports';
+import { getAvatarColor } from '../../utils/avatar';
 
 const { width } = Dimensions.get('window');
 
@@ -22,6 +24,7 @@ type MapItem = {
   vicinity: string;
   geometry: { location: { lat: number; lng: number } };
   isLocalGame?: boolean;
+  venue_type?: 'court' | 'gym' | 'studio' | 'facility';
   host_id?: number;
   max_players?: number | null;
   participant_count?: number;
@@ -30,27 +33,21 @@ type MapItem = {
 
 type Participant = { id: number; username: string; avatar: string | null; role: string };
 
-const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
-const getAvatarColor = (name: string) =>
-  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
 
 const getSportStyle = (type: string): { icon: IconName; color: string } => {
   switch (type) {
-    case 'basketball': return { icon: 'basketball', color: '#FF8C00' };
-    case 'tennis':     return { icon: 'tennis',     color: '#CCFF00' };
-    case 'volleyball': return { icon: 'volleyball', color: '#FFD700' };
-    case 'football':   return { icon: 'soccer',     color: '#FFFFFF' };
-    default:           return { icon: 'map-marker', color: '#0FEA95' };
+    case 'basketball': return { icon: 'basketball',     color: '#FF8C00' };
+    case 'tennis':     return { icon: 'tennis',         color: '#CCFF00' };
+    case 'volleyball': return { icon: 'volleyball',     color: '#FFD700' };
+    case 'football':   return { icon: 'soccer',         color: '#FFFFFF' };
+    case 'yoga':       return { icon: 'yoga',           color: '#A78BFA' };
+    case 'gym':        return { icon: 'dumbbell',       color: '#FB923C' };
+    case 'studio':     return { icon: 'dance-ballroom', color: '#F472B6' };
+    case 'footvolley': return { icon: 'volleyball',     color: '#22D3EE' };
+    default:           return { icon: 'map-marker',     color: '#0FEA95' };
   }
 };
 
-const SPORT_FILTERS = [
-  { key: 'all',        label: 'All Sports' },
-  { key: 'basketball', label: '🏀' },
-  { key: 'tennis',     label: '🎾' },
-  { key: 'volleyball', label: '🏐' },
-  { key: 'football',   label: '⚽' },
-] as const;
 
 type ClusterItem = MapItem & {
   _isCluster: boolean;
@@ -106,16 +103,17 @@ function BottomCard({ court, userId, token, onJoined }: {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const isOwnGame = court.isLocalGame && court.host_id === userId;
-  const isFull = court.max_players != null && (court.participant_count ?? 0) >= court.max_players;
+  // Host occupies one slot; participants fill max_players - 1 remaining spots
+  const participantCount = court.participant_count ?? 0;
+  const isFull = court.max_players != null && participantCount >= court.max_players - 1;
+  const displayCount = participantCount + 1; // include host
   const playersLabel = court.max_players
-    ? `${court.participant_count ?? 0} / ${court.max_players} players`
-    : `${court.participant_count ?? 0} player${court.participant_count !== 1 ? 's' : ''}`;
+    ? `${displayCount} / ${court.max_players} players`
+    : `${displayCount} player${displayCount !== 1 ? 's' : ''}`;
 
   useEffect(() => {
     if (!court.isLocalGame || !court.id || !token) return;
-    fetch(`${API_BASE}/api/games/${court.id}/participants`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    apiFetch(`/api/games/${court.id}/participants`, { token })
       .then(r => r.json())
       .then(d => { if (d.success) setParticipants(d.participants); })
       .catch(() => {});
@@ -130,10 +128,7 @@ function BottomCard({ court, userId, token, onJoined }: {
     Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
     setJoining(true);
     try {
-      const res = await fetch(`${API_BASE}/api/games/${court.id}/join`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/games/${court.id}/join`, { method: 'POST', token });
       const data = await res.json();
       if (!data.success) {
         springBack();
@@ -143,7 +138,8 @@ function BottomCard({ court, userId, token, onJoined }: {
       onJoined(data.participant_count);
       springBack();
       Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return;
       springBack();
       Alert.alert('Error', 'Could not connect to server');
     } finally {
@@ -152,7 +148,7 @@ function BottomCard({ court, userId, token, onJoined }: {
   };
 
   const spotsLeft = court.max_players != null
-    ? court.max_players - (court.participant_count ?? 0)
+    ? (court.max_players - 1) - participantCount
     : null;
 
   return (
@@ -291,7 +287,7 @@ export default function HomeScreen() {
 
   const fetchCourts = async (lat: number, lng: number) => {
     try {
-      const res = await fetch(`${API_BASE}/api/courts/nearby?lat=${lat}&lng=${lng}`);
+      const res = await apiFetch(`/api/courts/nearby?lat=${lat}&lng=${lng}`, { token });
       const data = await res.json();
       if (data.success) setCourts(data.courts);
     } catch (err) {
@@ -301,11 +297,12 @@ export default function HomeScreen() {
     }
   };
 
+
   useFocusEffect(
     useCallback(() => {
       const fetchGames = async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/games`);
+          const res = await apiFetch('/api/games', { token });
           const data = await res.json();
           if (data.success) setGames(data.games);
         } catch (err) {
@@ -355,9 +352,13 @@ export default function HomeScreen() {
           }
         }}
       >
-        {/* Court markers */}
+        {/* Court / venue markers */}
         {displayedCourts.map((item) => {
           const sportStyle = getSportStyle(item.sport_type);
+          const vt = item.venue_type ?? 'court';
+          // Gyms & studios: solid dark background (indoor facility feel)
+          // Courts: hollow border-only ring (outdoor, open)
+          const isIndoor = vt === 'gym' || vt === 'studio';
           return (
             <Marker
               key={item.place_id}
@@ -365,10 +366,20 @@ export default function HomeScreen() {
               onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(item); }}
             >
               <View style={styles.markerWrapper}>
-                <View style={[styles.markerIconBg, { borderColor: sportStyle.color }]}>
-                  <MaterialCommunityIcons name={sportStyle.icon} size={22} color={sportStyle.color} />
+                <View style={[
+                  styles.markerIconBg,
+                  { borderColor: sportStyle.color },
+                  isIndoor
+                    ? { backgroundColor: sportStyle.color + '33', borderStyle: 'solid' }
+                    : { backgroundColor: 'rgba(255,255,255,0.92)', borderStyle: 'dashed' },
+                ]}>
+                  <MaterialCommunityIcons
+                    name={sportStyle.icon}
+                    size={20}
+                    color={isIndoor ? sportStyle.color : sportStyle.color}
+                  />
                 </View>
-                <View style={[styles.markerPointer, { backgroundColor: '#555' }]} />
+                <View style={[styles.markerPointer, { backgroundColor: sportStyle.color + '88' }]} />
               </View>
             </Marker>
           );
@@ -462,7 +473,7 @@ export default function HomeScreen() {
             {showSportFilter && (
               <View style={styles.sportFiltersWrapper}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
-                  {SPORT_FILTERS.map(f => (
+                  {SPORT_FILTER_ITEMS.map(f => (
                     <TouchableOpacity
                       key={f.key}
                       style={[styles.sportChip, sportFilter === f.key && styles.sportChipActive]}

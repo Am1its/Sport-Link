@@ -6,11 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../constants/api';
-
-const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
-const getAvatarColor = (name: string) =>
-  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
+import { apiFetch, UnauthorizedError } from '../utils/api';
+import { getAvatarColor } from '../utils/avatar';
 
 type Entry = {
   id: number;
@@ -33,12 +30,11 @@ export default function LeaderboardScreen() {
   useEffect(() => {
     const fetchBoard = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/users/leaderboard`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch('/api/users/leaderboard', { token });
         const data = await res.json();
         if (data.success) setBoard(data.leaderboard);
       } catch (err) {
+        if (err instanceof UnauthorizedError) return;
         console.error('Leaderboard fetch error:', err);
       } finally {
         setLoading(false);

@@ -4,6 +4,196 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 6] — May 2026 — Code Quality & Architecture Hardening
+
+### Backend — Security & Reliability
+**`backend/server.js`**
+- Added `express-rate-limit`: 10 requests/min on `/api/auth` (brute-force protection), 300 requests/min on all other routes.
+- `remindersSent` changed from a `Set` to a `Map<gameId, timestamp>` — stale entries (older than 2 hours) are pruned at the top of every `sendGameReminders()` poll, preventing unbounded memory growth across long server uptimes.
+
+**`backend/migrations/010_indexes.sql`** — new migration
+- 9 indexes on high-traffic columns: `GameParticipants(game_id)`, `GameParticipants(user_id)`, `Messages(game_id)`, `Messages(game_id, created_at)`, `Ratings(ratee_id)`, `PeerRatings(ratee_id)`, `Games(status)`, `Games(host_id)`, `Friends(addressee_id, status)`.
+- Uses `ADD INDEX IF NOT EXISTS` for safe re-run.
+
+### Backend — Bug Fixes
+**`backend/routes/users.js`**
+- Fixed bio data-loss bug: `PUT /api/users/me` now builds the `SET` clause dynamically — only fields explicitly present in the request body are included. Previously a missing `bio` field would COALESCE to NULL and silently overwrite stored bios.
+- Added `username.trim()` validation and try/catch to `/api/users/avatars`.
+
+**`backend/routes/games.js`**
+- Fixed race condition in `POST /api/games/:id/join`: the capacity check and participant insert now run inside a MySQL transaction with `SELECT … FOR UPDATE` row locking, preventing two simultaneous requests from both passing the check.
+- `invited_friends` IDs are now verified against the `Friends` table before batch-inserting into `GameParticipants` — previously any user ID could be invited.
+- `DELETE /api/games/:id` (cancel) now sends a push notification to all participants informing them the game was cancelled.
+- Host occupies a slot for capacity: capacity full check is `count >= max_players - 1`; display count is `participant_count + 1`.
+
+**`backend/routes/ratings.js`**
+- `POST /api/ratings/batch` and `POST /api/ratings/peer` now use a single batch `INSERT` with dynamic value placeholders instead of sequential `await pool.execute()` in a for-loop.
+
+**`backend/routes/chats.js`**
+- `GET /api/chats` replaced 4 correlated subqueries with a single derived-table `LEFT JOIN` (aggregates max message ID per game first, then joins once).
+- `GET /:gameId/messages` now `JOIN`s `Users` to return the current username — fixes stale-username-in-chat bug where a renamed user's old name could persist from the JWT.
+- `POST /:gameId/messages` fetches the current username from DB before inserting (same fix for the stored `username` column).
+- Added 1000-character content length check (400 response if exceeded).
+
+### Frontend — Architecture
+**`frontend/utils/api.ts`** — new utility
+- Centralized `apiFetch` wrapper: injects `Authorization` header from token, auto-adds `Content-Type: application/json` when a body is present.
+- `UnauthorizedError` class thrown on any 401 response.
+- `setUnauthorizedHandler(fn)` — registers a global callback invoked on 401 (wired to `logout` in `_layout.tsx`).
+
+**`frontend/utils/avatar.ts`** — new utility
+- `AVATAR_PALETTE` and `getAvatarColor(name)` extracted as a single source of truth (was duplicated in 7 screens).
+
+**`frontend/utils/time.ts`** — new utility
+- `isPastGame`, `formatTime`, `formatChatTimestamp` extracted (was duplicated or inlined per screen).
+
+**`frontend/constants/sports.ts`** — new file
+- `SPORT_COLORS`, `SPORT_ICONS`, `SPORT_FILTER_ITEMS` extracted (was duplicated across map, discover, games, and chat screens).
+
+**`frontend/.env`** / **`frontend/constants/api.ts`**
+- `API_BASE` now reads from `EXPO_PUBLIC_API_URL` env var (Expo SDK 49+ pattern); falls back to `localhost:3000`.
+- `.env` added to `.gitignore`.
+
+**`frontend/app/_layout.tsx`**
+- `AppServices` component wires `setUnauthorizedHandler(logout)` on mount so any 401 from any screen triggers a clean logout — no more silent failures.
+
+### Frontend — Screen Migrations
+All screens migrated from raw `fetch()` + hardcoded `API_BASE` to `apiFetch`; all catch blocks handle `UnauthorizedError`:
+- `game-chat.tsx` — `sendMessage` uses `apiFetch`; `maxLength={1000}` added to the message TextInput.
+- `modal.tsx` — `useGlobalSearchParams` → `useLocalSearchParams`; all fetches use `apiFetch`.
+- `rate-players.tsx` — `useGlobalSearchParams` → `useLocalSearchParams`; all fetches use `apiFetch`.
+- `profile.tsx` — bio fallback replaced: no longer shows fake "Living and breathing sports"; shows italic "No bio yet" when bio is empty.
+- `friends.tsx`, `leaderboard.tsx`, `player-profile.tsx`, `onboarding.tsx` — local avatar palette removed; imported from `utils/avatar`.
+- `(tabs)/_layout.tsx`, `(tabs)/index.tsx`, `login.tsx`, `register.tsx` — migrated to `apiFetch`.
+
+---
+
+## [Sprint 5] — May 2026 — Game-Start Reminder Notifications
+
+### Game-Start Reminders
+**Backend (`backend/server.js`)**
+- `setInterval` running every 60 seconds calls `sendGameReminders()` — no external cron library needed.
+- Queries `Games` for active games whose `scheduled_time` falls in the 25–35 minute window from now (`STR_TO_DATE` + `DATE_ADD`), giving a 10-minute detection band to survive missed polls.
+- Collects push tokens for the host and all `GameParticipants` in a single `UNION` query.
+- Sends a "⏰ Game starting soon!" push notification with the game title and a 30-minute countdown.
+- An in-memory `remindersSent` Set ensures each game is notified exactly once per server lifecycle, even across multiple polling intervals.
+
+---
+
+## [Sprint 4] — May 2026 — Onboarding, Social System, Game Enhancements & Map Redesign
+
+### Onboarding Flow
+**Database (`backend/migrations/008_sprint4_schema.sql`)**
+- Added `onboarding_complete BOOLEAN DEFAULT FALSE` to `Users`; backfilled to `TRUE` for all existing accounts so existing users skip onboarding.
+
+**Backend (`backend/routes/auth.js`)**
+- `POST /api/auth/register` — now sets `onboarding_complete = FALSE` for new users and returns it in the user object.
+- `POST /api/auth/login` — fetches and returns `onboarding_complete` so the client can gate routing on first launch.
+
+**Backend (`backend/routes/users.js`)**
+- `PUT /api/users/me` — accepts `onboarding_complete` flag; uses `COALESCE(?, onboarding_complete)` so the field is only updated when explicitly provided.
+
+**Frontend (`frontend/context/AuthContext.tsx`)**
+- `User` type extended with `onboarding_complete: boolean`.
+- Added `setOnboardingComplete()` helper: updates `AsyncStorage` and React state atomically.
+
+**Frontend (`frontend/app/index.tsx`)**
+- Routing gate: unauthenticated → `/login`; authenticated but `!onboarding_complete` → `/onboarding`; otherwise → `/(tabs)`.
+
+**Frontend (`frontend/app/_layout.tsx`)**
+- Registered `<Stack.Screen name="onboarding" />`.
+
+**Frontend (`frontend/app/onboarding.tsx`)** — new screen
+- 3-step wizard: **Avatar** → **Bio** → **Sports**.
+- Animated progress dots (active dot widens to 22 px).
+- Step 1: opens `expo-image-picker` for avatar; skippable.
+- Step 2: multi-line bio textarea with 120-char limit and live counter; skippable.
+- Step 3: 8-sport grid (2-column tiles) with multi-select and checkmarks; skippable.
+- On finish: `PUT /api/users/me` with `{ avatar, bio, onboarding_complete: true }`, then calls `setOnboardingComplete()`, then navigates to `/(tabs)`.
+
+---
+
+### Social System — Friends
+**Database (`backend/migrations/009_friends.sql`)**
+- New `Friends` table: `(id, requester_id, addressee_id, status ENUM('pending','accepted'), created_at)`. Unique on `(requester_id, addressee_id)`.
+
+**Backend (`backend/routes/friends.js`)** — new route file
+- `GET /api/friends` — accepted friends; resolves the "other" user from both directions using `CASE WHEN`.
+- `GET /api/friends/requests` — incoming pending requests where `addressee_id = userId`.
+- `POST /api/friends` — send request; checks both `(A→B)` and `(B→A)` before inserting; sends push notification to addressee.
+- `PUT /api/friends/:id/accept` — verifies `addressee_id` matches caller; sends push notification to requester.
+- `DELETE /api/friends/:id` — verifies caller is requester or addressee.
+
+**Backend (`backend/routes/users.js`)**
+- `GET /api/users/search?q=` — username prefix search (min 2 chars, excludes self, LIMIT 20). Registered before `/:id` to avoid route shadowing.
+
+**Backend (`backend/server.js`)**
+- Registered `/api/friends` route.
+
+**Frontend (`frontend/app/friends.tsx`)** — new screen
+- 3-tab UI: **Friends** / **Requests** / **Search**.
+- Friends tab: tappable rows, remove button with confirmation alert, pull-to-refresh.
+- Requests tab: accept (green checkmark) + decline (red outlined) buttons per request, pull-to-refresh.
+- Search tab: live search with 2-char minimum; shows "Friends" or "Sent" badge for existing connections; add-friend button for others.
+- Tracks `pendingSentIds` Set for optimistic sent state.
+
+**Frontend (`frontend/app/(tabs)/profile.tsx`)**
+- Added **Friends** entry (people icon, blue tint) to the Community menu section, navigating to `/friends`.
+
+---
+
+### Game Enhancements — Title Field
+**Database (`backend/migrations/008_sprint4_schema.sql`)**
+- Added `title VARCHAR(100) DEFAULT NULL` to `Games`.
+
+**Backend (`backend/routes/games.js`)**
+- `GET /api/games` and `GET /api/games/mine` — include `title` in response.
+- `POST /api/games` — accepts optional `title`; also accepts `invited_friends: number[]` — batch-inserts them as `GameParticipants` via `INSERT IGNORE` and sends push notifications.
+- `PUT /api/games/:id` — accepts optional `title` update.
+
+**Frontend (`frontend/app/modal.tsx`)**
+- Title input added at the top of the form (optional, max 100 chars).
+- Sports row expanded to all 8 sports.
+- **Invite Friends** section (create mode only): fetches `/api/friends`, renders tappable chips with avatar and name; selected friends get a green border/bg + checkmark. Shows "X friend(s) will be added automatically" note.
+- On submit: includes `title` and `invited_friends` array in POST/PUT body.
+
+**Frontend (`frontend/app/(tabs)/discover.tsx`)**
+- `Game` type extended with `title: string | null`.
+- Game title displayed above `location_desc` on cards when present.
+
+**Frontend (`frontend/app/(tabs)/games.tsx`)**
+- `Game` type extended with `title: string | null`.
+- Game title shown on card; `existingTitle` passed to modal for editing.
+
+---
+
+### New Sport Types (yoga, footvolley, studio, gym)
+**Database (`backend/migrations/008_sprint4_schema.sql`)**
+- `sport_type` ENUM extended: added `yoga`, `footvolley`, `studio`, `gym`.
+
+**Frontend (all tabs and screens)**
+- `SPORT_COLORS`, `SPORT_ICONS`, and `SPORT_FILTERS` expanded across `discover.tsx`, `games.tsx`, `chat.tsx`, and `index.tsx` for the 4 new sports.
+- `sport-preferences.tsx` — toggle grid now includes all 8 sports.
+
+---
+
+### Map Marker Redesign & Enhanced Courts API
+**Backend (`backend/server.js`)**
+- `GET /api/courts/nearby` — now fires 4 parallel Google Places queries (Hebrew "מגרש", English "sport court", `type=gym`, keyword `"yoga studio dance"`) and deduplicates by `place_id`.
+- `classifyVenueType()` helper: classifies each result as `'court' | 'gym' | 'studio' | 'facility'` from `place.types` and `place.name`.
+- `detectSportType()` extended with patterns for yoga, gym, and studio.
+- Mock fallback data includes gym and yoga studio entries.
+
+**Frontend (`frontend/app/(tabs)/index.tsx`)**
+- `MapItem` type extended with `venue_type?: 'court' | 'gym' | 'studio' | 'facility'`.
+- Court markers now differ by venue type:
+  - **Outdoor courts**: white background, dashed border (hollow/open feel).
+  - **Indoor facilities (gym/studio)**: tinted background (`color + '33'`), solid border.
+  - Both types use `color + '88'` for the pointer chevron.
+- `SPORT_FILTERS` expanded to include all 8 sports with emoji labels.
+
+---
+
 ## [Sprint 3.2] — May 2026 — Push Notifications, Map Clustering & UX Polish
 
 ### Push Notifications

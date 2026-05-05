@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../constants/api';
+import { apiFetch } from '../utils/api';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -19,9 +19,8 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
+      const res = await apiFetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),
       });
       const data = await res.json();

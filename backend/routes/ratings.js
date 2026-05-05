@@ -5,7 +5,6 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // GET /api/ratings/game/:gameId
-// Returns is_host and the players the requester can still rate
 router.get('/game/:gameId', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.gameId);
   const userId = req.user.id;
@@ -26,7 +25,6 @@ router.get('/game/:gameId', authMiddleware, async (req, res) => {
     let players;
 
     if (isHost) {
-      // Host sees players not yet attendance-marked
       [players] = await pool.execute(`
         SELECT u.id, u.username, u.avatar
         FROM GameParticipants gp
@@ -38,7 +36,6 @@ router.get('/game/:gameId', authMiddleware, async (req, res) => {
           )
       `, [gameId, gameId, userId]);
     } else {
-      // Non-host sees other players (host + participants) not yet peer-rated
       [players] = await pool.execute(`
         SELECT u.id, u.username, u.avatar
         FROM (
@@ -76,11 +73,15 @@ router.post('/batch', authMiddleware, async (req, res) => {
     if (game.host_id !== userId)
       return res.status(403).json({ success: false, message: 'Only the host can mark attendance' });
 
-    for (const { ratee_id, attended } of ratings) {
-      if (ratee_id === userId) continue;
+    const rows = ratings
+      .filter(r => r.ratee_id !== userId)
+      .map(r => [game_id, userId, r.ratee_id, r.attended ? 1 : 0]);
+
+    if (rows.length > 0) {
+      const placeholders = rows.map(() => '(?, ?, ?, ?)').join(', ');
       await pool.execute(
-        'INSERT IGNORE INTO Ratings (game_id, rater_id, ratee_id, attended) VALUES (?, ?, ?, ?)',
-        [game_id, userId, ratee_id, attended ? 1 : 0]
+        `INSERT IGNORE INTO Ratings (game_id, rater_id, ratee_id, attended) VALUES ${placeholders}`,
+        rows.flat()
       );
     }
 
@@ -92,7 +93,6 @@ router.post('/batch', authMiddleware, async (req, res) => {
 });
 
 // POST /api/ratings/peer — players rate teammates by category
-// Body: { game_id, ratings: [{ ratee_id, sportsmanship, punctuality, communication, skill }] }
 router.post('/peer', authMiddleware, async (req, res) => {
   const { game_id, ratings } = req.body;
   const userId = req.user.id;
@@ -111,18 +111,26 @@ router.post('/peer', authMiddleware, async (req, res) => {
     if (!participation)
       return res.status(403).json({ success: false, message: 'You were not a participant in this game' });
 
-    for (const { ratee_id, sportsmanship, punctuality, communication, skill } of ratings) {
-      if (ratee_id === userId) continue;
-      const skillVal = (skill >= 1 && skill <= 5) ? skill : null;
-      await pool.execute(
-        `INSERT IGNORE INTO PeerRatings (game_id, rater_id, ratee_id, sportsmanship, punctuality, communication, skill)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [game_id, userId, ratee_id,
-          sportsmanship != null ? (sportsmanship ? 1 : 0) : null,
-          punctuality   != null ? (punctuality   ? 1 : 0) : null,
-          communication != null ? (communication ? 1 : 0) : null,
+    const rows = ratings
+      .filter(r => r.ratee_id !== userId)
+      .map(r => {
+        const skillVal = (r.skill >= 1 && r.skill <= 5) ? r.skill : null;
+        return [
+          game_id, userId, r.ratee_id,
+          r.sportsmanship != null ? (r.sportsmanship ? 1 : 0) : null,
+          r.punctuality   != null ? (r.punctuality   ? 1 : 0) : null,
+          r.communication != null ? (r.communication ? 1 : 0) : null,
           skillVal,
-        ]
+        ];
+      });
+
+    if (rows.length > 0) {
+      const placeholders = rows.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
+      await pool.execute(
+        `INSERT IGNORE INTO PeerRatings
+           (game_id, rater_id, ratee_id, sportsmanship, punctuality, communication, skill)
+         VALUES ${placeholders}`,
+        rows.flat()
       );
     }
 

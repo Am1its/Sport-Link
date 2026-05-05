@@ -5,11 +5,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../constants/api';
-
-const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
-const getAvatarColor = (name: string) =>
-  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
+import { apiFetch, UnauthorizedError } from '../utils/api';
+import { getAvatarColor } from '../utils/avatar';
 
 type PublicUser = {
   id: number;
@@ -32,12 +29,11 @@ export default function PlayerProfileScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/users/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch(`/api/users/${userId}`, { token });
         const data = await res.json();
         if (data.success) setProfile(data.user);
       } catch (err) {
+        if (err instanceof UnauthorizedError) return;
         console.error('Player profile fetch error:', err);
       } finally {
         setLoading(false);

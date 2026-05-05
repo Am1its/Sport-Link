@@ -45,13 +45,18 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 // GET /api/users/avatars?ids=1,2,3
 router.get('/avatars', authMiddleware, async (req, res) => {
-  const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
-  if (ids.length === 0) return res.json({ success: true, avatars: [] });
-  const placeholders = ids.map(() => '?').join(',');
-  const [rows] = await pool.execute(
-    `SELECT id, avatar FROM Users WHERE id IN (${placeholders})`, ids
-  );
-  res.json({ success: true, avatars: rows });
+  try {
+    const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
+    if (ids.length === 0) return res.json({ success: true, avatars: [] });
+    const placeholders = ids.map(() => '?').join(',');
+    const [rows] = await pool.execute(
+      `SELECT id, avatar FROM Users WHERE id IN (${placeholders})`, ids
+    );
+    res.json({ success: true, avatars: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 // GET /api/users/leaderboard — top 20 by karma
@@ -87,33 +92,72 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/users/me
+// PUT /api/users/me — only updates fields that are explicitly provided
 router.put('/me', authMiddleware, async (req, res) => {
-  const { username, bio, avatar } = req.body;
+  const { username, bio, avatar, onboarding_complete } = req.body;
   const userId = req.user.id;
 
   try {
-    if (username) {
+    if (username !== undefined) {
+      if (!username.trim()) return res.status(400).json({ success: false, message: 'Username cannot be empty' });
       const [[taken]] = await pool.execute(
-        'SELECT id FROM Users WHERE username = ? AND id != ?', [username, userId]
+        'SELECT id FROM Users WHERE username = ? AND id != ?', [username.trim(), userId]
       );
       if (taken) return res.status(409).json({ success: false, message: 'Username already taken' });
     }
 
-    await pool.execute(
-      `UPDATE Users SET
-         username = COALESCE(?, username),
-         bio      = ?,
-         avatar   = COALESCE(?, avatar)
-       WHERE id = ?`,
-      [username || null, bio !== undefined ? (bio || null) : null, avatar || null, userId]
-    );
+    // Build the SET clause dynamically — only touch fields that were sent
+    const setClauses = [];
+    const values = [];
+
+    if (username !== undefined) {
+      setClauses.push('username = ?');
+      values.push(username.trim());
+    }
+    if (bio !== undefined) {
+      setClauses.push('bio = ?');
+      values.push(bio || null);
+    }
+    if (avatar !== undefined) {
+      setClauses.push('avatar = ?');
+      values.push(avatar || null);
+    }
+    if (onboarding_complete !== undefined) {
+      setClauses.push('onboarding_complete = ?');
+      values.push(onboarding_complete ? 1 : 0);
+    }
+
+    if (setClauses.length > 0) {
+      values.push(userId);
+      await pool.execute(
+        `UPDATE Users SET ${setClauses.join(', ')} WHERE id = ?`,
+        values
+      );
+    }
 
     const user = await fetchUser(userId);
     res.json({ success: true, user });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY')
       return res.status(409).json({ success: false, message: 'Username already taken' });
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/users/search?q= — find users by username prefix (for friend requests)
+router.get('/search', authMiddleware, async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.json({ success: true, users: [] });
+  try {
+    const [rows] = await pool.execute(
+      `SELECT id, username, avatar FROM Users
+       WHERE username LIKE ? AND id != ?
+       LIMIT 20`,
+      [`${q}%`, req.user.id]
+    );
+    res.json({ success: true, users: rows });
+  } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -138,7 +182,6 @@ router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const user = await fetchUser(targetId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    // Strip sensitive fields before returning public profile
     const { avatar, username, bio, karma, games_hosted, games_joined } = user;
     res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined } });
   } catch (err) {

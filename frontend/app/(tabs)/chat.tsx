@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator }
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../constants/api';
+import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { formatChatTimestamp } from '../../utils/time';
+import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
 
 type ChatPreview = {
   id: number;
@@ -13,28 +15,6 @@ type ChatPreview = {
   last_message: string | null;
   last_sender: string | null;
   last_message_at: string | null;
-};
-
-const SPORT_COLORS: Record<string, string> = {
-  basketball: '#FF8C00',
-  tennis:     '#CCFF00',
-  volleyball: '#FFD700',
-  football:   '#FFFFFF',
-};
-const SPORT_ICONS: Record<string, string> = {
-  basketball: 'basketball',
-  tennis:     'tennis',
-  volleyball: 'volleyball',
-  football:   'soccer',
-};
-
-const formatTime = (iso: string | null) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString())
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
 export default function ChatScreen() {
@@ -48,12 +28,11 @@ export default function ChatScreen() {
       const fetchChats = async () => {
         setLoading(true);
         try {
-          const res = await fetch(`${API_BASE}/api/chats`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const res = await apiFetch('/api/chats', { token });
           const data = await res.json();
           if (data.success) setChats(data.chats);
         } catch (err) {
+          if (err instanceof UnauthorizedError) return;
           console.error('Chats fetch error:', err);
         } finally {
           setLoading(false);
@@ -81,7 +60,7 @@ export default function ChatScreen() {
         <View style={styles.chatBody}>
           <View style={styles.chatTopRow}>
             <Text style={styles.chatTitle}>{gameName}</Text>
-            <Text style={styles.chatTime}>{formatTime(item.last_message_at)}</Text>
+            <Text style={styles.chatTime}>{formatChatTimestamp(item.last_message_at)}</Text>
           </View>
           {item.location_desc ? (
             <Text style={styles.chatSub} numberOfLines={1}>{item.location_desc}</Text>

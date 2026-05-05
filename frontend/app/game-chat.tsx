@@ -7,7 +7,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../constants/api';
+import { apiFetch, UnauthorizedError } from '../utils/api';
+import { getAvatarColor } from '../utils/avatar';
+import { formatTime } from '../utils/time';
+
+const MAX_MESSAGE_LENGTH = 1000;
 
 type Message = {
   id: number;
@@ -16,13 +20,6 @@ type Message = {
   content: string;
   created_at: string;
 };
-
-const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
-const getAvatarColor = (name: string) =>
-  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
-
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 export default function GameChatScreen() {
   const router = useRouter();
@@ -42,9 +39,7 @@ export default function GameChatScreen() {
     if (newIds.length === 0) return;
     newIds.forEach(uid => seenUserIds.current.add(uid));
     try {
-      const res = await fetch(`${API_BASE}/api/users/avatars?ids=${newIds.join(',')}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/users/avatars?ids=${newIds.join(',')}`, { token });
       const data = await res.json();
       if (data.success) {
         const map: Record<number, string | null> = {};
@@ -56,9 +51,7 @@ export default function GameChatScreen() {
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/chats/${id}/messages`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch(`/api/chats/${id}/messages`, { token });
       const data = await res.json();
       if (data.success) {
         setMessages(data.messages);
@@ -99,13 +92,14 @@ export default function GameChatScreen() {
     setInput('');
     setSending(true);
     try {
-      await fetch(`${API_BASE}/api/chats/${id}/messages`, {
+      await apiFetch(`/api/chats/${id}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        token,
         body: JSON.stringify({ content }),
       });
       await fetchMessages();
     } catch (err) {
+      if (err instanceof UnauthorizedError) return;
       console.error('Send message error:', err);
     } finally {
       setSending(false);
@@ -213,6 +207,7 @@ export default function GameChatScreen() {
           value={input}
           onChangeText={setInput}
           multiline
+          maxLength={MAX_MESSAGE_LENGTH}
           onSubmitEditing={sendMessage}
           returnKeyType="send"
         />

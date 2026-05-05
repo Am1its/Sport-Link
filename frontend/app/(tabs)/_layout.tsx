@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../constants/api';
+import { apiFetch } from '../../utils/api';
 
 export default function TabLayout() {
   const { token } = useAuth();
@@ -12,9 +12,7 @@ export default function TabLayout() {
   const checkUnread = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/chats`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiFetch('/api/chats', { token });
       const data = await res.json();
       if (!data.success) return;
 

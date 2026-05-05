@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type User = { id: number; username: string };
+type User = { id: number; username: string; onboarding_complete: boolean };
 
 type AuthState = {
   token: string | null;
@@ -9,6 +9,7 @@ type AuthState = {
   isLoading: boolean;
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
+  setOnboardingComplete: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState>({} as AuthState);
@@ -48,8 +49,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const setOnboardingComplete = async () => {
+    if (!user) return;
+    const updated = { ...user, onboarding_complete: true };
+    await AsyncStorage.setItem('user', JSON.stringify(updated));
+    setUser(updated);
+  };
+
   return (
-    <AuthContext.Provider value={{ token, user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ token, user, isLoading, login, logout, setOnboardingComplete }}>
       {children}
     </AuthContext.Provider>
   );
