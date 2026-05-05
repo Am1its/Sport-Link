@@ -1,15 +1,17 @@
 import { Redirect } from 'expo-router';
+import { View, ActivityIndicator } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 export default function Index() {
-  // כרגע אנחנו מגדירים שמשתמש לא מחובר כברירת מחדל
-  // בשלב הבא, נחבר את זה ל-Backend כדי לבדוק אם הוא באמת מחובר
-  const isLoggedIn = false;
+  const { token, isLoading } = useAuth();
 
-  if (!isLoggedIn) {
-    // אם לא מחובר -> זרוק אותו למסך התחברות
-    return <Redirect href="/login" />;
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1C1C1E' }}>
+        <ActivityIndicator size="large" color="#0FEA95" />
+      </View>
+    );
   }
 
-  // אם מחובר -> הכנס אותו ישר לאפליקציה (למפה)
-  return <Redirect href="/(tabs)" />;
+  return <Redirect href={token ? '/(tabs)' : '/login'} />;
 }

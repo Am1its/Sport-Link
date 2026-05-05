@@ -5,8 +5,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false, // מעלים את הכותרת העליונה הדיפולטיבית
-        tabBarActiveTintColor: '#0FEA95', // הירוק הספורטיבי שלנו
+        headerShown: false,
+        tabBarActiveTintColor: '#0FEA95',
         tabBarInactiveTintColor: '#8E8E93',
         tabBarStyle: {
           backgroundColor: '#ffffff',
@@ -21,50 +21,11 @@ export default function TabLayout() {
         },
       }}
     >
-      {/* 1. מסך הבית - המפה שלנו */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'מפה',
-          tabBarIcon: ({ color }) => <Ionicons name="map" size={26} color={color} />,
-        }}
-      />
-
-      {/* 2. גילוי - רשימת מגרשים ואירועים */}
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: 'חיפוש',
-          tabBarIcon: ({ color }) => <Ionicons name="search" size={26} color={color} />,
-        }}
-      />
-
-      {/* 3. המשחקים שלי */}
-      <Tabs.Screen
-        name="games"
-        options={{
-          title: 'המשחקים שלי',
-          tabBarIcon: ({ color }) => <Ionicons name="calendar" size={26} color={color} />,
-        }}
-      />
-
-      {/* 4. צ'אט */}
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: 'צ\'אט',
-          tabBarIcon: ({ color }) => <Ionicons name="chatbubbles" size={26} color={color} />,
-        }}
-      />
-
-      {/* 5. פרופיל אישי */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'פרופיל',
-          tabBarIcon: ({ color }) => <Ionicons name="person" size={26} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="index"    options={{ title: 'Map',      tabBarIcon: ({ color }) => <Ionicons name="map"         size={26} color={color} /> }} />
+      <Tabs.Screen name="discover" options={{ title: 'Discover', tabBarIcon: ({ color }) => <Ionicons name="search"      size={26} color={color} /> }} />
+      <Tabs.Screen name="games"    options={{ title: 'My Games', tabBarIcon: ({ color }) => <Ionicons name="calendar"    size={26} color={color} /> }} />
+      <Tabs.Screen name="chat"     options={{ title: 'Chat',     tabBarIcon: ({ color }) => <Ionicons name="chatbubbles" size={26} color={color} /> }} />
+      <Tabs.Screen name="profile"  options={{ title: 'Profile',  tabBarIcon: ({ color }) => <Ionicons name="person"      size={26} color={color} /> }} />
     </Tabs>
   );
 }

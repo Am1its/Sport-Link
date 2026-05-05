@@ -1,17 +1,17 @@
 import { Stack } from 'expo-router';
+import { AuthProvider } from '../context/AuthContext';
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="register" />
-      <Stack.Screen name="(tabs)" />
-      {/* כאן אנחנו מגדירים את ה-modal שייפתח מלמטה! */}
-      <Stack.Screen 
-        name="modal" 
-        options={{ presentation: 'modal' }} 
-      />
-    </Stack>
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="game-chat" />
+      </Stack>
+    </AuthProvider>
   );
 }
