@@ -30,9 +30,9 @@ const THUMB_CATEGORIES: { key: keyof Omit<CategoryRating, 'skill'>; label: strin
   { key: 'communication', label: 'Communication', icon: 'chatbubble-ellipses-outline' },
 ];
 
-function AvatarCircle({ player }: { player: Player }) {
+function AvatarCircle({ player, onPress }: { player: Player; onPress?: () => void }) {
   const color = getAvatarColor(player.username);
-  return (
+  const inner = (
     <View style={[styles.avatar, { backgroundColor: color + '22', borderColor: color, borderWidth: 1.5 }]}>
       {player.avatar ? (
         <Image source={{ uri: `data:image/jpeg;base64,${player.avatar}` }} style={styles.avatarImage} />
@@ -43,6 +43,8 @@ function AvatarCircle({ player }: { player: Player }) {
       )}
     </View>
   );
+  if (onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.75}>{inner}</TouchableOpacity>;
+  return inner;
 }
 
 export default function RatePlayersScreen() {
@@ -205,7 +207,7 @@ export default function RatePlayersScreen() {
                 return (
                   <View style={styles.playerCard}>
                     <View style={styles.playerLeft}>
-                      <AvatarCircle player={item} />
+                      <AvatarCircle player={item} onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })} />
                       <Text style={styles.username}>{item.username}</Text>
                       {status === null && (
                         <View style={styles.pendingBadge}>
@@ -238,7 +240,7 @@ export default function RatePlayersScreen() {
               return (
                 <View style={styles.playerCard}>
                   <View style={styles.playerLeft}>
-                    <AvatarCircle player={item} />
+                    <AvatarCircle player={item} onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })} />
                     <Text style={styles.username}>{item.username}</Text>
                   </View>
 

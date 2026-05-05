@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const sendPushNotifications = require('../utils/sendPushNotification');
 
 const router = express.Router();
 
@@ -60,7 +61,7 @@ router.get('/mine', authMiddleware, async (req, res) => {
         (g.host_id = ?)            AS is_host
       FROM Games g
       LEFT JOIN GameParticipants gp ON gp.game_id = g.id
-      WHERE g.status = 'active'
+      WHERE g.status IN ('active', 'completed')
         AND (
           g.host_id = ?
           OR EXISTS (SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?)
@@ -72,8 +73,29 @@ router.get('/mine', authMiddleware, async (req, res) => {
     const games = rows.map((row) => ({
       ...toMapGame(row),
       is_host: !!row.is_host,
+      status: row.status,
     }));
     res.json({ success: true, games });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/games/:id/complete — host closes the game
+router.post('/:id/complete', authMiddleware, async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  const userId = req.user.id;
+  try {
+    const [[game]] = await pool.execute(
+      "SELECT host_id FROM Games WHERE id = ? AND status = 'active'", [gameId]
+    );
+    if (!game) return res.status(404).json({ success: false, message: 'Game not found or already closed' });
+    if (game.host_id !== userId)
+      return res.status(403).json({ success: false, message: 'Only the host can close this game' });
+
+    await pool.execute("UPDATE Games SET status = 'completed' WHERE id = ?", [gameId]);
+    res.json({ success: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -110,7 +132,43 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     const [[{ count: newCount }]] = await pool.execute(
       'SELECT COUNT(*) AS count FROM GameParticipants WHERE game_id = ?', [gameId]
     );
+
+    // Notify the host
+    const [[joiner]]  = await pool.execute('SELECT username FROM Users WHERE id = ?', [userId]);
+    const [[hostRow]] = await pool.execute('SELECT push_token FROM Users WHERE id = ?', [game.host_id]);
+    if (hostRow?.push_token) {
+      sendPushNotifications([{
+        to: hostRow.push_token,
+        title: '🏅 New player joined!',
+        body: `${joiner.username} joined your ${game.sport_type} game.`,
+        data: { gameId },
+      }]);
+    }
+
     res.json({ success: true, participant_count: newCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/games/:id/participants — host + joined players with avatars
+router.get('/:id/participants', authMiddleware, async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  try {
+    const [[game]] = await pool.execute('SELECT host_id FROM Games WHERE id = ?', [gameId]);
+    if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
+
+    const [rows] = await pool.execute(`
+      SELECT u.id, u.username, u.avatar, 'host' AS role
+      FROM Users u WHERE u.id = ?
+      UNION ALL
+      SELECT u.id, u.username, u.avatar, 'player' AS role
+      FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id
+      WHERE gp.game_id = ?
+    `, [game.host_id, gameId]);
+
+    res.json({ success: true, participants: rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });

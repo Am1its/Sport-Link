@@ -4,6 +4,56 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 3.2] — May 2026 — Push Notifications, Map Clustering & UX Polish
+
+### Push Notifications
+**Database (`backend/migrations/007_add_push_token.sql`)**
+- Added `push_token VARCHAR(200)` column to `Users` for storing Expo push tokens.
+
+**Backend (`backend/utils/sendPushNotification.js`)** — new utility
+- Sends one or more messages to Expo's push API (`exp.host/--/api/v2/push/send`) over native HTTPS — no server SDK required.
+- Filters out non-Expo tokens before sending.
+
+**Backend (`backend/routes/users.js`)**
+- `PUT /api/users/push-token` — new endpoint; saves or clears the authenticated user's push token.
+
+**Backend (`backend/routes/games.js`)**
+- `POST /api/games/:id/join` — after a successful join, fetches the host's push token and fires a "🏅 New player joined!" notification.
+
+**Frontend (`frontend/utils/registerPushToken.ts`)** — new utility
+- Requests notification permission, retrieves `ExponentPushToken[...]` via `expo-notifications`, and POSTs it to the backend.
+- Passes `projectId` from `expo-constants` if available; silently no-ops in Expo Go (not supported since SDK 53).
+
+**Frontend (`frontend/app/_layout.tsx`)**
+- Added `PushTokenRegistrar` component inside `AuthProvider`; re-registers the push token whenever the auth token changes (i.e., on login).
+
+---
+
+### Map Clustering
+**Frontend (`frontend/app/(tabs)/index.tsx`)**
+- Custom grid-based clustering algorithm (`clusterGames`) — no external library.
+- At low zoom (`latitudeDelta ≥ 0.03`), nearby game markers are grouped into a grid cell of size `latitudeDelta / 5`; each cell is represented by a single green circle marker showing the count.
+- Tapping a cluster animates the map to zoom in 3× on that cluster (`animateToRegion`), revealing individual markers.
+- Courts are never clustered (they are already spread across the city).
+- `onRegionChangeComplete` tracks the live `latitudeDelta` so clustering updates on pan/zoom.
+
+---
+
+### Discover Screen Polish
+**Frontend (`frontend/app/(tabs)/discover.tsx`)**
+- Urgency badge ("Only X spot(s) left!") appears in amber on game cards when ≤ 2 spots remain; player count text also turns amber.
+- Equipment notes shown below the meta row with a bag icon when present.
+- Pull-to-refresh (green tint) on the game list.
+
+---
+
+### Games Tab (My Schedule) Polish
+**Frontend (`frontend/app/(tabs)/games.tsx`)**
+- **Chat** button added to every active game card (host and participant) — taps directly into the game's chat screen.
+- Pull-to-refresh on the games list.
+
+---
+
 ## [Sprint 3.1] — May 2026 — Ratings v2, Avatars, Leaderboard & Profile Polish
 
 ### Peer Ratings System (host attendance + player category ratings)

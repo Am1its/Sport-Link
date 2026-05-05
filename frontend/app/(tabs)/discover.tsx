@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList,
-  TouchableOpacity, ActivityIndicator, Alert, Animated,
+  TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ type Game = {
   level: number;
   scheduled_time: string | null;
   location_desc: string | null;
+  equipment_notes: string | null;
   max_players: number | null;
   participant_count: number;
   host_id: number;
@@ -52,6 +53,8 @@ function GameCard({
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
   const isOwn = game.host_id === userId;
   const isFull = game.max_players != null && game.participant_count >= game.max_players;
+  const spotsLeft = game.max_players != null ? game.max_players - game.participant_count : null;
+  const isUrgent = spotsLeft != null && spotsLeft <= 2 && spotsLeft > 0;
   const playersLabel = game.max_players
     ? `${game.participant_count} / ${game.max_players}`
     : `${game.participant_count}`;
@@ -92,7 +95,14 @@ function GameCard({
           <MaterialCommunityIcons name={icon as any} size={26} color={color} />
         </View>
         <View style={styles.cardInfo}>
-          <Text style={styles.sportLabel}>{game.sport_type.toUpperCase()}</Text>
+          <View style={styles.sportRow}>
+            <Text style={styles.sportLabel}>{game.sport_type.toUpperCase()}</Text>
+            {isUrgent && (
+              <View style={styles.urgencyBadge}>
+                <Text style={styles.urgencyText}>Only {spotsLeft} spot{spotsLeft === 1 ? '' : 's'} left!</Text>
+              </View>
+            )}
+          </View>
           {game.location_desc ? (
             <Text style={styles.locationText} numberOfLines={1}>{game.location_desc}</Text>
           ) : null}
@@ -105,7 +115,7 @@ function GameCard({
             ) : null}
             <View style={styles.metaItem}>
               <Ionicons name="people-outline" size={13} color="#8E8E93" />
-              <Text style={styles.metaText}>{playersLabel} players</Text>
+              <Text style={[styles.metaText, isUrgent && { color: '#FF9F0A' }]}>{playersLabel} players</Text>
             </View>
             <View style={styles.metaItem}>
               <Ionicons name="flash-outline" size={13} color="#8E8E93" />
@@ -114,6 +124,13 @@ function GameCard({
           </View>
         </View>
       </View>
+
+      {game.equipment_notes ? (
+        <View style={styles.equipRow}>
+          <Ionicons name="bag-outline" size={13} color="#636366" />
+          <Text style={styles.equipText} numberOfLines={1}>{game.equipment_notes}</Text>
+        </View>
+      ) : null}
 
       {isOwn ? (
         <View style={[styles.joinBtn, styles.joinBtnMuted]}>
@@ -140,25 +157,29 @@ export default function DiscoverScreen() {
   const { token, user } = useAuth();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [sportFilter, setSportFilter] = useState<string>('all');
 
+  const fetchGames = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/games`);
+      const data = await res.json();
+      if (data.success) setGames(data.games);
+    } catch (err) {
+      console.error('Discover fetch error:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      const fetchGames = async () => {
-        setLoading(true);
-        try {
-          const res = await fetch(`${API_BASE}/api/games`);
-          const data = await res.json();
-          if (data.success) setGames(data.games);
-        } catch (err) {
-          console.error('Discover fetch error:', err);
-        } finally {
-          setLoading(false);
-        }
-      };
       fetchGames();
-    }, [])
+    }, [fetchGames])
   );
 
   const handleJoined = (id: number, newCount: number) => {
@@ -228,6 +249,14 @@ export default function DiscoverScreen() {
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchGames(true)}
+              tintColor="#0FEA95"
+              colors={['#0FEA95']}
+            />
+          }
         />
       )}
     </View>
@@ -253,11 +282,17 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', marginBottom: 14 },
   iconCircle: { width: 52, height: 52, borderRadius: 26, borderWidth: 2, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   cardInfo: { flex: 1 },
-  sportLabel: { fontSize: 15, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5, marginBottom: 3 },
+  sportRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
+  sportLabel: { fontSize: 15, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 },
+  urgencyBadge: { backgroundColor: '#FF9F0A22', borderRadius: 8, borderWidth: 1, borderColor: '#FF9F0A66', paddingHorizontal: 7, paddingVertical: 2 },
+  urgencyText: { color: '#FF9F0A', fontSize: 11, fontWeight: '800' },
   locationText: { fontSize: 13, color: '#AEAEB2', marginBottom: 6 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { fontSize: 12, color: '#8E8E93' },
+
+  equipRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 12, paddingHorizontal: 2 },
+  equipText: { color: '#636366', fontSize: 12, flex: 1 },
 
   joinBtn: { backgroundColor: '#0FEA95', height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   joinBtnMuted: { backgroundColor: '#3A3A3C' },

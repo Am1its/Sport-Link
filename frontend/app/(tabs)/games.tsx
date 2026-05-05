@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +21,7 @@ type Game = {
   max_players: number | null;
   participant_count: number;
   is_host: boolean;
+  status: string;
   created_at: string;
 };
 
@@ -39,13 +40,15 @@ const SPORT_ICONS: Record<string, string> = {
 };
 
 function GameCard({
-  game, onRatePlayers, onEdit, onDelete, onLeave,
+  game, onRatePlayers, onCloseGame, onEdit, onDelete, onLeave, onChat,
 }: {
   game: Game;
   onRatePlayers: () => void;
+  onCloseGame: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onLeave: () => void;
+  onChat: () => void;
 }) {
   const color = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
@@ -92,28 +95,48 @@ function GameCard({
         </View>
 
         {!past && (
-          <View style={styles.actionRow}>
-            {game.is_host ? (
-              <>
-                <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-                  <Ionicons name="pencil-outline" size={14} color="#FFFFFF" />
-                  <Text style={styles.editBtnText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
-                  <Ionicons name="trash-outline" size={14} color="#FF453A" />
-                  <Text style={styles.deleteBtnText}>Delete</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <TouchableOpacity style={styles.leaveBtn} onPress={onLeave}>
-                <Ionicons name="exit-outline" size={14} color="#FF8C00" />
-                <Text style={styles.leaveBtnText}>Leave Game</Text>
+          <>
+            <View style={[styles.actionRow, { marginTop: 10 }]}>
+              <TouchableOpacity style={styles.chatBtn} onPress={onChat}>
+                <Ionicons name="chatbubble-outline" size={14} color="#4F9EFF" />
+                <Text style={styles.chatBtnText}>Chat</Text>
               </TouchableOpacity>
-            )}
+              {game.is_host ? (
+                <>
+                  <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+                    <Ionicons name="pencil-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.editBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
+                    <Ionicons name="trash-outline" size={14} color="#FF453A" />
+                    <Text style={styles.deleteBtnText}>Delete</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity style={styles.leaveBtn} onPress={onLeave}>
+                  <Ionicons name="exit-outline" size={14} color="#FF8C00" />
+                  <Text style={styles.leaveBtnText}>Leave Game</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+        {past && game.is_host && game.status === 'active' && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.closeBtn} onPress={onCloseGame}>
+              <Ionicons name="checkmark-circle-outline" size={15} color="#1C1C1E" />
+              <Text style={styles.closeBtnText}>Close & Rate</Text>
+            </TouchableOpacity>
           </View>
         )}
-        {past && (
+        {past && (!game.is_host || game.status === 'completed') && (
           <View style={styles.actionRow}>
+            {game.status === 'completed' && game.is_host && (
+              <View style={styles.completedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#0FEA95" />
+                <Text style={styles.completedBadgeText}>Completed</Text>
+              </View>
+            )}
             <TouchableOpacity style={styles.rateBtn} onPress={onRatePlayers}>
               <Ionicons name="star-outline" size={15} color="#1C1C1E" />
               <Text style={styles.rateBtnText}>Rate Players</Text>
@@ -130,8 +153,41 @@ export default function GamesScreen() {
   const router = useRouter();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const removeGame = (id: number) => setGames((prev) => prev.filter((g) => g.id !== id));
+  const markCompleted = (id: number) =>
+    setGames((prev) => prev.map((g) => g.id === id ? { ...g, status: 'completed' } : g));
+
+  const handleClose = (game: Game) => {
+    Alert.alert(
+      'Close Game',
+      'Mark this game as completed and rate player attendance?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Close & Rate',
+          onPress: async () => {
+            try {
+              const res = await fetch(`${API_BASE}/api/games/${game.id}/complete`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const data = await res.json();
+              if (!data.success) return Alert.alert('Error', data.message);
+              markCompleted(game.id);
+              router.push({
+                pathname: '/rate-players',
+                params: { gameId: game.id, sport: game.sport_type, scheduledTime: game.scheduled_time ?? '' },
+              });
+            } catch {
+              Alert.alert('Error', 'Could not connect to server');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleDelete = (game: Game) => {
     Alert.alert(
@@ -185,24 +241,27 @@ export default function GamesScreen() {
     );
   };
 
+  const fetchMyGames = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/games/mine`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) setGames(data.games);
+    } catch (err) {
+      console.error('My games fetch error:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [token]);
+
   useFocusEffect(
     useCallback(() => {
-      const fetchMyGames = async () => {
-        setLoading(true);
-        try {
-          const res = await fetch(`${API_BASE}/api/games/mine`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
-          if (data.success) setGames(data.games);
-        } catch (err) {
-          console.error('My games fetch error:', err);
-        } finally {
-          setLoading(false);
-        }
-      };
       fetchMyGames();
-    }, [token])
+    }, [fetchMyGames])
   );
 
   return (
@@ -221,12 +280,22 @@ export default function GamesScreen() {
           <GameCard
             key={String(item.id)}
             game={item}
+            onChat={() =>
+              router.push({
+                pathname: '/game-chat',
+                params: {
+                  id: String(item.id),
+                  name: `${item.sport_type.charAt(0).toUpperCase() + item.sport_type.slice(1)} Game`,
+                },
+              })
+            }
             onRatePlayers={() =>
               router.push({
                 pathname: '/rate-players',
                 params: { gameId: item.id, sport: item.sport_type, scheduledTime: item.scheduled_time ?? '' },
               })
             }
+            onCloseGame={() => handleClose(item)}
             onEdit={() =>
               router.push({
                 pathname: '/modal',
@@ -247,7 +316,18 @@ export default function GamesScreen() {
         );
 
         return (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => fetchMyGames(true)}
+                tintColor="#0FEA95"
+                colors={['#0FEA95']}
+              />
+            }
+          >
             {upcoming.length === 0 && history.length === 0 ? (
               <View style={styles.center}>
                 <Ionicons name="calendar-outline" size={80} color="#2C2C2E" />
@@ -302,14 +382,20 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: '#8E8E93' },
 
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  chatBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#4F9EFF22', height: 36, borderRadius: 10, borderWidth: 1, borderColor: '#4F9EFF55', paddingHorizontal: 14 },
+  chatBtnText: { color: '#4F9EFF', fontWeight: '800', fontSize: 13 },
   editBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#3A3A3C', height: 36, borderRadius: 10 },
   editBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
   deleteBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FF453A22', height: 36, borderRadius: 10, borderWidth: 1, borderColor: '#FF453A55' },
   deleteBtnText: { color: '#FF453A', fontWeight: '800', fontSize: 13 },
   leaveBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FF8C0022', height: 36, borderRadius: 10, borderWidth: 1, borderColor: '#FF8C0055' },
   leaveBtnText: { color: '#FF8C00', fontWeight: '800', fontSize: 13 },
+  closeBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#4F9EFF', height: 36, borderRadius: 10 },
+  closeBtnText: { color: '#1C1C1E', fontWeight: '800', fontSize: 13 },
   rateBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0FEA95', height: 36, borderRadius: 10 },
   rateBtnText: { color: '#1C1C1E', fontWeight: '800', fontSize: 13 },
+  completedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#0FEA9515', borderRadius: 8 },
+  completedBadgeText: { color: '#0FEA95', fontSize: 12, fontWeight: '700' },
 
   sectionHeader: { fontSize: 13, fontWeight: '800', color: '#636366', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10, marginTop: 4 },
   emptyTitle: { color: '#FFFFFF', fontSize: 18, marginTop: 15, fontWeight: 'bold' },

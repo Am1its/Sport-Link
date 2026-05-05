@@ -1,9 +1,20 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider, useAuth } from '../context/AuthContext';
+import { registerPushToken } from '../utils/registerPushToken';
+
+function PushTokenRegistrar() {
+  const { token } = useAuth();
+  useEffect(() => {
+    if (token) registerPushToken(token);
+  }, [token]);
+  return null;
+}
 
 export default function RootLayout() {
   return (
     <AuthProvider>
+      <PushTokenRegistrar />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />

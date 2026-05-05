@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ComponentProps, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated, FlatList } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated, FlatList, Image } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -25,7 +25,14 @@ type MapItem = {
   host_id?: number;
   max_players?: number | null;
   participant_count?: number;
+  scheduled_time?: string | null;
 };
+
+type Participant = { id: number; username: string; avatar: string | null; role: string };
+
+const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
+const getAvatarColor = (name: string) =>
+  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
 
 const getSportStyle = (type: string): { icon: IconName; color: string } => {
   switch (type) {
@@ -37,19 +44,82 @@ const getSportStyle = (type: string): { icon: IconName; color: string } => {
   }
 };
 
+const SPORT_FILTERS = [
+  { key: 'all',        label: 'All Sports' },
+  { key: 'basketball', label: '🏀' },
+  { key: 'tennis',     label: '🎾' },
+  { key: 'volleyball', label: '🏐' },
+  { key: 'football',   label: '⚽' },
+] as const;
+
+type ClusterItem = MapItem & {
+  _isCluster: boolean;
+  _clusterCount: number;
+  _clusterItems: MapItem[];
+};
+
+function clusterGames(items: MapItem[], latDelta: number): ClusterItem[] {
+  if (latDelta < 0.03) {
+    return items.map(i => ({ ...i, _isCluster: false, _clusterCount: 1, _clusterItems: [i] }));
+  }
+  const gridSize = latDelta / 5;
+  const grid = new Map<string, MapItem[]>();
+  for (const item of items) {
+    const key = `${Math.floor(item.geometry.location.lat / gridSize)},${Math.floor(item.geometry.location.lng / gridSize)}`;
+    const cell = grid.get(key);
+    if (cell) cell.push(item);
+    else grid.set(key, [item]);
+  }
+  return Array.from(grid.values()).map(cell => {
+    const avgLat = cell.reduce((s, i) => s + i.geometry.location.lat, 0) / cell.length;
+    const avgLng = cell.reduce((s, i) => s + i.geometry.location.lng, 0) / cell.length;
+    return {
+      ...cell[0],
+      place_id: `cluster_${cell.map(c => c.place_id).join('_')}`,
+      geometry: { location: { lat: avgLat, lng: avgLng } },
+      _isCluster: cell.length > 1,
+      _clusterCount: cell.length,
+      _clusterItems: cell,
+    };
+  });
+}
+
+function AvatarMini({ name, avatar }: { name: string; avatar: string | null }) {
+  const color = getAvatarColor(name);
+  return (
+    <View style={[styles.avatarMini, { backgroundColor: color + '33', borderColor: color }]}>
+      {avatar
+        ? <Image source={{ uri: `data:image/jpeg;base64,${avatar}` }} style={styles.avatarMiniImg} />
+        : <Text style={[styles.avatarMiniLetter, { color }]}>{name.charAt(0).toUpperCase()}</Text>}
+    </View>
+  );
+}
+
 function BottomCard({ court, userId, token, onJoined }: {
   court: MapItem;
   userId?: number;
   token: string | null;
   onJoined: (newCount: number) => void;
 }) {
+  const router = useRouter();
   const [joining, setJoining] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const isOwnGame = court.isLocalGame && court.host_id === userId;
   const isFull = court.max_players != null && (court.participant_count ?? 0) >= court.max_players;
   const playersLabel = court.max_players
     ? `${court.participant_count ?? 0} / ${court.max_players} players`
-    : null;
+    : `${court.participant_count ?? 0} player${court.participant_count !== 1 ? 's' : ''}`;
+
+  useEffect(() => {
+    if (!court.isLocalGame || !court.id || !token) return;
+    fetch(`${API_BASE}/api/games/${court.id}/participants`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => { if (d.success) setParticipants(d.participants); })
+      .catch(() => {});
+  }, [court.id]);
 
   const springBack = () =>
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
@@ -72,7 +142,7 @@ function BottomCard({ court, userId, token, onJoined }: {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onJoined(data.participant_count);
       springBack();
-      Alert.alert('You\'re in! 🎉', 'Game added to My Schedule.');
+      Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
     } catch {
       springBack();
       Alert.alert('Error', 'Could not connect to server');
@@ -81,12 +151,23 @@ function BottomCard({ court, userId, token, onJoined }: {
     }
   };
 
+  const spotsLeft = court.max_players != null
+    ? court.max_players - (court.participant_count ?? 0)
+    : null;
+
   return (
     <View style={styles.bottomCard}>
       <View style={styles.cardHeader}>
         <View style={{ flex: 1, marginRight: 10 }}>
           <Text style={styles.cardTitle} numberOfLines={1}>{court.name}</Text>
-          <Text style={styles.sportBadgeText}>{court.sport_type?.toUpperCase()}</Text>
+          <View style={styles.cardBadgeRow}>
+            <Text style={styles.sportBadgeText}>{court.sport_type?.toUpperCase()}</Text>
+            {spotsLeft !== null && spotsLeft <= 2 && spotsLeft > 0 && (
+              <View style={styles.urgentBadge}>
+                <Text style={styles.urgentBadgeText}>Only {spotsLeft} spot{spotsLeft > 1 ? 's' : ''} left!</Text>
+              </View>
+            )}
+          </View>
         </View>
         <View style={styles.ratingBadge}>
           <Ionicons name="star" size={14} color="#FFD700" />
@@ -96,10 +177,38 @@ function BottomCard({ court, userId, token, onJoined }: {
 
       {court.vicinity ? <Text style={styles.cardAddress}>{court.vicinity}</Text> : null}
 
-      {court.isLocalGame && playersLabel && (
+      {court.isLocalGame && (
         <View style={styles.playersRow}>
           <Ionicons name="people-outline" size={16} color="#8E8E93" />
           <Text style={styles.playersText}>{playersLabel}</Text>
+        </View>
+      )}
+
+      {/* Participants avatars */}
+      {court.isLocalGame && participants.length > 0 && (
+        <View style={styles.participantsRow}>
+          <View style={styles.participantAvatars}>
+            {participants.slice(0, 5).map((p, i) => (
+              <TouchableOpacity
+                key={p.id}
+                style={[styles.avatarMiniWrap, { marginLeft: i > 0 ? -10 : 0, zIndex: 10 - i }]}
+                onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(p.id) } })}
+              >
+                <AvatarMini name={p.username} avatar={p.avatar} />
+              </TouchableOpacity>
+            ))}
+            {participants.length > 5 && (
+              <View style={[styles.avatarMiniWrap, styles.avatarMiniMore, { marginLeft: -10 }]}>
+                <Text style={styles.avatarMiniMoreText}>+{participants.length - 5}</Text>
+              </View>
+            )}
+          </View>
+          {participants[0] && (
+            <Text style={styles.participantLabel} numberOfLines={1}>
+              {participants[0].role === 'host' ? `${participants[0].username} (host)` : participants[0].username}
+              {participants.length > 1 ? ` & ${participants.length - 1} more` : ''}
+            </Text>
+          )}
         </View>
       )}
 
@@ -133,6 +242,7 @@ function BottomCard({ court, userId, token, onJoined }: {
 export default function HomeScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
+  const mapRef = useRef<MapView>(null);
 
   const [courts, setCourts] = useState<MapItem[]>([]);
   const [games, setGames] = useState<MapItem[]>([]);
@@ -140,20 +250,23 @@ export default function HomeScreen() {
   const [selectedCourt, setSelectedCourt] = useState<MapItem | null>(null);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [currentDelta, setCurrentDelta] = useState(0.05);
   const [showCourtPicker, setShowCourtPicker] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [sportFilter, setSportFilter] = useState('all');
 
-  const isPastGame = (scheduledTime: string | null) => {
-    if (!scheduledTime) return false;
-    const d = new Date(scheduledTime);
-    return !isNaN(d.getTime()) && d < new Date();
-  };
   const [mapRegion, setMapRegion] = useState<Region>({
     latitude: 32.0853,
     longitude: 34.7818,
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+
+  const isPastGame = (scheduledTime: string | null) => {
+    if (!scheduledTime) return false;
+    const d = new Date(scheduledTime);
+    return !isNaN(d.getTime()) && d < new Date();
+  };
 
   useEffect(() => {
     const initLocation = async () => {
@@ -212,26 +325,26 @@ export default function HomeScreen() {
     );
   }
 
-  const activeGames = games.filter(g => !isPastGame(g.scheduled_time));
+  const activeGames = games.filter(g => !isPastGame(g.scheduled_time ?? null));
+  const filteredGames = sportFilter === 'all'
+    ? activeGames
+    : activeGames.filter(g => g.sport_type === sportFilter);
 
-  const getFilteredCourts = () => {
-    switch (activeFilter) {
-      case 'courts': return courts;
-      case 'games':  return activeGames;
-      case 'all':
-      default:       return [...courts, ...activeGames];
-    }
-  };
+  const displayedCourts = activeFilter === 'games' ? [] : courts;
+  const clusteredGames  = activeFilter === 'courts' ? [] : clusterGames(filteredGames, currentDelta);
 
-  const displayedCourts = getFilteredCourts();
+  const showSportFilter = activeFilter !== 'courts';
+  const visibleGameCount = filteredGames.length;
 
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         initialRegion={mapRegion}
         showsUserLocation
         showsMyLocationButton={false}
+        onRegionChangeComplete={(r) => setCurrentDelta(r.latitudeDelta)}
         onPress={(e) => {
           if (isSelectingLocation) {
             const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -242,17 +355,61 @@ export default function HomeScreen() {
           }
         }}
       >
-        {displayedCourts.map((court) => {
-          const sportStyle = getSportStyle(court.sport_type);
+        {/* Court markers */}
+        {displayedCourts.map((item) => {
+          const sportStyle = getSportStyle(item.sport_type);
           return (
             <Marker
-              key={court.place_id}
-              coordinate={{ latitude: court.geometry.location.lat, longitude: court.geometry.location.lng }}
-              onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(court); }}
+              key={item.place_id}
+              coordinate={{ latitude: item.geometry.location.lat, longitude: item.geometry.location.lng }}
+              onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(item); }}
             >
               <View style={styles.markerWrapper}>
                 <View style={[styles.markerIconBg, { borderColor: sportStyle.color }]}>
                   <MaterialCommunityIcons name={sportStyle.icon} size={22} color={sportStyle.color} />
+                </View>
+                <View style={[styles.markerPointer, { backgroundColor: '#555' }]} />
+              </View>
+            </Marker>
+          );
+        })}
+
+        {/* Game markers (clustered) */}
+        {clusteredGames.map((item) => {
+          const sportStyle = getSportStyle(item.sport_type);
+          if (item._isCluster) {
+            return (
+              <Marker
+                key={item.place_id}
+                coordinate={{ latitude: item.geometry.location.lat, longitude: item.geometry.location.lng }}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  if (!isSelectingLocation) {
+                    mapRef.current?.animateToRegion({
+                      latitude: item.geometry.location.lat,
+                      longitude: item.geometry.location.lng,
+                      latitudeDelta: currentDelta / 3,
+                      longitudeDelta: currentDelta / 3,
+                    }, 350);
+                  }
+                }}
+              >
+                <View style={styles.clusterMarker}>
+                  <Text style={styles.clusterText}>{item._clusterCount}</Text>
+                </View>
+              </Marker>
+            );
+          }
+          return (
+            <Marker
+              key={item.place_id}
+              coordinate={{ latitude: item.geometry.location.lat, longitude: item.geometry.location.lng }}
+              onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(item); }}
+            >
+              <View style={styles.markerWrapper}>
+                <View style={[styles.markerIconBg, { borderColor: sportStyle.color }, styles.markerIconBgGame]}>
+                  <MaterialCommunityIcons name={sportStyle.icon} size={22} color={sportStyle.color} />
+                  <View style={[styles.markerGameDot, { backgroundColor: sportStyle.color }]} />
                 </View>
                 <View style={[styles.markerPointer, { backgroundColor: sportStyle.color }]} />
               </View>
@@ -272,24 +429,53 @@ export default function HomeScreen() {
           <View>
             <View style={styles.header}>
               <Text style={styles.headerTitle}>SportLink</Text>
-              <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/profile')}>
+              {visibleGameCount > 0 && activeFilter !== 'courts' && (
+                <View style={styles.gameCountBadge}>
+                  <Text style={styles.gameCountText}>{visibleGameCount} game{visibleGameCount !== 1 ? 's' : ''}</Text>
+                </View>
+              )}
+              <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile' as any)}>
                 <Ionicons name="person-circle" size={36} color="#333" />
               </TouchableOpacity>
             </View>
 
+            {/* Main filter row */}
             <View style={styles.filtersWrapper}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
-                <TouchableOpacity style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]} onPress={() => setActiveFilter('all')}>
-                  <Text style={[styles.filterText, activeFilter === 'all' && styles.filterTextActive]}>All</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.filterChip, activeFilter === 'games' && styles.filterChipActive]} onPress={() => setActiveFilter('games')}>
-                  <Text style={[styles.filterText, activeFilter === 'games' && styles.filterTextActive]}>Community Games</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.filterChip, activeFilter === 'courts' && styles.filterChipActive]} onPress={() => setActiveFilter('courts')}>
-                  <Text style={[styles.filterText, activeFilter === 'courts' && styles.filterTextActive]}>Courts</Text>
-                </TouchableOpacity>
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'games', label: 'Community Games' },
+                  { key: 'courts', label: 'Courts' },
+                ].map(f => (
+                  <TouchableOpacity
+                    key={f.key}
+                    style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
+                    onPress={() => { setActiveFilter(f.key); setSportFilter('all'); }}
+                  >
+                    <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>{f.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             </View>
+
+            {/* Sport sub-filter row */}
+            {showSportFilter && (
+              <View style={styles.sportFiltersWrapper}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
+                  {SPORT_FILTERS.map(f => (
+                    <TouchableOpacity
+                      key={f.key}
+                      style={[styles.sportChip, sportFilter === f.key && styles.sportChipActive]}
+                      onPress={() => setSportFilter(f.key)}
+                    >
+                      <Text style={[styles.sportChipText, sportFilter === f.key && styles.sportChipTextActive]}>
+                        {f.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
         )}
       </SafeAreaView>
@@ -300,10 +486,8 @@ export default function HomeScreen() {
           userId={user?.id}
           token={token}
           onJoined={(newCount) => {
-            setGames((prev) =>
-              prev.map((g) => g.id === selectedCourt.id ? { ...g, participant_count: newCount } : g)
-            );
-            setSelectedCourt((prev) => prev ? { ...prev, participant_count: newCount } : prev);
+            setGames(prev => prev.map(g => g.id === selectedCourt.id ? { ...g, participant_count: newCount } : g));
+            setSelectedCourt(prev => prev ? { ...prev, participant_count: newCount } : prev);
           }}
         />
       )}
@@ -398,28 +582,59 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f0f0' },
   map: { width: '100%', height: '100%' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1C1C1E' },
+
   markerWrapper: { alignItems: 'center', justifyContent: 'center' },
   markerIconBg: { backgroundColor: '#1C1C1E', padding: 6, borderRadius: 22, borderWidth: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },
+  markerIconBgGame: { borderWidth: 2.5, shadowOpacity: 0.5 },
+  markerGameDot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#1C1C1E' },
   markerPointer: { width: 3, height: 6, marginTop: -1 },
+  clusterMarker: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFFFFF', shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 8 },
+  clusterText: { color: '#1C1C1E', fontWeight: '900', fontSize: 15 },
+
   headerContainer: { position: 'absolute', top: 0, width: '100%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.95)', marginHorizontal: 20, marginTop: 15, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
   headerTitle: { fontSize: 22, fontWeight: '900', color: '#1C1C1E' },
+  gameCountBadge: { backgroundColor: '#0FEA9522', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#0FEA9555' },
+  gameCountText: { color: '#0FEA95', fontSize: 12, fontWeight: '800' },
   profileButton: {},
-  filtersWrapper: { marginTop: 15, paddingHorizontal: 5 },
+
+  filtersWrapper: { marginTop: 10, paddingHorizontal: 5 },
+  sportFiltersWrapper: { marginTop: 6, paddingHorizontal: 5 },
   filtersScroll: { paddingHorizontal: 15, paddingBottom: 5 },
+
   filterChip: { backgroundColor: 'rgba(255, 255, 255, 0.9)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: '#E5E5EA' },
   filterChipActive: { backgroundColor: '#0FEA95', borderColor: '#0FEA95' },
   filterText: { color: '#3A3A3C', fontSize: 14, fontWeight: 'bold' },
   filterTextActive: { color: '#1C1C1E' },
+
+  sportChip: { backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, marginRight: 8, borderWidth: 1, borderColor: '#E5E5EA' },
+  sportChipActive: { backgroundColor: '#1C1C1E', borderColor: '#1C1C1E' },
+  sportChipText: { color: '#636366', fontSize: 13, fontWeight: '700' },
+  sportChipTextActive: { color: '#0FEA95' },
+
   bottomCard: { position: 'absolute', bottom: 30, alignSelf: 'center', width: width * 0.9, backgroundColor: 'white', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#1C1C1E' },
-  sportBadgeText: { fontSize: 12, color: '#8E8E93', fontWeight: '600', marginTop: 2 },
+  cardBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  sportBadgeText: { fontSize: 12, color: '#8E8E93', fontWeight: '600' },
+  urgentBadge: { backgroundColor: '#FF453A22', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: '#FF453A66' },
+  urgentBadgeText: { color: '#FF453A', fontSize: 11, fontWeight: '800' },
   ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9C4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, height: 25 },
   ratingText: { fontSize: 14, fontWeight: '700', marginLeft: 4, color: '#FBC02D' },
-  cardAddress: { fontSize: 14, color: '#636366', marginBottom: 12, lineHeight: 22 },
-  playersRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  cardAddress: { fontSize: 14, color: '#636366', marginBottom: 10, lineHeight: 22 },
+  playersRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   playersText: { fontSize: 13, color: '#8E8E93', fontWeight: '600' },
+
+  participantsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  participantAvatars: { flexDirection: 'row', alignItems: 'center' },
+  avatarMiniWrap: {},
+  avatarMini: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#2C2C2E' },
+  avatarMiniImg: { width: '100%', height: '100%' },
+  avatarMiniLetter: { fontSize: 12, fontWeight: '900' },
+  avatarMiniMore: { backgroundColor: '#3A3A3C', borderColor: '#636366' },
+  avatarMiniMoreText: { color: '#AEAEB2', fontSize: 10, fontWeight: '800' },
+  participantLabel: { flex: 1, fontSize: 12, color: '#636366' },
+
   joinButton: { backgroundColor: '#0FEA95', paddingVertical: 15, borderRadius: 15, alignItems: 'center' },
   joinButtonText: { fontSize: 16, fontWeight: 'bold', color: '#1C1C1E' },
   fab: { position: 'absolute', bottom: 30, right: 25, backgroundColor: '#1C1C1E', width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },

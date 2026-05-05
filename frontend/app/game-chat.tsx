@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -78,7 +79,11 @@ export default function GameChatScreen() {
   useEffect(() => {
     if (user?.id) fetchAvatars([user.id]);
     fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
+    AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
+    const interval = setInterval(() => {
+      fetchMessages();
+      AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
+    }, 3000);
     return () => clearInterval(interval);
   }, [id]);
 
@@ -144,15 +149,20 @@ export default function GameChatScreen() {
             const avatarBase64 = avatarCache[msg.user_id] ?? null;
 
             const avatarCircle = (
-              <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
-                {avatarBase64 ? (
-                  <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
-                ) : (
-                  <Text style={[styles.avatarSmallLetter, { color }]}>
-                    {msg.username.charAt(0).toUpperCase()}
-                  </Text>
-                )}
-              </View>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(msg.user_id) } })}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
+                  {avatarBase64 ? (
+                    <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
+                  ) : (
+                    <Text style={[styles.avatarSmallLetter, { color }]}>
+                      {msg.username.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
             );
 
             if (isOwn) {

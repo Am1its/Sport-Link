@@ -119,4 +119,32 @@ router.put('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// PUT /api/users/push-token — save or clear Expo push token
+router.put('/push-token', authMiddleware, async (req, res) => {
+  const { push_token } = req.body;
+  try {
+    await pool.execute('UPDATE Users SET push_token = ? WHERE id = ?', [push_token || null, req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/users/:id — public profile (registered last to avoid shadowing /me /avatars /leaderboard)
+router.get('/:id', authMiddleware, async (req, res) => {
+  const targetId = parseInt(req.params.id);
+  if (isNaN(targetId)) return res.status(400).json({ success: false, message: 'Invalid user id' });
+  try {
+    const user = await fetchUser(targetId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    // Strip sensitive fields before returning public profile
+    const { avatar, username, bio, karma, games_hosted, games_joined } = user;
+    res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
