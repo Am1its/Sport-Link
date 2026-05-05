@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, ComponentProps, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated, FlatList } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -139,7 +139,15 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedCourt, setSelectedCourt] = useState<MapItem | null>(null);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showCourtPicker, setShowCourtPicker] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
+
+  const isPastGame = (scheduledTime: string | null) => {
+    if (!scheduledTime) return false;
+    const d = new Date(scheduledTime);
+    return !isNaN(d.getTime()) && d < new Date();
+  };
   const [mapRegion, setMapRegion] = useState<Region>({
     latitude: 32.0853,
     longitude: 34.7818,
@@ -204,12 +212,14 @@ export default function HomeScreen() {
     );
   }
 
+  const activeGames = games.filter(g => !isPastGame(g.scheduled_time));
+
   const getFilteredCourts = () => {
     switch (activeFilter) {
       case 'courts': return courts;
-      case 'games':  return games;
+      case 'games':  return activeGames;
       case 'all':
-      default:       return [...courts, ...games];
+      default:       return [...courts, ...activeGames];
     }
   };
 
@@ -300,14 +310,85 @@ export default function HomeScreen() {
 
       {!selectedCourt && (
         isSelectingLocation ? (
-          <TouchableOpacity style={[styles.fab, { backgroundColor: '#FF453A', width: 'auto', paddingHorizontal: 20, borderRadius: 20 }]} onPress={() => setIsSelectingLocation(false)}>
+          <TouchableOpacity
+            style={[styles.fab, { backgroundColor: '#FF453A', width: 'auto', paddingHorizontal: 20, borderRadius: 20 }]}
+            onPress={() => setIsSelectingLocation(false)}
+          >
             <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Cancel</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.fab} onPress={() => setIsSelectingLocation(true)}>
-            <Ionicons name="add" size={32} color="white" />
-          </TouchableOpacity>
+          <>
+            {showAddMenu && (
+              <View style={styles.addMenu}>
+                <TouchableOpacity
+                  style={styles.addMenuItem}
+                  onPress={() => { setShowAddMenu(false); setIsSelectingLocation(true); }}
+                >
+                  <Ionicons name="location-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.addMenuText}>Drop Pin</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.addMenuItem}
+                  onPress={() => setShowCourtPicker(true)}
+                >
+                  <Ionicons name="business-outline" size={20} color="#0FEA95" />
+                  <Text style={[styles.addMenuText, { color: '#0FEA95' }]}>Choose Court</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.fab, showAddMenu && { backgroundColor: '#FF453A' }]}
+              onPress={() => { setShowAddMenu(v => !v); setShowCourtPicker(false); }}
+            >
+              <Ionicons name={showAddMenu ? 'close' : 'add'} size={32} color="white" />
+            </TouchableOpacity>
+          </>
         )
+      )}
+
+      {showCourtPicker && (
+        <View style={styles.courtPickerSheet}>
+          <View style={styles.courtPickerHeader}>
+            <Text style={styles.courtPickerTitle}>Choose a Court</Text>
+            <TouchableOpacity onPress={() => { setShowCourtPicker(false); setShowAddMenu(false); }}>
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={courts}
+            keyExtractor={(item) => item.place_id}
+            style={{ maxHeight: 320 }}
+            renderItem={({ item }) => {
+              const { icon, color } = getSportStyle(item.sport_type);
+              return (
+                <TouchableOpacity
+                  style={styles.courtPickerItem}
+                  onPress={() => {
+                    setShowCourtPicker(false);
+                    setShowAddMenu(false);
+                    router.push({
+                      pathname: '/modal',
+                      params: {
+                        lat: item.geometry.location.lat,
+                        lng: item.geometry.location.lng,
+                        existingLocationDesc: item.name,
+                      },
+                    });
+                  }}
+                >
+                  <View style={[styles.courtPickerIcon, { backgroundColor: color + '22', borderColor: color }]}>
+                    <MaterialCommunityIcons name={icon} size={20} color={color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.courtPickerName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.courtPickerAddress} numberOfLines={1}>{item.vicinity}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#48484A" />
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
       )}
     </View>
   );
@@ -342,4 +423,16 @@ const styles = StyleSheet.create({
   joinButton: { backgroundColor: '#0FEA95', paddingVertical: 15, borderRadius: 15, alignItems: 'center' },
   joinButtonText: { fontSize: 16, fontWeight: 'bold', color: '#1C1C1E' },
   fab: { position: 'absolute', bottom: 30, right: 25, backgroundColor: '#1C1C1E', width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
+
+  addMenu: { position: 'absolute', bottom: 105, right: 20, gap: 10 },
+  addMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1C1C1E', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  addMenuText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+
+  courtPickerSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 30, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 12 },
+  courtPickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
+  courtPickerTitle: { fontSize: 18, fontWeight: '900', color: '#FFFFFF' },
+  courtPickerItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
+  courtPickerIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  courtPickerName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  courtPickerAddress: { fontSize: 12, color: '#636366', marginTop: 2 },
 });

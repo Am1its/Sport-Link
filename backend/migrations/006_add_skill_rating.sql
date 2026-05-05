@@ -1,0 +1,1 @@
+ALTER TABLE PeerRatings ADD COLUMN skill TINYINT DEFAULT NULL COMMENT '1-5 skill rating';

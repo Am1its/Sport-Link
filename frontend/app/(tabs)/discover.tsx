@@ -165,7 +165,10 @@ export default function DiscoverScreen() {
     setGames((prev) => prev.map((g) => g.id === id ? { ...g, participant_count: newCount } : g));
   };
 
+  const isPastGame = (t: string | null) => { const d = new Date(t ?? ''); return !isNaN(d.getTime()) && d < new Date(); };
+
   const filtered = games.filter((g) => {
+    if (isPastGame(g.scheduled_time)) return false;
     const matchSport = sportFilter === 'all' || g.sport_type === sportFilter;
     const matchSearch = !search.trim() ||
       g.sport_type.includes(search.toLowerCase()) ||

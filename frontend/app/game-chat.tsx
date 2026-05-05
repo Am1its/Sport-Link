@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView,
+  ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,10 @@ type Message = {
   created_at: string;
 };
 
+const AVATAR_PALETTE = ['#FF8C00', '#4F9EFF', '#FF453A', '#FFD700', '#A78BFA', '#0FEA95', '#FF6B9D', '#34C759'];
+const getAvatarColor = (name: string) =>
+  AVATAR_PALETTE[(name.charCodeAt(0) + name.length) % AVATAR_PALETTE.length];
+
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -28,7 +32,26 @@ export default function GameChatScreen() {
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [avatarCache, setAvatarCache] = useState<Record<number, string | null>>({});
+  const seenUserIds = useRef<Set<number>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
+
+  const fetchAvatars = async (userIds: number[]) => {
+    const newIds = userIds.filter(uid => !seenUserIds.current.has(uid));
+    if (newIds.length === 0) return;
+    newIds.forEach(uid => seenUserIds.current.add(uid));
+    try {
+      const res = await fetch(`${API_BASE}/api/users/avatars?ids=${newIds.join(',')}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        const map: Record<number, string | null> = {};
+        data.avatars.forEach((a: { id: number; avatar: string | null }) => { map[a.id] = a.avatar; });
+        setAvatarCache(prev => ({ ...prev, ...map }));
+      }
+    } catch {}
+  };
 
   const fetchMessages = async () => {
     try {
@@ -36,7 +59,15 @@ export default function GameChatScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (data.success) setMessages(data.messages);
+      if (data.success) {
+        setMessages(data.messages);
+        const otherIds = [...new Set<number>(
+          data.messages
+            .filter((m: Message) => m.user_id !== user?.id)
+            .map((m: Message) => m.user_id)
+        )];
+        fetchAvatars(otherIds);
+      }
     } catch (err) {
       console.error('Fetch messages error:', err);
     } finally {
@@ -45,6 +76,7 @@ export default function GameChatScreen() {
   };
 
   useEffect(() => {
+    if (user?.id) fetchAvatars([user.id]);
     fetchMessages();
     const interval = setInterval(fetchMessages, 3000);
     return () => clearInterval(interval);
@@ -108,15 +140,55 @@ export default function GameChatScreen() {
           )}
           {messages.map((msg) => {
             const isOwn = msg.user_id === user?.id;
-            return (
-              <View key={msg.id} style={[styles.bubbleRow, isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther]}>
-                {!isOwn && <Text style={styles.senderName}>{msg.username}</Text>}
-                <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
-                  <Text style={[styles.bubbleText, isOwn && styles.bubbleTextOwn]}>{msg.content}</Text>
+            const color = getAvatarColor(msg.username);
+            const avatarBase64 = avatarCache[msg.user_id] ?? null;
+
+            const avatarCircle = (
+              <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
+                {avatarBase64 ? (
+                  <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
+                ) : (
+                  <Text style={[styles.avatarSmallLetter, { color }]}>
+                    {msg.username.charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+            );
+
+            if (isOwn) {
+              return (
+                <View key={msg.id} style={styles.bubbleRowOwn}>
+                  <View style={styles.bubbleOwnContent}>
+                    <View style={[styles.bubble, styles.bubbleOwn]}>
+                      <Text style={[styles.bubbleText, styles.bubbleTextOwn]}>{msg.content}</Text>
+                    </View>
+                    <Text style={[styles.timestamp, { textAlign: 'right' }]}>
+                      {formatTime(msg.created_at)}
+                    </Text>
+                  </View>
+                  {avatarCircle}
                 </View>
-                <Text style={[styles.timestamp, isOwn && { textAlign: 'right' }]}>
-                  {formatTime(msg.created_at)}
-                </Text>
+              );
+            }
+
+            return (
+              <View key={msg.id} style={styles.bubbleRowOther}>
+                <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
+                  {avatarBase64 ? (
+                    <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
+                  ) : (
+                    <Text style={[styles.avatarSmallLetter, { color }]}>
+                      {msg.username.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.bubbleOtherContent}>
+                  <Text style={styles.senderName}>{msg.username}</Text>
+                  <View style={[styles.bubble, styles.bubbleOther]}>
+                    <Text style={styles.bubbleText}>{msg.content}</Text>
+                  </View>
+                  <Text style={styles.timestamp}>{formatTime(msg.created_at)}</Text>
+                </View>
               </View>
             );
           })}
@@ -161,10 +233,15 @@ const styles = StyleSheet.create({
   emptyChat: { flex: 1, alignItems: 'center', paddingTop: 80 },
   emptyChatText: { color: '#636366', marginTop: 12, fontSize: 15 },
 
-  bubbleRow: { maxWidth: '80%' },
-  bubbleRowOwn: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  bubbleRowOther: { alignSelf: 'flex-start', alignItems: 'flex-start' },
+  bubbleRowOwn: { flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '85%' },
+  bubbleOwnContent: { flex: 1, alignItems: 'flex-end' },
+  bubbleRowOther: { flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'flex-start', maxWidth: '85%' },
 
+  avatarSmall: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', marginHorizontal: 6 },
+  avatarSmallImage: { width: '100%', height: '100%' },
+  avatarSmallLetter: { fontSize: 14, fontWeight: '900' },
+
+  bubbleOtherContent: { flex: 1 },
   senderName: { color: '#8E8E93', fontSize: 12, fontWeight: '600', marginBottom: 3, marginLeft: 4 },
 
   bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
