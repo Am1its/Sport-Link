@@ -1,0 +1,12 @@
+USE sportlink;
+
+CREATE TABLE IF NOT EXISTS Messages (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  game_id    INT NOT NULL,
+  user_id    INT NOT NULL,
+  username   VARCHAR(50) NOT NULL,
+  content    TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (game_id) REFERENCES Games(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES Users(id)  ON DELETE CASCADE
+);
