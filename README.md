@@ -40,7 +40,7 @@ We rely on a robust, scalable stack optimized for location-based services. Click
 | Mar 26, 2026 | [**App Flow & Core Features**](docs/APP_FLOW.md) | ✅ Completed |
 | Mar 29, 2026 | [**Business & Growth Strategy**](docs/BUSINESS_STRATEGY.md) | ✅ Completed |
 | Apr 1, 2026 | [**Authentication \& Trust Model**](docs\/AUTHENTICATION_MODEL.md) | ✅ Completed |
-| May 10, 2026 | **Full Prototype** | ⏳ Pending |
+| May 10, 2026 | [**Full Prototype**](docs/FULL_PROTOTYPE.md) | ✅ Completed |
 | Sep 08, 2026 | **Final Submission** | ⏳ Pending |
 
 ## 👥 The Team
