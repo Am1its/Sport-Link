@@ -43,13 +43,13 @@ The system follows a **Client-Server** architecture with a persistent WebSocket 
 ```
 Users ──────────────────────────────────────────────────────────┐
   │                                                             │
-  ├── hosts ──────► Games ◄──── GameParticipants ◄─── Users    │
+  ├── hosts ──────► Games ◄──── GameParticipants ◄─── Users     │
   │                  │                                          │
   │              Messages                                       │
   │                                                             │
   ├── Ratings (host marks attendance)                           │
   ├── PeerRatings (participants rate each other)                │
-  ├── Friends (requester_id / addressee_id, status)            │
+  ├── Friends (requester_id / addressee_id, status)             │
   └── Notifications (persisted push payloads)                   │
                                                                 │
 Users ──────────────────────────────────────────────────────────┘
