@@ -178,12 +178,34 @@ router.put('/push-token', authMiddleware, async (req, res) => {
 // GET /api/users/:id — public profile (registered last to avoid shadowing /me /avatars /leaderboard)
 router.get('/:id', authMiddleware, async (req, res) => {
   const targetId = parseInt(req.params.id);
+  const viewerId = req.user.id;
   if (isNaN(targetId)) return res.status(400).json({ success: false, message: 'Invalid user id' });
   try {
     const user = await fetchUser(targetId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     const { avatar, username, bio, karma, games_hosted, games_joined } = user;
-    res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined } });
+
+    // Determine friendship status between viewer and target
+    let friendship_status = 'none';
+    let friendship_id = null;
+    if (viewerId !== targetId) {
+      const [[row]] = await pool.execute(
+        'SELECT id, requester_id, status FROM Friends WHERE (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)',
+        [viewerId, targetId, targetId, viewerId]
+      );
+      if (row) {
+        friendship_id = row.id;
+        if (row.status === 'accepted') {
+          friendship_status = 'friends';
+        } else if (row.requester_id === viewerId) {
+          friendship_status = 'pending_sent';
+        } else {
+          friendship_status = 'pending_received';
+        }
+      }
+    }
+
+    res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined, friendship_status, friendship_id } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });

@@ -44,6 +44,7 @@ export default function ProfileScreen() {
   const [editBio, setEditBio]     = useState('');
   const [editAvatar, setEditAvatar] = useState<string | null>(null);
   const [saving, setSaving]    = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -56,7 +57,15 @@ export default function ProfileScreen() {
           console.error('Stats fetch error:', err);
         }
       };
+      const fetchUnread = async () => {
+        try {
+          const res = await apiFetch('/api/notifications', { token });
+          const data = await res.json();
+          if (data.success) setUnreadNotifs(data.unread_count);
+        } catch {}
+      };
       fetchStats();
+      fetchUnread();
     }, [token])
   );
 
@@ -256,12 +265,27 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color="#48484A" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications-settings' as any)}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notification-inbox' as any)}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIconWrap, { backgroundColor: '#4F9EFF22' }]}>
               <Ionicons name="notifications-outline" size={20} color="#4F9EFF" />
             </View>
             <Text style={styles.menuText}>Notifications</Text>
+            {unreadNotifs > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
+              </View>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#48484A" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications-settings' as any)}>
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.menuIconWrap, { backgroundColor: '#4F9EFF22' }]}>
+              <Ionicons name="settings-outline" size={20} color="#4F9EFF" />
+            </View>
+            <Text style={styles.menuText}>Notification Settings</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#48484A" />
         </TouchableOpacity>
@@ -322,4 +346,7 @@ const styles = StyleSheet.create({
   menuItemLeft: { flexDirection: 'row', alignItems: 'center' },
   menuIconWrap: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   menuText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+
+  notifBadge: { backgroundColor: '#FF453A', borderRadius: 9, minWidth: 18, height: 18, paddingHorizontal: 4, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+  notifBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
 });

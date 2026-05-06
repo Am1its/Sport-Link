@@ -20,6 +20,7 @@ type Game = {
   is_host: boolean;
   status: string;
   created_at: string;
+  photo: string | null;
 };
 
 function GameCard({
@@ -286,6 +287,7 @@ export default function GamesScreen() {
                   existingTime:         item.scheduled_time  ?? '',
                   existingEquipment:    item.equipment_notes ?? '',
                   existingMaxPlayers:   item.max_players != null ? String(item.max_players) : '',
+                  existingPhoto:        item.photo ?? '',
                 },
               })
             }

@@ -6,10 +6,12 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { formatTime } from '../utils/time';
+import { API_BASE } from '../constants/api';
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -33,6 +35,7 @@ export default function GameChatScreen() {
   const [avatarCache, setAvatarCache] = useState<Record<number, string | null>>({});
   const seenUserIds = useRef<Set<number>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const fetchAvatars = async (userIds: number[]) => {
     const newIds = userIds.filter(uid => !seenUserIds.current.has(uid));
@@ -73,11 +76,24 @@ export default function GameChatScreen() {
     if (user?.id) fetchAvatars([user.id]);
     fetchMessages();
     AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
-    const interval = setInterval(() => {
-      fetchMessages();
+
+    // Connect socket.io for real-time messages
+    const socket = io(API_BASE, { auth: { token } });
+    socketRef.current = socket;
+    socket.emit('join_game', id);
+    socket.on('new_message', (msg: Message) => {
+      setMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
       AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
-    }, 3000);
-    return () => clearInterval(interval);
+      fetchAvatars([msg.user_id]);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -86,23 +102,20 @@ export default function GameChatScreen() {
     }
   }, [messages.length]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = () => {
+    if (!input.trim() || sending) return;
     const content = input.trim();
     setInput('');
-    setSending(true);
-    try {
-      await apiFetch(`/api/chats/${id}/messages`, {
-        method: 'POST',
-        token,
-        body: JSON.stringify({ content }),
-      });
-      await fetchMessages();
-    } catch (err) {
-      if (err instanceof UnauthorizedError) return;
-      console.error('Send message error:', err);
-    } finally {
-      setSending(false);
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('send_message', { gameId: id, content });
+    } else {
+      // Fallback to REST if socket not connected
+      setSending(true);
+      apiFetch(`/api/chats/${id}/messages`, { method: 'POST', token, body: JSON.stringify({ content }) })
+        .then(r => r.json())
+        .then(data => { if (data.success) setMessages(prev => [...prev, data.message]); })
+        .catch(err => { if (!(err instanceof UnauthorizedError)) console.error('Send message error:', err); })
+        .finally(() => setSending(false));
     }
   };
 

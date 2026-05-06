@@ -6,7 +6,7 @@ const pool = require('../db');
 const router = express.Router();
 
 const signToken = (user) =>
-  jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '90d' });
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {

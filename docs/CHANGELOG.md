@@ -4,6 +4,128 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 7] — May 2026 — Feature Completion: Real-Time Chat, Notification Inbox, Game Photos, Radius Search & Profile Friend Button
+
+### WebSocket Chat (socket.io)
+**Backend (`backend/server.js`)**
+- Replaced `app.listen()` with `http.createServer(app)` + `socket.io` v4 `IOServer`.
+- Socket auth middleware: extracts `token` from `socket.handshake.auth`, verifies with `jwt.verify` — unauthenticated connections are rejected.
+- `join_game` event: client joins a socket.io room `game_<id>` after verifying membership via DB.
+- `send_message` event: validates content length (≤1000 chars), saves to `Messages`, fetches the new row, and emits `new_message` to the entire room.
+- CORS set to `{ origin: '*' }` for Expo Go compatibility.
+
+**Frontend (`frontend/app/game-chat.tsx`)**
+- Installed `socket.io-client` v4 via `npx expo install`.
+- Replaced 3-second `setInterval` polling with a persistent socket connection on screen mount.
+- On mount: connect to `API_BASE` with `{ auth: { token } }`, emit `join_game`, register `new_message` listener.
+- Deduplication guard: checks `prev.some(m => m.id === msg.id)` before appending to prevent duplicates on reconnect.
+- `sendMessage` now emits `send_message` via socket; falls back to REST `POST /api/chats/:id/messages` when socket is disconnected.
+- Cleanup: `socket.disconnect()` on unmount.
+- `API_BASE` imported from `../constants/api` for consistent socket URL.
+
+---
+
+### In-App Notification Inbox
+**Database**
+- New `Notifications` table: `(id INT PK, user_id INT FK, title VARCHAR(200), body TEXT, data JSON, is_read BOOL DEFAULT FALSE, created_at TIMESTAMP)`. Index on `user_id`. FK to `Users` with `ON DELETE CASCADE`.
+
+**Backend (`backend/utils/sendPushNotification.js`)**
+- Extended to also persist each notification to the `Notifications` table.
+- Bulk-fetches `user_id` for all push tokens in one query (`SELECT id, push_token FROM Users WHERE push_token IN (...)`).
+- Batch-inserts `(user_id, title, body, data)` rows via a single `INSERT INTO Notifications ... VALUES ...`.
+- DB errors are caught and logged without interrupting the push send.
+
+**Backend (`backend/routes/notifications.js`)** — new route file
+- `GET /api/notifications` — returns last 50 notifications for current user (DESC), plus `unread_count`.
+- `PUT /api/notifications/:id/read` — marks a single notification read (guards `user_id = caller`).
+- `PUT /api/notifications/read-all` — marks all unread notifications read for current user.
+
+**Backend (`backend/server.js`)**
+- Registered `/api/notifications` route.
+
+**Frontend (`frontend/app/notification-inbox.tsx`)** — new screen
+- Lists notifications with unread green dot, title, body, and relative time (`timeAgo` helper).
+- Unread rows have a subtle green tint background.
+- Tapping a row calls `PUT /:id/read` and clears the dot optimistically.
+- "Mark all read" button in header (only shown when `unread_count > 0`); fires `PUT /read-all`.
+- Empty state: bell outline icon + "No notifications yet".
+
+**Frontend (`frontend/app/(tabs)/profile.tsx`)**
+- `fetchUnread()` called on screen focus via `useFocusEffect`; sets `unreadNotifs` state.
+- "Notifications" menu item now navigates to `/notification-inbox` and shows a red badge pill when `unreadNotifs > 0`.
+- Separate "Notification Settings" menu item kept below it (navigates to `/notifications-settings`).
+
+---
+
+### Game Photo
+**Database**
+- `ALTER TABLE Games ADD COLUMN photo MEDIUMTEXT NULL AFTER equipment_notes`.
+
+**Backend (`backend/routes/games.js`)**
+- `toMapGame()` now includes `photo: row.photo ?? null` in the response shape.
+- `POST /api/games` — accepts `photo` (base64 string) in body; inserts into new column.
+- `PUT /api/games/:id` — accepts `photo`; merges with existing value using same pattern as other optional fields.
+
+**Frontend (`frontend/app/modal.tsx`)**
+- Installed `expo-image-picker` (already available in Expo SDK).
+- `pickPhoto()` helper: requests media library permission, launches picker with `aspect: [16, 9]`, `quality: 0.6`, `base64: true`.
+- Photo state initialised from `params.existingPhoto` for edit mode.
+- Photo section rendered above Invite Friends: shows 16:9 preview with an overlay remove button, or a dashed camera placeholder button when empty.
+- `photo` included in POST/PUT body.
+
+**Frontend (`frontend/app/(tabs)/discover.tsx`)**
+- `Game` type extended with `photo: string | null`.
+- `GameCard`: renders `<Image>` at 160px height with `borderRadius: 12` above the equipment row when `game.photo` is present.
+- `Image` added to React Native imports.
+
+**Frontend (`frontend/app/(tabs)/games.tsx`)**
+- `Game` type extended with `photo: string | null`.
+- `onEdit` router push includes `existingPhoto: item.photo ?? ''` param.
+
+---
+
+### Radius-Based Game Search
+**Backend (`backend/routes/games.js`)**
+- `GET /api/games` now accepts optional `?lat=&lng=&radius_km=` query params.
+- When all three are present, adds a Haversine `distance_km` expression to the `SELECT` clause (3 bound params: `lat`, `lng`, `lat`) and filters with `HAVING distance_km <= ?` (1 more param: `radius_km`).
+- Non-radius requests are unchanged (no extra params passed).
+
+**Frontend (`frontend/app/(tabs)/discover.tsx`)**
+- `expo-location` already installed; imported `* as Location`.
+- `RADIUS_OPTIONS` constant: `[Any, 1 km, 5 km, 10 km, 20 km]`.
+- `radiusKm` state (`number | null`, default `null`).
+- `userLocation` ref caches the GPS result across re-fetches; cleared when a new radius chip is selected to force a fresh location fix.
+- `fetchGames` requests `Location.requestForegroundPermissionsAsync()` then `getCurrentPositionAsync()` only when a km option is active and no cached location exists; appends `lat/lng/radius_km` to the URL.
+- Second horizontal `ScrollView` of radius chips rendered below the sport chips; active chip uses a blue (`#4F9EFF`) color scheme distinct from the green sport chips.
+
+---
+
+### Player-Profile Friend Button
+**Backend (`backend/routes/users.js`)**
+- `GET /api/users/:id` now queries the `Friends` table for a row matching either `(viewer→target)` or `(target→viewer)`.
+- Returns `friendship_status: 'none' | 'pending_sent' | 'pending_received' | 'friends'` and `friendship_id: number | null` in the user object.
+
+**Frontend (`frontend/app/player-profile.tsx`)**
+- `PublicUser` type extended with `friendship_status` and `friendship_id`.
+- `handleFriendAction()` async handler:
+  - `none` → `POST /api/friends` → sets state to `pending_sent`.
+  - `pending_received` → `PUT /api/friends/:id/accept` → sets state to `friends`.
+  - `friends` / `pending_sent` → confirms via `Alert`, then `DELETE /api/friends/:id` → sets state to `none`.
+- Friend button rendered below stats (hidden for own profile via `!isMe`):
+  - **Add Friend** — green background, dark text.
+  - **Request Sent** — muted background, grey text + clock icon.
+  - **Accept Request** — blue background, white text + checkmark icon.
+  - **Remove Friend** — muted background, red destructive text.
+- Loading spinner replaces content during API call.
+
+---
+
+### Auth — Token Expiry Extended
+**Backend (`backend/routes/auth.js`)**
+- JWT `expiresIn` changed from `'7d'` to `'90d'` — eliminates frequent forced logouts.
+
+---
+
 ## [Sprint 6] — May 2026 — Code Quality & Architecture Hardening
 
 ### Backend — Security & Reliability

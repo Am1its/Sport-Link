@@ -22,10 +22,15 @@ To ensure our technical architecture serves real user needs, we have defined the
 
 Here is how user needs translate into our architectural choices:
 
-| ID | As a... | I want to... | So that... | **Technical Solution (HLD)** |
+| ID | As a... | I want to... | So that... | **Technical Solution (Implemented)** |
 | :--- | :--- | :--- | :--- | :--- |
-| **US-1** | **Newcomer** | See all active games within 2km of my location | I can walk to the game without driving. | **PostgreSQL + PostGIS** for efficient geospatial radius queries. |
-| **US-2** | **Organizer** | Open a game at a specific, verified court | Players know exactly where to meet. | **Google Places API** ensures the location exists and has coordinates. |
-| **US-3** | **Newcomer** | Filter games by skill level (1-5) | I don't join a pro league and embarrass myself. | **SQL Schema** with structured columns for filtering (not unstructured NoSQL). |
-| **US-4** | **Organizer** | See in real-time when someone joins my game | I can stop searching for players. | **Node.js** backend handling concurrent requests and status updates. |
+| **US-1** | **Newcomer** | See all active games within X km of my location | I can walk to the game without driving. | **Haversine formula** in `GET /api/games?radius_km=` + radius chips in Discover screen. |
+| **US-2** | **Organizer** | Open a game at a specific, verified court | Players know exactly where to meet. | **Google Places API** (4 parallel queries) — court picker pre-fills game location. |
+| **US-3** | **Newcomer** | Filter games by skill level (1-5) | I don't join a pro league and embarrass myself. | `level` column in `Games` + filter UI in Discover; level badge on map markers. |
+| **US-4** | **Organizer** | See in real-time when someone joins my game | I can stop searching for players. | **Push notification** on join + **socket.io** group chat for coordination. |
+| **US-5** | **Organizer** | Fill a last-minute spot quickly | The game doesn't get cancelled. | Urgency badge (≤2 spots left) in Discover + 30-min reminder push to all participants. |
+| **US-6** | **Newcomer** | Trust that my teammates will show up | I don't waste a trip to the court. | **Karma score** from host attendance ratings + peer category ratings. |
+| **US-7** | **Player** | Chat with my game group | We can coordinate meetup details. | **socket.io** room per game — real-time, no polling. |
+| **US-8** | **Player** | See notifications I missed | I don't miss important game updates. | **Notification inbox** — all push payloads persisted to DB; unread badge on profile. |
+| **US-9** | **Player** | Add friends and invite them to my games | I play with people I already know. | **Friends system** + invite chips in the Create Game modal. |
 

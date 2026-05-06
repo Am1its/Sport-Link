@@ -1,15 +1,24 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl,
+  TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl, Image,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { isPastGame } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/sports';
+
+const RADIUS_OPTIONS = [
+  { label: 'Any', km: null },
+  { label: '1 km', km: 1 },
+  { label: '5 km', km: 5 },
+  { label: '10 km', km: 10 },
+  { label: '20 km', km: 20 },
+];
 
 type Game = {
   id: number;
@@ -23,6 +32,7 @@ type Game = {
   max_players: number | null;
   participant_count: number;
   host_id: number;
+  photo: string | null;
 };
 
 function GameCard({
@@ -122,6 +132,14 @@ function GameCard({
         </View>
       </View>
 
+      {game.photo ? (
+        <Image
+          source={{ uri: `data:image/jpeg;base64,${game.photo}` }}
+          style={styles.cardPhoto}
+          resizeMode="cover"
+        />
+      ) : null}
+
       {game.equipment_notes ? (
         <View style={styles.equipRow}>
           <Ionicons name="bag-outline" size={13} color="#636366" />
@@ -157,12 +175,27 @@ export default function DiscoverScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [sportFilter, setSportFilter] = useState<string>('all');
+  const [radiusKm, setRadiusKm] = useState<number | null>(null);
+  const userLocation = useRef<{ lat: number; lng: number } | null>(null);
 
   const fetchGames = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res = await apiFetch('/api/games', { token });
+      let url = '/api/games';
+      if (radiusKm !== null) {
+        if (!userLocation.current) {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            userLocation.current = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+          }
+        }
+        if (userLocation.current) {
+          url += `?lat=${userLocation.current.lat}&lng=${userLocation.current.lng}&radius_km=${radiusKm}`;
+        }
+      }
+      const res = await apiFetch(url, { token });
       const data = await res.json();
       if (data.success) setGames(data.games);
     } catch (err) {
@@ -172,7 +205,7 @@ export default function DiscoverScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token]);
+  }, [token, radiusKm]);
 
   useFocusEffect(
     useCallback(() => { fetchGames(); }, [fetchGames])
@@ -232,6 +265,29 @@ export default function DiscoverScreen() {
         ))}
       </ScrollView>
 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterScroll}
+        style={styles.radiusRow}
+      >
+        <Ionicons name="location-outline" size={15} color="#8E8E93" style={{ marginRight: 4, alignSelf: 'center' }} />
+        {RADIUS_OPTIONS.map(({ label, km }) => (
+          <TouchableOpacity
+            key={label}
+            style={[styles.filterChip, radiusKm === km && styles.radiusChipActive]}
+            onPress={() => {
+              userLocation.current = null;
+              setRadiusKm(km);
+            }}
+          >
+            <Text style={[styles.filterText, radiusKm === km && styles.radiusTextActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#0FEA95" />
@@ -273,12 +329,15 @@ const styles = StyleSheet.create({
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, paddingHorizontal: 14, height: 48, marginBottom: 14, gap: 10 },
   searchInput: { flex: 1, color: '#FFFFFF', fontSize: 15 },
 
-  filterRow: { marginBottom: 18 },
+  filterRow: { marginBottom: 10 },
+  radiusRow: { marginBottom: 18 },
   filterScroll: { gap: 8, paddingRight: 4 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#2C2C2E', borderWidth: 1, borderColor: '#3A3A3C' },
   filterChipActive: { backgroundColor: '#0FEA95', borderColor: '#0FEA95' },
   filterText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
   filterTextActive: { color: '#1C1C1E' },
+  radiusChipActive: { backgroundColor: '#4F9EFF22', borderColor: '#4F9EFF' },
+  radiusTextActive: { color: '#4F9EFF' },
 
   card: { backgroundColor: '#2C2C2E', borderRadius: 18, padding: 16, marginBottom: 12 },
   cardTop: { flexDirection: 'row', marginBottom: 14 },
@@ -294,6 +353,7 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { fontSize: 12, color: '#8E8E93' },
 
+  cardPhoto: { width: '100%', height: 160, borderRadius: 12, marginBottom: 12 },
   equipRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 12, paddingHorizontal: 2 },
   equipText: { color: '#636366', fontSize: 12, flex: 1 },
 

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
+
+type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 
 type PublicUser = {
   id: number;
@@ -16,6 +18,8 @@ type PublicUser = {
   karma: number;
   games_hosted: number;
   games_joined: number;
+  friendship_status: FriendshipStatus;
+  friendship_id: number | null;
 };
 
 export default function PlayerProfileScreen() {
@@ -25,6 +29,7 @@ export default function PlayerProfileScreen() {
 
   const [profile, setProfile] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [friendLoading, setFriendLoading] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,6 +46,56 @@ export default function PlayerProfileScreen() {
     };
     if (userId) fetchProfile();
   }, [userId]);
+
+  const handleFriendAction = async () => {
+    if (!profile || friendLoading) return;
+    setFriendLoading(true);
+    try {
+      if (profile.friendship_status === 'none') {
+        const res = await apiFetch('/api/friends', { method: 'POST', token, body: JSON.stringify({ addressee_id: profile.id }) });
+        const data = await res.json();
+        if (data.success) {
+          setProfile(p => p ? { ...p, friendship_status: 'pending_sent' } : p);
+        } else {
+          Alert.alert('Error', data.message);
+        }
+      } else if (profile.friendship_status === 'pending_received') {
+        const res = await apiFetch(`/api/friends/${profile.friendship_id}/accept`, { method: 'PUT', token });
+        const data = await res.json();
+        if (data.success) {
+          setProfile(p => p ? { ...p, friendship_status: 'friends' } : p);
+        } else {
+          Alert.alert('Error', data.message);
+        }
+      } else if (profile.friendship_status === 'friends' || profile.friendship_status === 'pending_sent') {
+        Alert.alert(
+          profile.friendship_status === 'friends' ? 'Remove Friend' : 'Cancel Request',
+          profile.friendship_status === 'friends'
+            ? `Remove ${profile.username} from friends?`
+            : `Cancel friend request to ${profile.username}?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Confirm', style: 'destructive', onPress: async () => {
+                const res = await apiFetch(`/api/friends/${profile.friendship_id}`, { method: 'DELETE', token });
+                const data = await res.json();
+                if (data.success) {
+                  setProfile(p => p ? { ...p, friendship_status: 'none', friendship_id: null } : p);
+                } else {
+                  Alert.alert('Error', data.message);
+                }
+              },
+            },
+          ]
+        );
+      }
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return;
+      Alert.alert('Error', 'Could not connect to server');
+    } finally {
+      setFriendLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -128,6 +183,47 @@ export default function PlayerProfileScreen() {
         </View>
       </View>
 
+      {/* Friend button */}
+      {!isMe && (() => {
+        const s = profile.friendship_status;
+        const btnColor =
+          s === 'friends'          ? '#2C2C2E' :
+          s === 'pending_sent'     ? '#2C2C2E' :
+          s === 'pending_received' ? '#4F9EFF' :
+                                     '#0FEA95';
+        const textColor =
+          s === 'friends'          ? '#FF453A' :
+          s === 'pending_sent'     ? '#8E8E93' :
+          s === 'pending_received' ? '#FFFFFF' :
+                                     '#1C1C1E';
+        const iconName: any =
+          s === 'friends'          ? 'person-remove-outline' :
+          s === 'pending_sent'     ? 'time-outline' :
+          s === 'pending_received' ? 'checkmark-circle-outline' :
+                                     'person-add-outline';
+        const label =
+          s === 'friends'          ? 'Remove Friend' :
+          s === 'pending_sent'     ? 'Request Sent' :
+          s === 'pending_received' ? 'Accept Request' :
+                                     'Add Friend';
+        return (
+          <TouchableOpacity
+            style={[styles.friendBtn, { backgroundColor: btnColor }]}
+            onPress={handleFriendAction}
+            disabled={friendLoading}
+            activeOpacity={0.8}
+          >
+            {friendLoading
+              ? <ActivityIndicator size="small" color={textColor} />
+              : <>
+                  <Ionicons name={iconName} size={18} color={textColor} />
+                  <Text style={[styles.friendBtnText, { color: textColor }]}>{label}</Text>
+                </>
+            }
+          </TouchableOpacity>
+        );
+      })()}
+
     </ScrollView>
   );
 }
@@ -163,4 +259,7 @@ const styles = StyleSheet.create({
   errorText: { color: '#636366', fontSize: 16, marginTop: 14 },
   backBtnCenter: { marginTop: 20, backgroundColor: '#2C2C2E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   backBtnCenterText: { color: '#FFFFFF', fontWeight: '700' },
+
+  friendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginBottom: 40, paddingVertical: 14, borderRadius: 16 },
+  friendBtnText: { fontSize: 15, fontWeight: '700' },
 });

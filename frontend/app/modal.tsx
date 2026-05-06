@@ -4,6 +4,7 @@ import {
   ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +27,23 @@ export default function GameFormModal() {
   const [equipment, setEquipment] = useState((params.existingEquipment as string) || '');
   const [maxPlayers, setMaxPlayers] = useState((params.existingMaxPlayers as string) || '');
   const [title, setTitle] = useState((params.existingTitle as string) || '');
+  const [photo, setPhoto] = useState<string | null>((params.existingPhoto as string) || null);
   const [loading, setLoading] = useState(false);
+
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Permission needed', 'Allow photo access to add a game photo.');
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      setPhoto(result.assets[0].base64);
+    }
+  };
 
   // Friends for pre-inviting (create mode only)
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -86,6 +103,7 @@ export default function GameFormModal() {
         scheduled_time:  scheduledTimeStr,
         equipment_notes: equipment     || null,
         max_players:     maxPlayers    ? parseInt(maxPlayers) : null,
+        photo:           photo         || null,
       };
       if (!isEdit) {
         body.latitude  = parseFloat(params.lat as string);
@@ -264,6 +282,22 @@ export default function GameFormModal() {
           />
         </View>
 
+        {/* Game Photo (optional) */}
+        <Text style={styles.label}>Game Photo (optional)</Text>
+        {photo ? (
+          <View style={styles.photoPreviewWrapper}>
+            <Image source={{ uri: `data:image/jpeg;base64,${photo}` }} style={styles.photoPreview} resizeMode="cover" />
+            <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => setPhoto(null)}>
+              <Ionicons name="close-circle" size={26} color="#FF453A" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.photoPickerBtn} onPress={pickPhoto} activeOpacity={0.75}>
+            <Ionicons name="camera-outline" size={22} color="#8E8E93" />
+            <Text style={styles.photoPickerText}>Add a court or action photo</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Invite Friends (create mode only) */}
         {!isEdit && friends.length > 0 && (
           <>
@@ -344,6 +378,12 @@ const styles = StyleSheet.create({
   friendChipLetter: { fontSize: 12, fontWeight: '900' },
   friendChipName: { color: '#AEAEB2', fontSize: 13, fontWeight: '700', flexShrink: 1 },
   inviteNote:   { color: '#0FEA95', fontSize: 13, fontWeight: '600', marginBottom: 20 },
+
+  photoPickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#2C2C2E', borderRadius: 15, height: 55, paddingHorizontal: 16, marginBottom: 25, borderWidth: 1, borderColor: '#3A3A3C', borderStyle: 'dashed' },
+  photoPickerText: { color: '#636366', fontSize: 15 },
+  photoPreviewWrapper: { position: 'relative', marginBottom: 25 },
+  photoPreview: { width: '100%', height: 180, borderRadius: 15 },
+  photoRemoveBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: '#1C1C1E', borderRadius: 13 },
 
   submitButton: { backgroundColor: '#0FEA95', height: 60, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 10, shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 5 },
   submitButtonText: { color: '#1C1C1E', fontSize: 18, fontWeight: 'bold' },

@@ -28,14 +28,29 @@ const toMapGame = (row) => ({
   scheduled_time: row.scheduled_time,
   location_desc: row.location_desc,
   equipment_notes: row.equipment_notes ?? null,
+  photo: row.photo ?? null,
   created_at: row.created_at,
 });
 
-// GET /api/games — public
+// GET /api/games — public; optional ?lat=&lng=&radius_km= for distance filter
 router.get('/', async (req, res) => {
+  const { lat, lng, radius_km } = req.query;
+  const useRadius = lat && lng && radius_km;
+
   try {
+    // Haversine SELECT expression — params: lat, lng, lat
+    const haversineExpr = `(6371 * ACOS(
+      COS(RADIANS(?)) * COS(RADIANS(g.latitude)) *
+      COS(RADIANS(g.longitude) - RADIANS(?)) +
+      SIN(RADIANS(?)) * SIN(RADIANS(g.latitude))
+    ))`;
+
+    // params order: [lat, lng, lat (for SELECT expr)] + [radius_km (for HAVING)]
+    const params = useRadius ? [parseFloat(lat), parseFloat(lng), parseFloat(lat), parseFloat(radius_km)] : [];
+
     const [rows] = await pool.execute(`
       SELECT g.*, COUNT(gp.user_id) AS participant_count
+        ${useRadius ? `, ${haversineExpr} AS distance_km` : ''}
       FROM Games g
       LEFT JOIN GameParticipants gp ON gp.game_id = g.id
       WHERE g.status = 'active'
@@ -45,8 +60,10 @@ router.get('/', async (req, res) => {
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > NOW()
         )
       GROUP BY g.id
+      ${useRadius ? 'HAVING distance_km <= ?' : ''}
       ORDER BY g.created_at DESC
-    `);
+    `, params);
+
     res.json({ success: true, games: rows.map(toMapGame) });
   } catch (err) {
     console.error(err);
@@ -266,7 +283,7 @@ router.delete('/:id/leave', authMiddleware, async (req, res) => {
 router.put('/:id', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.id);
   const userId = req.user.id;
-  const { sport_type, level, location_desc, scheduled_time, equipment_notes, max_players, title } = req.body;
+  const { sport_type, level, location_desc, scheduled_time, equipment_notes, max_players, title, photo } = req.body;
 
   try {
     const [[game]] = await pool.execute(
@@ -300,7 +317,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
          scheduled_time  = ?,
          equipment_notes = ?,
          max_players     = ?,
-         title           = ?
+         title           = ?,
+         photo           = ?
        WHERE id = ?`,
       [
         sport_type || game.sport_type,
@@ -310,6 +328,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
         equipment_notes !== undefined ? (equipment_notes || null) : game.equipment_notes,
         max_players     !== undefined && max_players !== '' ? parseInt(max_players) : (max_players === '' ? null : game.max_players),
         title           !== undefined ? (title || null) : game.title,
+        photo           !== undefined ? (photo || null) : game.photo,
         gameId,
       ]
     );
@@ -329,7 +348,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 // POST /api/games — requires auth
 router.post('/', authMiddleware, async (req, res) => {
-  const { sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, invited_friends } = req.body;
+  const { sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, invited_friends, photo } = req.body;
   if (!sport_type || !level || latitude == null || longitude == null)
     return res.status(400).json({ success: false, message: 'sport_type, level, latitude, longitude are required' });
 
@@ -351,9 +370,9 @@ router.post('/', authMiddleware, async (req, res) => {
 
   try {
     const [result] = await pool.execute(
-      `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, sport_type, level, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null]
+      `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, photo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, sport_type, level, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null, photo || null]
     );
     const gameId = result.insertId;
 
