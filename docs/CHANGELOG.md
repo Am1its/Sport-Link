@@ -4,6 +4,22 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 10] — May 2026 — Discover Screen Joined-Game State
+
+### "✓ Joined" Button State in Find Games
+
+**Backend (`backend/routes/games.js`)**
+- `GET /api/games` is now auth-optional: if a valid JWT is present in the `Authorization` header, the query adds `CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS is_joined` to the SELECT. Unauthenticated requests are unaffected — `is_joined` falls back to `false` in `toMapGame()`.
+- `jwt` imported at the top of `games.js`; token decoded with a silent try/catch so a missing or expired token never causes a 401 on this public endpoint.
+- `toMapGame()` mapper passes through `is_joined` as a boolean.
+
+**Frontend (`frontend/app/(tabs)/discover.tsx`)**
+- `Game` type gains `is_joined?: boolean`.
+- `GameCard` gains `isJoined` local state (initialized from `game.is_joined`). Button priority order: **"Your Game"** (host, muted) → **"✓ Joined"** (already joined, muted green) → **"Full"** (muted red) → **"Join Game"** (active).
+- On successful join: `setIsJoined(true)` flips the button immediately; `handleJoined` in `DiscoverScreen` also sets `is_joined: true` on the game object so state survives re-renders.
+
+---
+
 ## [Sprint 9] — May 2026 — Court Reviews, Player Matching, Auth Redesign, Unified Onboarding & Direct Messaging
 
 ### Court Detail Screen & Reviews

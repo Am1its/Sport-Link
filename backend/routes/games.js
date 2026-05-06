@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
 const sendPushNotifications = require('../utils/sendPushNotification');
@@ -30,12 +31,22 @@ const toMapGame = (row) => ({
   equipment_notes: row.equipment_notes ?? null,
   photo: row.photo ?? null,
   created_at: row.created_at,
+  is_joined: row.is_joined != null ? Boolean(row.is_joined) : false,
 });
 
 // GET /api/games — public; optional ?lat=&lng=&radius_km= for distance filter
+// If a valid JWT is present, is_joined is included per game.
 router.get('/', async (req, res) => {
   const { lat, lng, radius_km } = req.query;
   const useRadius = lat && lng && radius_km;
+
+  // Optionally decode userId from Bearer token if present
+  let userId = null;
+  try {
+    const header = req.headers['authorization'];
+    const raw = header && header.split(' ')[1];
+    if (raw) userId = jwt.verify(raw, process.env.JWT_SECRET)?.id ?? null;
+  } catch { /* invalid/expired token — treat as unauthenticated */ }
 
   try {
     // Haversine SELECT expression — params: lat, lng, lat
@@ -45,11 +56,14 @@ router.get('/', async (req, res) => {
       SIN(RADIANS(?)) * SIN(RADIANS(g.latitude))
     ))`;
 
-    // params order: [lat, lng, lat (for SELECT expr)] + [radius_km (for HAVING)]
-    const params = useRadius ? [parseFloat(lat), parseFloat(lng), parseFloat(lat), parseFloat(radius_km)] : [];
+    // Build params: [userId?] + [lat, lng, lat, radius_km (if radius)]
+    const params = [];
+    if (userId) params.push(userId);
+    if (useRadius) params.push(parseFloat(lat), parseFloat(lng), parseFloat(lat), parseFloat(radius_km));
 
     const [rows] = await pool.execute(`
       SELECT g.*, COUNT(gp.user_id) AS participant_count
+        ${userId ? ', CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS is_joined' : ''}
         ${useRadius ? `, ${haversineExpr} AS distance_km` : ''}
       FROM Games g
       LEFT JOIN GameParticipants gp ON gp.game_id = g.id

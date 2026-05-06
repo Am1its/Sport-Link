@@ -33,6 +33,7 @@ type Game = {
   participant_count: number;
   host_id: number;
   photo: string | null;
+  is_joined?: boolean;
 };
 
 function GameCard({
@@ -45,6 +46,7 @@ function GameCard({
   onViewParticipants: () => void;
 }) {
   const [joining, setJoining] = useState(false);
+  const [isJoined, setIsJoined] = useState(!!game.is_joined);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const color = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
@@ -80,6 +82,7 @@ function GameCard({
         return Alert.alert('Error', data.message);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsJoined(true);
       onJoined(game.id, data.participant_count);
       springBack();
       Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
@@ -152,6 +155,10 @@ function GameCard({
         <View style={[styles.joinBtn, styles.joinBtnMuted]}>
           <Text style={[styles.joinBtnText, { color: '#0FEA95' }]}>Your Game</Text>
         </View>
+      ) : isJoined ? (
+        <View style={[styles.joinBtn, styles.joinBtnMuted]}>
+          <Text style={[styles.joinBtnText, { color: '#0FEA95' }]}>✓ Joined</Text>
+        </View>
       ) : isFull ? (
         <View style={[styles.joinBtn, styles.joinBtnMuted]}>
           <Text style={[styles.joinBtnText, { color: '#FF453A' }]}>Full</Text>
@@ -216,7 +223,7 @@ export default function DiscoverScreen() {
   );
 
   const handleJoined = (id: number, newCount: number) => {
-    setGames((prev) => prev.map((g) => g.id === id ? { ...g, participant_count: newCount } : g));
+    setGames((prev) => prev.map((g) => g.id === id ? { ...g, participant_count: newCount, is_joined: true } : g));
   };
 
   const filtered = games.filter((g) => {
