@@ -1,28 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  TextInput, ActivityIndicator, Alert, Image, RefreshControl,
+  TextInput, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
-import { getAvatarColor } from '../utils/avatar';
+import AvatarCircle from '../components/AvatarCircle';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null; karma: number };
 type Request = { friendship_id: number; id: number; username: string; avatar: string | null };
 type SearchUser = { id: number; username: string; avatar: string | null };
-
-function AvatarCircle({ username, avatar, size = 46 }: { username: string; avatar: string | null; size?: number }) {
-  const color = getAvatarColor(username);
-  return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, borderColor: color, backgroundColor: color + '22' }]}>
-      {avatar
-        ? <Image source={{ uri: `data:image/jpeg;base64,${avatar}` }} style={{ width: '100%', height: '100%' }} />
-        : <Text style={[styles.avatarLetter, { color, fontSize: size * 0.4 }]}>{username.charAt(0).toUpperCase()}</Text>}
-    </View>
-  );
-}
 
 type Tab = 'friends' | 'requests' | 'search';
 
@@ -311,9 +300,6 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#1C1C1E' },
 
   list: { paddingHorizontal: 20, paddingBottom: 30 },
-
-  avatar: { overflow: 'hidden', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5 },
-  avatarLetter: { fontWeight: '900' },
 
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
   rowBody: { flex: 1, marginLeft: 12 },

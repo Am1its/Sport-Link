@@ -24,15 +24,17 @@ type Game = {
 };
 
 function GameCard({
-  game, onRatePlayers, onCloseGame, onEdit, onDelete, onLeave, onChat,
+  game, onRatePlayers, onViewResults, onCloseGame, onEdit, onDelete, onLeave, onChat, onViewParticipants,
 }: {
   game: Game;
   onRatePlayers: () => void;
+  onViewResults: () => void;
   onCloseGame: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onLeave: () => void;
   onChat: () => void;
+  onViewParticipants: () => void;
 }) {
   const color = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon  = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
@@ -87,8 +89,12 @@ function GameCard({
         {!past && (
           <View style={[styles.actionRow, { marginTop: 10 }]}>
             <TouchableOpacity style={styles.chatBtn} onPress={onChat}>
-              <Ionicons name="chatbubble-outline" size={14} color="#4F9EFF" />
+              <Ionicons name="chatbubble-outline" size={12} color="#4F9EFF" />
               <Text style={styles.chatBtnText}>Chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.playersBtn} onPress={onViewParticipants}>
+              <Ionicons name="people-outline" size={12} color="#A78BFA" />
+              <Text style={styles.playersBtnText}>Players</Text>
             </TouchableOpacity>
             {game.is_host ? (
               <>
@@ -103,8 +109,8 @@ function GameCard({
               </>
             ) : (
               <TouchableOpacity style={styles.leaveBtn} onPress={onLeave}>
-                <Ionicons name="exit-outline" size={14} color="#FF8C00" />
-                <Text style={styles.leaveBtnText}>Leave Game</Text>
+                <Ionicons name="exit-outline" size={12} color="#FF8C00" />
+                <Text style={styles.leaveBtnText}>Leave</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -129,6 +135,12 @@ function GameCard({
               <Ionicons name="star-outline" size={15} color="#1C1C1E" />
               <Text style={styles.rateBtnText}>Rate Players</Text>
             </TouchableOpacity>
+            {game.status === 'completed' && (
+              <TouchableOpacity style={styles.resultsBtn} onPress={onViewResults}>
+                <Ionicons name="bar-chart-outline" size={15} color="#FFD700" />
+                <Text style={styles.resultsBtnText}>Results</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -274,6 +286,17 @@ export default function GamesScreen() {
                 params: { gameId: item.id, sport: item.sport_type, scheduledTime: item.scheduled_time ?? '' },
               })
             }
+            onViewResults={() =>
+              router.push({
+                pathname: '/game-results' as any,
+                params: {
+                  gameId: String(item.id),
+                  title: item.title ?? '',
+                  sport: item.sport_type,
+                  scheduledTime: item.scheduled_time ?? '',
+                },
+              })
+            }
             onCloseGame={() => handleClose(item)}
             onEdit={() =>
               router.push({
@@ -293,6 +316,15 @@ export default function GamesScreen() {
             }
             onDelete={() => handleDelete(item)}
             onLeave={() => handleLeave(item)}
+            onViewParticipants={() =>
+              router.push({
+                pathname: '/game-participants',
+                params: {
+                  gameId: String(item.id),
+                  title: item.title ?? `${item.sport_type.charAt(0).toUpperCase() + item.sport_type.slice(1)} Game`,
+                },
+              } as any)
+            }
           />
         );
 
@@ -364,18 +396,22 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: '#8E8E93' },
 
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  chatBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#4F9EFF22', height: 36, borderRadius: 10, borderWidth: 1, borderColor: '#4F9EFF55', paddingHorizontal: 14 },
-  chatBtnText: { color: '#4F9EFF', fontWeight: '800', fontSize: 13 },
+  chatBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#4F9EFF22', height: 32, borderRadius: 10, borderWidth: 1, borderColor: '#4F9EFF55', paddingHorizontal: 10 },
+  chatBtnText: { color: '#4F9EFF', fontWeight: '800', fontSize: 12 },
+  playersBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#A78BFA22', height: 32, borderRadius: 10, borderWidth: 1, borderColor: '#A78BFA55', paddingHorizontal: 10 },
+  playersBtnText: { color: '#A78BFA', fontWeight: '800', fontSize: 12 },
   editBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#3A3A3C', height: 36, borderRadius: 10 },
   editBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
   deleteBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FF453A22', height: 36, borderRadius: 10, borderWidth: 1, borderColor: '#FF453A55' },
   deleteBtnText: { color: '#FF453A', fontWeight: '800', fontSize: 13 },
-  leaveBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FF8C0022', height: 36, borderRadius: 10, borderWidth: 1, borderColor: '#FF8C0055' },
-  leaveBtnText: { color: '#FF8C00', fontWeight: '800', fontSize: 13 },
+  leaveBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FF8C0022', height: 32, borderRadius: 10, borderWidth: 1, borderColor: '#FF8C0055', paddingHorizontal: 10 },
+  leaveBtnText: { color: '#FF8C00', fontWeight: '800', fontSize: 12 },
   closeBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#4F9EFF', height: 36, borderRadius: 10 },
   closeBtnText: { color: '#1C1C1E', fontWeight: '800', fontSize: 13 },
-  rateBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0FEA95', height: 36, borderRadius: 10 },
+  rateBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0FEA95', height: 36, borderRadius: 10 },
   rateBtnText: { color: '#1C1C1E', fontWeight: '800', fontSize: 13 },
+  resultsBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFD70022', borderWidth: 1, borderColor: '#FFD70066', height: 36, borderRadius: 10 },
+  resultsBtnText: { color: '#FFD700', fontWeight: '800', fontSize: 13 },
   completedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#0FEA9515', borderRadius: 8 },
   completedBadgeText: { color: '#0FEA95', fontSize: 12, fontWeight: '700' },
 

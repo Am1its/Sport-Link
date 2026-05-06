@@ -7,6 +7,7 @@ export const SPORT_COLORS: Record<string, string> = {
   gym:        '#FB923C',
   studio:     '#F472B6',
   footvolley: '#22D3EE',
+  swimming:   '#0288D1',
 };
 
 export const SPORT_ICONS: Record<string, string> = {
@@ -17,7 +18,8 @@ export const SPORT_ICONS: Record<string, string> = {
   yoga:       'yoga',
   gym:        'dumbbell',
   studio:     'dance-ballroom',
-  footvolley: 'volleyball',
+  footvolley: 'handball',
+  swimming:   'swim',
 };
 
 // { key, label } pairs used by map and discover filter rows
@@ -31,4 +33,5 @@ export const SPORT_FILTER_ITEMS = [
   { key: 'gym',        label: '🏋️' },
   { key: 'studio',     label: '💃' },
   { key: 'footvolley', label: '🏖️' },
+  { key: 'swimming',   label: '🏊' },
 ] as const;

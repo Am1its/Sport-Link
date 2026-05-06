@@ -4,6 +4,14 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+const fetchSportPreferences = async (userId) => {
+  const [rows] = await pool.execute(
+    'SELECT sport_type, skill_level, is_favorite FROM SportPreferences WHERE user_id = ? ORDER BY is_favorite DESC, sport_type ASC',
+    [userId]
+  );
+  return rows;
+};
+
 const fetchUser = async (userId) => {
   const [[user]] = await pool.execute(
     `SELECT
@@ -24,7 +32,16 @@ const fetchUser = async (userId) => {
            CASE WHEN communication = 1 THEN 1 WHEN communication = 0 THEN -1 ELSE 0 END
          )
          FROM PeerRatings WHERE ratee_id = u.id
-       ), 0) AS karma
+       ), 0) AS karma,
+       (
+         SELECT g2.sport_type
+         FROM GameParticipants gp2
+         JOIN Games g2 ON g2.id = gp2.game_id
+         WHERE gp2.user_id = u.id
+         GROUP BY g2.sport_type
+         ORDER BY COUNT(*) DESC
+         LIMIT 1
+       ) AS top_sport
      FROM Users u WHERE u.id = ?`,
     [userId]
   );
@@ -34,9 +51,12 @@ const fetchUser = async (userId) => {
 // GET /api/users/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await fetchUser(req.user.id);
+    const [user, sport_preferences] = await Promise.all([
+      fetchUser(req.user.id),
+      fetchSportPreferences(req.user.id),
+    ]);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    res.json({ success: true, user });
+    res.json({ success: true, user: { ...user, sport_preferences } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -175,15 +195,60 @@ router.put('/push-token', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/users/sport-preferences — current user's per-sport prefs
+router.get('/sport-preferences', authMiddleware, async (req, res) => {
+  try {
+    const prefs = await fetchSportPreferences(req.user.id);
+    res.json({ success: true, sport_preferences: prefs });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/users/sport-preferences — upsert array of { sport_type, skill_level, is_favorite }
+router.put('/sport-preferences', authMiddleware, async (req, res) => {
+  const { preferences } = req.body; // [{ sport_type, skill_level, is_favorite }]
+  const userId = req.user.id;
+  if (!Array.isArray(preferences)) return res.status(400).json({ success: false, message: 'preferences must be an array' });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    // Delete all existing prefs for this user then re-insert
+    await conn.execute('DELETE FROM SportPreferences WHERE user_id = ?', [userId]);
+    for (const pref of preferences) {
+      const { sport_type, skill_level, is_favorite } = pref;
+      if (!sport_type || skill_level == null) continue;
+      await conn.execute(
+        'INSERT INTO SportPreferences (user_id, sport_type, skill_level, is_favorite) VALUES (?, ?, ?, ?)',
+        [userId, sport_type, skill_level, is_favorite ? 1 : 0]
+      );
+    }
+    await conn.commit();
+    const prefs = await fetchSportPreferences(userId);
+    res.json({ success: true, sport_preferences: prefs });
+  } catch (err) {
+    await conn.rollback();
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    conn.release();
+  }
+});
+
 // GET /api/users/:id — public profile (registered last to avoid shadowing /me /avatars /leaderboard)
 router.get('/:id', authMiddleware, async (req, res) => {
   const targetId = parseInt(req.params.id);
   const viewerId = req.user.id;
   if (isNaN(targetId)) return res.status(400).json({ success: false, message: 'Invalid user id' });
   try {
-    const user = await fetchUser(targetId);
+    const [user, sport_preferences] = await Promise.all([
+      fetchUser(targetId),
+      fetchSportPreferences(targetId),
+    ]);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const { avatar, username, bio, karma, games_hosted, games_joined } = user;
+    const { avatar, username, bio, karma, games_hosted, games_joined, top_sport } = user;
 
     // Determine friendship status between viewer and target
     let friendship_status = 'none';
@@ -205,7 +270,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       }
     }
 
-    res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined, friendship_status, friendship_id } });
+    res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined, top_sport: top_sport ?? null, sport_preferences, friendship_status, friendship_id } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });

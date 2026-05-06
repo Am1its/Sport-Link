@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
+import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
+type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
 
 type PublicUser = {
   id: number;
@@ -18,17 +20,21 @@ type PublicUser = {
   karma: number;
   games_hosted: number;
   games_joined: number;
+  top_sport: string | null;
+  sport_preferences: SportPref[];
   friendship_status: FriendshipStatus;
   friendship_id: number | null;
 };
+
+const SKILL_LABELS = ['', 'Beginner', 'Casual', 'Intermediate', 'Advanced', 'Pro'];
 
 export default function PlayerProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const { token, user: me } = useAuth();
 
-  const [profile, setProfile] = useState<PublicUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile]       = useState<PublicUser | null>(null);
+  const [loading, setLoading]       = useState(true);
   const [friendLoading, setFriendLoading] = useState(false);
 
   useEffect(() => {
@@ -118,15 +124,20 @@ export default function PlayerProfileScreen() {
   }
 
   const isMe = me?.id === profile.id;
-  const color = getAvatarColor(profile.username);
+  const color = (profile.top_sport ? SPORT_COLORS[profile.top_sport] : null) ?? getAvatarColor(profile.username);
   const karmaStr = profile.karma > 0 ? `+${profile.karma}` : `${profile.karma}`;
   const karmaColor = profile.karma > 0 ? '#0FEA95' : profile.karma < 0 ? '#FF453A' : '#8E8E93';
   const totalGames = profile.games_hosted + profile.games_joined;
+  const prefs = profile.sport_preferences ?? [];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
+
+      {/* ── Hero band ── */}
+      <View style={[styles.heroBand, { backgroundColor: color + '28' }]}>
+        <View style={[styles.heroCircle1, { backgroundColor: color + '35' }]} />
+        <View style={[styles.heroCircle2, { backgroundColor: color + '20' }]} />
+        {/* Back button inside hero */}
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
         </TouchableOpacity>
@@ -135,21 +146,27 @@ export default function PlayerProfileScreen() {
             <Text style={styles.youTagText}>Your Profile</Text>
           </View>
         )}
-        <View style={{ width: 40 }} />
       </View>
 
-      {/* Avatar */}
+      {/* ── Avatar section ── */}
       <View style={styles.avatarSection}>
-        <View style={[styles.avatarRing, { borderColor: color }]}>
-          <View style={styles.avatarInner}>
-            {profile.avatar ? (
-              <Image source={{ uri: `data:image/jpeg;base64,${profile.avatar}` }} style={styles.avatarImage} />
-            ) : (
-              <Text style={[styles.avatarLetter, { color }]}>
-                {profile.username.charAt(0).toUpperCase()}
-              </Text>
-            )}
+        <View style={styles.avatarWrapper}>
+          <View style={[styles.avatarRing, { borderColor: color }]}>
+            <View style={styles.avatarInner}>
+              {profile.avatar ? (
+                <Image source={{ uri: `data:image/jpeg;base64,${profile.avatar}` }} style={styles.avatarImage} />
+              ) : (
+                <Text style={[styles.avatarLetter, { color }]}>
+                  {profile.username.charAt(0).toUpperCase()}
+                </Text>
+              )}
+            </View>
           </View>
+          {profile.top_sport && (
+            <View style={[styles.sportBadge, { backgroundColor: color + '22', borderColor: color + '66' }]}>
+              <MaterialCommunityIcons name={SPORT_ICONS[profile.top_sport] as any} size={14} color={color} />
+            </View>
+          )}
         </View>
 
         <Text style={styles.username}>{profile.username}</Text>
@@ -160,30 +177,58 @@ export default function PlayerProfileScreen() {
         )}
       </View>
 
-      {/* Karma */}
-      <View style={[styles.karmaCard, { borderColor: karmaColor + '55' }]}>
-        <Ionicons name="flash" size={28} color={karmaColor} />
-        <Text style={[styles.karmaValue, { color: karmaColor }]}>{karmaStr}</Text>
-        <Text style={styles.karmaLabel}>Karma</Text>
-      </View>
-
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+      {/* ── Stats bar ── */}
+      <View style={styles.statsBar}>
+        <View style={styles.statItem}>
           <Text style={styles.statValue}>{totalGames}</Text>
-          <Text style={styles.statLabel}>Total Games</Text>
+          <Text style={styles.statLabel}>Games</Text>
         </View>
-        <View style={[styles.statCard, styles.statCardMiddle]}>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: '#0FEA95' }]}>{profile.games_hosted}</Text>
           <Text style={styles.statLabel}>Hosted</Text>
         </View>
-        <View style={styles.statCard}>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: '#4F9EFF' }]}>{profile.games_joined}</Text>
           <Text style={styles.statLabel}>Joined</Text>
         </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: karmaColor }]}>{karmaStr}</Text>
+          <Text style={styles.statLabel}>Karma</Text>
+        </View>
       </View>
 
-      {/* Friend button */}
+      {/* ── Sport Preferences ── */}
+      {prefs.length > 0 && (
+        <View style={styles.sportsSection}>
+          <Text style={styles.sportsSectionTitle}>Sports</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportsScroll}>
+            {prefs.map(pref => {
+              const c = SPORT_COLORS[pref.sport_type] ?? '#636366';
+              const ic = SPORT_ICONS[pref.sport_type] ?? 'help-circle';
+              const lvl = SKILL_LABELS[pref.skill_level] ?? '';
+              return (
+                <View key={pref.sport_type} style={[styles.sportChip, { borderColor: c + '66', backgroundColor: c + '18' }]}>
+                  <MaterialCommunityIcons name={ic as any} size={18} color={c} />
+                  <View>
+                    <View style={styles.chipNameRow}>
+                      <Text style={[styles.chipName, { color: c }]}>
+                        {pref.sport_type.charAt(0).toUpperCase() + pref.sport_type.slice(1)}
+                      </Text>
+                      {!!pref.is_favorite && <Ionicons name="heart" size={11} color="#FF453A" />}
+                    </View>
+                    <Text style={[styles.chipLevel, { color: c + 'AA' }]}>{lvl}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── Friend button ── */}
       {!isMe && (() => {
         const s = profile.friendship_status;
         const btnColor =
@@ -224,42 +269,56 @@ export default function PlayerProfileScreen() {
         );
       })()}
 
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1C1C1E' },
-  center: { flex: 1, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', padding: 30 },
+  center:    { flex: 1, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', padding: 30 },
 
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 10 },
-  backBtn: { width: 40 },
-  youTag: { backgroundColor: '#0FEA9522', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#0FEA9555' },
-  youTagText: { color: '#0FEA95', fontSize: 12, fontWeight: '800' },
+  // Hero
+  heroBand:    { height: 130, width: '100%', overflow: 'hidden', justifyContent: 'flex-end', paddingBottom: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'flex-end' },
+  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, top: -80, right: -40 },
+  heroCircle2: { position: 'absolute', width: 160, height: 160, borderRadius: 80, top: -40, left: -50 },
+  backBtn:     { position: 'absolute', top: 60, left: 20, width: 40 },
+  youTag:      { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
+  youTagText:  { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
 
-  avatarSection: { alignItems: 'center', paddingTop: 20, paddingBottom: 28 },
-  avatarRing: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, padding: 3, marginBottom: 16 },
-  avatarInner: { flex: 1, borderRadius: 46, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#2C2C2E' },
-  avatarImage: { width: '100%', height: '100%' },
-  avatarLetter: { fontSize: 42, fontWeight: '900' },
-  username: { fontSize: 26, fontWeight: '900', color: '#FFFFFF', marginBottom: 6 },
-  bio: { fontSize: 14, color: '#8E8E93', textAlign: 'center', paddingHorizontal: 40 },
-  bioEmpty: { fontSize: 14, color: '#48484A', textAlign: 'center' },
+  // Avatar
+  avatarSection: { alignItems: 'center', marginTop: -52, paddingBottom: 20 },
+  avatarWrapper: { position: 'relative', marginBottom: 14 },
+  avatarRing:    { width: 100, height: 100, borderRadius: 50, borderWidth: 3, padding: 3, backgroundColor: '#1C1C1E' },
+  sportBadge:    { position: 'absolute', bottom: 2, right: -2, width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  avatarInner:   { flex: 1, borderRadius: 46, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#2C2C2E' },
+  avatarImage:   { width: '100%', height: '100%' },
+  avatarLetter:  { fontSize: 42, fontWeight: '900' },
+  username:  { fontSize: 26, fontWeight: '900', color: '#FFFFFF', marginBottom: 6 },
+  bio:       { fontSize: 14, color: '#8E8E93', textAlign: 'center', paddingHorizontal: 40 },
+  bioEmpty:  { fontSize: 14, color: '#48484A', textAlign: 'center' },
 
-  karmaCard: { marginHorizontal: 20, backgroundColor: '#2C2C2E', borderRadius: 18, borderWidth: 1.5, padding: 20, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 16 },
-  karmaValue: { fontSize: 36, fontWeight: '900' },
-  karmaLabel: { fontSize: 14, color: '#636366', fontWeight: '600' },
+  // Stats bar
+  statsBar:    { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#2C2C2E', borderRadius: 18, padding: 16, marginBottom: 6 },
+  statItem:    { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, backgroundColor: '#3A3A3C' },
+  statValue:   { fontSize: 22, fontWeight: '900', color: '#FFFFFF', marginBottom: 2 },
+  statLabel:   { fontSize: 11, color: '#636366', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  statsRow: { flexDirection: 'row', marginHorizontal: 20, gap: 12, marginBottom: 40 },
-  statCard: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 16, padding: 16, alignItems: 'center' },
-  statCardMiddle: {},
-  statValue: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  statLabel: { fontSize: 11, color: '#636366', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  // Sports
+  sportsSection:      { marginHorizontal: 20, marginTop: 16, marginBottom: 6 },
+  sportsSectionTitle: { fontSize: 12, color: '#636366', fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
+  sportsScroll:  { gap: 8 },
+  sportChip:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: 1 },
+  chipNameRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  chipName:      { fontSize: 13, fontWeight: '700' },
+  chipLevel:     { fontSize: 11, fontWeight: '600', marginTop: 1 },
 
-  errorText: { color: '#636366', fontSize: 16, marginTop: 14 },
-  backBtnCenter: { marginTop: 20, backgroundColor: '#2C2C2E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-  backBtnCenterText: { color: '#FFFFFF', fontWeight: '700' },
-
-  friendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginBottom: 40, paddingVertical: 14, borderRadius: 16 },
+  // Friend button
+  friendBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginTop: 20, paddingVertical: 14, borderRadius: 16 },
   friendBtnText: { fontSize: 15, fontWeight: '700' },
+
+  errorText:        { color: '#636366', fontSize: 16, marginTop: 14 },
+  backBtnCenter:    { marginTop: 20, backgroundColor: '#2C2C2E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  backBtnCenterText: { color: '#FFFFFF', fontWeight: '700' },
 });

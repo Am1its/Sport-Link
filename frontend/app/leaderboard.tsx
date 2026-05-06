@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
+import AvatarCircle from '../components/AvatarCircle';
 
 type Entry = {
   id: number;
@@ -124,21 +125,16 @@ export default function LeaderboardScreen() {
           renderItem={({ item, index }) => {
             const rank = index + 4;
             const isMe = item.id === user?.id;
-            const color = getAvatarColor(item.username);
             const karmaStr = item.karma > 0 ? `+${item.karma}` : `${item.karma}`;
             const totalGames = item.games_hosted + item.games_joined;
             return (
-              <View style={[styles.row, isMe && styles.rowMe]}>
+              <TouchableOpacity
+                style={[styles.row, isMe && styles.rowMe]}
+                onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
+                activeOpacity={0.75}
+              >
                 <Text style={styles.rankNum}>#{rank}</Text>
-                <View style={[styles.rowAvatar, { backgroundColor: color + '22', borderColor: color }]}>
-                  {item.avatar ? (
-                    <Image source={{ uri: `data:image/jpeg;base64,${item.avatar}` }} style={styles.rowAvatarImg} />
-                  ) : (
-                    <Text style={[styles.rowAvatarLetter, { color }]}>
-                      {item.username.charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
+                <AvatarCircle username={item.username} avatar={item.avatar} size={42} />
                 <View style={styles.rowInfo}>
                   <View style={styles.rowNameRow}>
                     <Text style={styles.rowName}>{item.username}</Text>
@@ -149,7 +145,7 @@ export default function LeaderboardScreen() {
                 <Text style={[styles.rowKarma, { color: item.karma >= 0 ? '#0FEA95' : '#FF453A' }]}>
                   {karmaStr}
                 </Text>
-              </View>
+              </TouchableOpacity>
             );
           }}
         />
@@ -186,10 +182,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, padding: 12, marginBottom: 10 },
   rowMe: { borderWidth: 1.5, borderColor: '#0FEA9555', backgroundColor: '#0FEA9508' },
   rankNum: { width: 32, fontSize: 14, fontWeight: '800', color: '#636366', textAlign: 'center' },
-  rowAvatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  rowAvatarImg: { width: '100%', height: '100%' },
-  rowAvatarLetter: { fontSize: 17, fontWeight: '900' },
-  rowInfo: { flex: 1 },
+  rowInfo: { flex: 1, marginLeft: 12 },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   youBadge: { backgroundColor: '#0FEA9533', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },

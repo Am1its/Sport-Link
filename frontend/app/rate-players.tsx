@@ -155,8 +155,17 @@ export default function RatePlayersScreen() {
         <Text style={styles.doneSubtitle}>
           {isHost ? 'Player karma has been updated.' : 'Your feedback helps build a trustworthy community.'}
         </Text>
-        <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-          <Text style={styles.doneBtnText}>Back to My Games</Text>
+        <TouchableOpacity
+          style={styles.doneBtn}
+          onPress={() => router.replace({
+            pathname: '/game-results' as any,
+            params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
+          })}
+        >
+          <Text style={styles.doneBtnText}>View Results</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.doneSecondaryBtn} onPress={() => router.back()}>
+          <Text style={styles.doneSecondaryBtnText}>Back to My Games</Text>
         </TouchableOpacity>
       </View>
     );
@@ -184,8 +193,17 @@ export default function RatePlayersScreen() {
           <Text style={styles.emptySubtitle}>
             {isHost ? "You've already marked attendance for everyone." : "You've already rated everyone."}
           </Text>
-          <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()}>
-            <Text style={styles.doneBtnText}>Go Back</Text>
+          <TouchableOpacity
+            style={styles.doneBtn}
+            onPress={() => router.replace({
+              pathname: '/game-results' as any,
+              params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
+            })}
+          >
+            <Text style={styles.doneBtnText}>View Results</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.doneSecondaryBtn} onPress={() => router.back()}>
+            <Text style={styles.doneSecondaryBtnText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -352,8 +370,10 @@ const styles = StyleSheet.create({
 
   doneTitle: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginTop: 20 },
   doneSubtitle: { fontSize: 14, color: '#8E8E93', marginTop: 8, textAlign: 'center' },
-  doneBtn: { marginTop: 30, backgroundColor: '#0FEA95', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 },
+  doneBtn: { marginTop: 30, backgroundColor: '#0FEA95', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
   doneBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 16 },
+  doneSecondaryBtn: { marginTop: 12, paddingHorizontal: 24, paddingVertical: 10 },
+  doneSecondaryBtnText: { color: '#636366', fontWeight: '700', fontSize: 14 },
 
   emptyTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', marginTop: 16 },
   emptySubtitle: { fontSize: 14, color: '#8E8E93', marginTop: 8, textAlign: 'center' },

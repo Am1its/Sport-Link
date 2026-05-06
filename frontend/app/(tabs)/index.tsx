@@ -43,7 +43,8 @@ const getSportStyle = (type: string): { icon: IconName; color: string } => {
     case 'yoga':       return { icon: 'yoga',           color: '#A78BFA' };
     case 'gym':        return { icon: 'dumbbell',       color: '#FB923C' };
     case 'studio':     return { icon: 'dance-ballroom', color: '#F472B6' };
-    case 'footvolley': return { icon: 'volleyball',     color: '#22D3EE' };
+    case 'footvolley': return { icon: 'handball',       color: '#22D3EE' };
+    case 'swimming':   return { icon: 'swim',           color: '#0288D1' };
     default:           return { icon: 'map-marker',     color: '#0FEA95' };
   }
 };
@@ -56,10 +57,12 @@ type ClusterItem = MapItem & {
 };
 
 function clusterGames(items: MapItem[], latDelta: number): ClusterItem[] {
-  if (latDelta < 0.03) {
+  // Show individual markers only when very zoomed in
+  if (latDelta < 0.012) {
     return items.map(i => ({ ...i, _isCluster: false, _clusterCount: 1, _clusterItems: [i] }));
   }
-  const gridSize = latDelta / 5;
+  // Larger cells = more aggressive clustering (3×3 grid instead of 5×5)
+  const gridSize = latDelta / 3;
   const grid = new Map<string, MapItem[]>();
   for (const item of items) {
     const key = `${Math.floor(item.geometry.location.lat / gridSize)},${Math.floor(item.geometry.location.lng / gridSize)}`;
@@ -250,6 +253,8 @@ export default function HomeScreen() {
   const [showCourtPicker, setShowCourtPicker] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [sportFilter, setSportFilter] = useState('all');
+  const [myAvatar, setMyAvatar] = useState<string | null>(null);
+  const [myUsername, setMyUsername] = useState<string>('');
 
   const [mapRegion, setMapRegion] = useState<Region>({
     latitude: 32.0853,
@@ -309,8 +314,19 @@ export default function HomeScreen() {
           console.error('Games fetch error:', err);
         }
       };
+      const fetchMe = async () => {
+        try {
+          const res = await apiFetch('/api/users/me', { token });
+          const data = await res.json();
+          if (data.success) {
+            setMyAvatar(data.user.avatar ?? null);
+            setMyUsername(data.user.username ?? '');
+          }
+        } catch {}
+      };
       fetchGames();
-    }, [])
+      fetchMe();
+    }, [token])
   );
 
   if (loading) {
@@ -327,7 +343,15 @@ export default function HomeScreen() {
     ? activeGames
     : activeGames.filter(g => g.sport_type === sportFilter);
 
-  const displayedCourts = activeFilter === 'games' ? [] : courts;
+  const displayedCourts = (() => {
+    if (activeFilter === 'games') return [];
+    // In "All" mode, hide courts when zoomed out to reduce clutter
+    if (activeFilter === 'all' && currentDelta > 0.035) return [];
+    // Apply sport sub-filter to courts too
+    if (sportFilter !== 'all') return courts.filter(c => c.sport_type === sportFilter);
+    return courts;
+  })();
+
   const clusteredGames  = activeFilter === 'courts' ? [] : clusterGames(filteredGames, currentDelta);
 
   const showSportFilter = activeFilter !== 'courts';
@@ -371,15 +395,10 @@ export default function HomeScreen() {
                   { borderColor: sportStyle.color },
                   isIndoor
                     ? { backgroundColor: sportStyle.color + '33', borderStyle: 'solid' }
-                    : { backgroundColor: 'rgba(255,255,255,0.92)', borderStyle: 'dashed' },
+                    : { borderStyle: 'dashed' },
                 ]}>
-                  <MaterialCommunityIcons
-                    name={sportStyle.icon}
-                    size={20}
-                    color={isIndoor ? sportStyle.color : sportStyle.color}
-                  />
+                  <MaterialCommunityIcons name={sportStyle.icon} size={16} color={sportStyle.color} />
                 </View>
-                <View style={[styles.markerPointer, { backgroundColor: sportStyle.color + '88' }]} />
               </View>
             </Marker>
           );
@@ -399,8 +418,8 @@ export default function HomeScreen() {
                     mapRef.current?.animateToRegion({
                       latitude: item.geometry.location.lat,
                       longitude: item.geometry.location.lng,
-                      latitudeDelta: currentDelta / 3,
-                      longitudeDelta: currentDelta / 3,
+                      latitudeDelta: currentDelta / 4,
+                      longitudeDelta: currentDelta / 4,
                     }, 350);
                   }
                 }}
@@ -418,7 +437,7 @@ export default function HomeScreen() {
               onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(item); }}
             >
               <View style={styles.markerWrapper}>
-                <View style={[styles.markerIconBg, { borderColor: sportStyle.color }, styles.markerIconBgGame]}>
+                <View style={[styles.markerIconBgGame, { borderColor: sportStyle.color }]}>
                   <MaterialCommunityIcons name={sportStyle.icon} size={22} color={sportStyle.color} />
                   <View style={[styles.markerGameDot, { backgroundColor: sportStyle.color }]} />
                 </View>
@@ -446,7 +465,18 @@ export default function HomeScreen() {
                 </View>
               )}
               <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile' as any)}>
-                <Ionicons name="person-circle" size={36} color="#333" />
+                {myAvatar ? (
+                  <Image
+                    source={{ uri: `data:image/jpeg;base64,${myAvatar}` }}
+                    style={styles.profileAvatar}
+                  />
+                ) : (
+                  <View style={[styles.profileAvatar, styles.profileAvatarFallback, { backgroundColor: getAvatarColor(myUsername || (user?.username ?? '')) }]}>
+                    <Text style={styles.profileAvatarLetter}>
+                      {(myUsername || user?.username || '?').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
 
@@ -595,8 +625,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1C1C1E' },
 
   markerWrapper: { alignItems: 'center', justifyContent: 'center' },
-  markerIconBg: { backgroundColor: '#1C1C1E', padding: 6, borderRadius: 22, borderWidth: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },
-  markerIconBgGame: { borderWidth: 2.5, shadowOpacity: 0.5 },
+  // Court markers — smaller and lighter (secondary visual weight)
+  markerIconBg: { backgroundColor: 'rgba(255,255,255,0.92)', padding: 4, borderRadius: 14, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 3, elevation: 4 },
+  // Game markers — more prominent (primary visual weight)
+  markerIconBgGame: { backgroundColor: '#1C1C1E', padding: 6, borderRadius: 20, borderWidth: 2.5, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.45, shadowRadius: 5, elevation: 7 },
   markerGameDot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#1C1C1E' },
   markerPointer: { width: 3, height: 6, marginTop: -1 },
   clusterMarker: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFFFFF', shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 8 },
@@ -607,7 +639,10 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '900', color: '#1C1C1E' },
   gameCountBadge: { backgroundColor: '#0FEA9522', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#0FEA9555' },
   gameCountText: { color: '#0FEA95', fontSize: 12, fontWeight: '800' },
-  profileButton: {},
+  profileButton: { marginLeft: 8 },
+  profileAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
+  profileAvatarFallback: { justifyContent: 'center', alignItems: 'center' },
+  profileAvatarLetter: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
 
   filtersWrapper: { marginTop: 10, paddingHorizontal: 5 },
   sportFiltersWrapper: { marginTop: 6, paddingHorizontal: 5 },

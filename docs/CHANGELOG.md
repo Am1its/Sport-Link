@@ -4,6 +4,82 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 8] — May 2026 — Sport Preferences, Profile Redesign & Game Results
+
+### Sport Preferences System
+**Database**
+- New `SportPreferences` table: `(id, user_id, sport_type VARCHAR(50), skill_level TINYINT 1-5, is_favorite BOOLEAN DEFAULT FALSE, created_at)`. Unique on `(user_id, sport_type)`. FK → `Users(id) ON DELETE CASCADE`.
+
+**Backend (`backend/routes/users.js`)**
+- `GET /api/users/me` — now returns `top_sport` (most-played sport from game history) and `sport_preferences` (array of `{ sport_type, skill_level, is_favorite }`).
+- `GET /api/users/:id` — same additions for public profiles.
+- `GET /api/users/sport-preferences` — returns current user's full preferences array.
+- `PUT /api/users/sport-preferences` — accepts `{ preferences: [{ sport_type, skill_level, is_favorite }] }`; replaces all existing rows in a single transaction (DELETE all + batch INSERT). Route registered before `/:id` to avoid shadowing.
+
+**Frontend (`frontend/app/sport-preferences.tsx`)** — full rewrite
+- All 9 sports displayed with per-sport cards.
+- Per-sport: enable/disable toggle + 5-dot skill selector (tap any dot to set level 1-5; dots filled with sport color up to selected level) + heart icon for favorite.
+- Tapping a skill dot automatically enables the sport.
+- Loads saved preferences on focus via `GET /api/users/sport-preferences`; saves via `PUT`.
+
+---
+
+### Profile & Player-Profile Redesign
+
+**Frontend (`frontend/app/(tabs)/profile.tsx`)**
+- **Hero band**: full-width 140px colored band (avatar's deterministic color + opacity) with two decorative translucent circles.
+- **Overlapping avatar**: avatar section uses `marginTop: -52` to overlap the hero band, giving a visual depth effect. Avatar ring border uses the same color.
+- **Horizontal stats bar**: replaced 2×2 grid with a single row of 4 stats (Games / Hosted / Joined / Karma) separated by dividers.
+- **Sport chips section**: horizontal `ScrollView` showing only enabled sport preferences — each chip displays the sport icon, name, skill level pill, and a red heart for favorites.
+- "Edit" link navigates to `/sport-preferences` for managing preferences.
+- `handleSave` uses `setStats(prev => ({ ...prev, ...data.user }))` to preserve `sport_preferences` in state (PUT /me doesn't return them).
+- Fixed `UnauthorizedError` instanceof issue: removed import, changed catch to `err?.name !== 'UnauthorizedError'` check.
+
+**Frontend (`frontend/app/player-profile.tsx`)**
+- Same hero band pattern (130px) with `marginTop: -52` overlapping avatar.
+- Back button positioned absolute in hero area.
+- Sport badge overlay on avatar (bottom-right corner): shows `top_sport` icon.
+- Horizontal 4-stat bar (same layout as own profile).
+- Sport chips section (same horizontal scroll pattern).
+- Friend button and all existing functionality preserved.
+
+---
+
+### Game Results Screen
+**Backend (`backend/routes/ratings.js`)**
+- `GET /api/ratings/game/:gameId/results` — **registered before `/game/:gameId`** to avoid route shadowing.
+  - `can_view` gate: host must have submitted attendance for all participants; non-host must have submitted peer ratings for all others (host + participants).
+  - Returns `{ can_view, results }` where results = per-player aggregate: `{ id, username, avatar, attended, peer_count, sportsmanship_pct, punctuality_pct, communication_pct, skill_avg }`.
+  - All data is anonymous — no per-rater attribution in the response.
+
+**Frontend (`frontend/app/game-results.tsx`)** — new screen
+- Route params: `{ gameId, title?, sport?, scheduledTime? }`.
+- **Locked state** (`can_view: false`): lock icon + "Results Locked" message + "Rate Players" button (navigates to `rate-players` via `router.replace`).
+- **Results view** (`can_view: true`): FlatList of player cards showing:
+  - Attended badge (green "Showed Up" / red "No-Show") from host's attendance rating.
+  - Horizontal score bars for Sportsmanship, Punctuality, Communication — bar color: green ≥70% / orange ≥40% / red <40%.
+  - 5-star skill display with numeric average.
+  - "Based on N ratings" footnote per player.
+  - "Scores are aggregated — individual votes are anonymous" note at top.
+
+**Frontend (`frontend/app/(tabs)/games.tsx`)**
+- Past completed games now show a gold **"Results"** button (`status='completed'` only) navigating to `game-results`.
+- Non-host past games with `status='completed'` show both "Rate Players" and "Results" in the action row.
+
+**Frontend (`frontend/app/rate-players.tsx`)**
+- Post-submit done state: primary **"View Results"** button → `router.replace` to `game-results`.
+- Secondary **"Back to My Games"** text link (gray, no background).
+- "Already rated everyone" empty state shows the same two buttons.
+
+---
+
+### Button Styling Fix (`games.tsx`)
+- Leave, Chat, and Players buttons all normalised to `height: 32, paddingHorizontal: 10, fontSize: 12, icon size: 12` so all three fit on one row without overflow.
+- "Leave Game" label shortened to "Leave".
+- Removed `flex: 1` from `leaveBtn` (was stretching to fill remaining row width).
+
+---
+
 ## [Sprint 7] — May 2026 — Feature Completion: Real-Time Chat, Notification Inbox, Game Photos, Radius Search & Profile Friend Button
 
 ### WebSocket Chat (socket.io)

@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, FlatList, ScrollView,
+  View, Text, StyleSheet, TextInput, FlatList, ScrollView, Modal,
   TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl, Image,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { isPastGame } from '../../utils/time';
@@ -36,12 +36,13 @@ type Game = {
 };
 
 function GameCard({
-  game, userId, token, onJoined,
+  game, userId, token, onJoined, onViewParticipants,
 }: {
   game: Game;
   userId?: number;
   token: string | null;
   onJoined: (id: number, newCount: number) => void;
+  onViewParticipants: () => void;
 }) {
   const [joining, setJoining] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -120,10 +121,10 @@ function GameCard({
                 <Text style={styles.metaText}>{game.scheduled_time}</Text>
               </View>
             ) : null}
-            <View style={styles.metaItem}>
-              <Ionicons name="people-outline" size={13} color="#8E8E93" />
-              <Text style={[styles.metaText, isUrgent && { color: '#FF9F0A' }]}>{playersLabel} players</Text>
-            </View>
+            <TouchableOpacity style={styles.metaItem} onPress={onViewParticipants} activeOpacity={0.7}>
+              <Ionicons name="people-outline" size={13} color="#4F9EFF" />
+              <Text style={[styles.metaText, { color: '#4F9EFF' }, isUrgent && { color: '#FF9F0A' }]}>{playersLabel} players</Text>
+            </TouchableOpacity>
             <View style={styles.metaItem}>
               <Ionicons name="flash-outline" size={13} color="#8E8E93" />
               <Text style={styles.metaText}>Lv.{game.level}</Text>
@@ -169,6 +170,7 @@ function GameCard({
 }
 
 export default function DiscoverScreen() {
+  const router = useRouter();
   const { token, user } = useAuth();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,6 +178,8 @@ export default function DiscoverScreen() {
   const [search, setSearch] = useState('');
   const [sportFilter, setSportFilter] = useState<string>('all');
   const [radiusKm, setRadiusKm] = useState<number | null>(null);
+  const [showSportModal, setShowSportModal] = useState(false);
+  const [showRadiusModal, setShowRadiusModal] = useState(false);
   const userLocation = useRef<{ lat: number; lng: number } | null>(null);
 
   const fetchGames = useCallback(async (isRefresh = false) => {
@@ -246,47 +250,35 @@ export default function DiscoverScreen() {
         )}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterScroll}
-        style={styles.filterRow}
-      >
-        {SPORT_FILTER_ITEMS.map(({ key, label }) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.filterChip, sportFilter === key && styles.filterChipActive]}
-            onPress={() => setSportFilter(key)}
-          >
-            <Text style={[styles.filterText, sportFilter === key && styles.filterTextActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[styles.selectorBtn, sportFilter !== 'all' && styles.selectorBtnSportActive]}
+          onPress={() => setShowSportModal(true)}
+        >
+          <MaterialCommunityIcons
+            name={(sportFilter === 'all' ? 'filter-variant' : SPORT_ICONS[sportFilter]) as any}
+            size={16}
+            color={sportFilter === 'all' ? '#8E8E93' : '#0FEA95'}
+          />
+          <Text style={[styles.selectorText, sportFilter !== 'all' && styles.selectorTextSportActive]} numberOfLines={1}>
+            {sportFilter === 'all'
+              ? 'All Sports'
+              : sportFilter.charAt(0).toUpperCase() + sportFilter.slice(1)}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={sportFilter === 'all' ? '#8E8E93' : '#0FEA95'} />
+        </TouchableOpacity>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterScroll}
-        style={styles.radiusRow}
-      >
-        <Ionicons name="location-outline" size={15} color="#8E8E93" style={{ marginRight: 4, alignSelf: 'center' }} />
-        {RADIUS_OPTIONS.map(({ label, km }) => (
-          <TouchableOpacity
-            key={label}
-            style={[styles.filterChip, radiusKm === km && styles.radiusChipActive]}
-            onPress={() => {
-              userLocation.current = null;
-              setRadiusKm(km);
-            }}
-          >
-            <Text style={[styles.filterText, radiusKm === km && styles.radiusTextActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+        <TouchableOpacity
+          style={[styles.selectorBtn, radiusKm !== null && styles.selectorBtnRadiusActive]}
+          onPress={() => setShowRadiusModal(true)}
+        >
+          <Ionicons name="location-outline" size={16} color={radiusKm === null ? '#8E8E93' : '#4F9EFF'} />
+          <Text style={[styles.selectorText, radiusKm !== null && styles.selectorTextRadiusActive]} numberOfLines={1}>
+            {radiusKm === null ? 'Any Distance' : `${radiusKm} km`}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={radiusKm === null ? '#8E8E93' : '#4F9EFF'} />
+        </TouchableOpacity>
+      </View>
 
       {loading ? (
         <View style={styles.center}>
@@ -302,7 +294,21 @@ export default function DiscoverScreen() {
           data={filtered}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <GameCard game={item} userId={user?.id} token={token} onJoined={handleJoined} />
+            <GameCard
+              game={item}
+              userId={user?.id}
+              token={token}
+              onJoined={handleJoined}
+              onViewParticipants={() =>
+                router.push({
+                  pathname: '/game-participants',
+                  params: {
+                    gameId: String(item.id),
+                    title: item.title ?? `${item.sport_type.charAt(0).toUpperCase() + item.sport_type.slice(1)} Game`,
+                  },
+                } as any)
+              }
+            />
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
@@ -316,6 +322,49 @@ export default function DiscoverScreen() {
           }
         />
       )}
+      <Modal visible={showSportModal} transparent animationType="fade" onRequestClose={() => setShowSportModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowSportModal(false)}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Sport</Text>
+            {SPORT_FILTER_ITEMS.map(({ key, label }) => (
+              <TouchableOpacity
+                key={key}
+                style={styles.modalOption}
+                onPress={() => { setSportFilter(key); setShowSportModal(false); }}
+              >
+                {key === 'all'
+                  ? <Ionicons name="apps-outline" size={20} color="#8E8E93" />
+                  : <MaterialCommunityIcons name={SPORT_ICONS[key] as any} size={20} color={SPORT_COLORS[key] ?? '#0FEA95'} />}
+                <Text style={[styles.modalOptionText, sportFilter === key && styles.modalOptionSelected]}>
+                  {label}
+                </Text>
+                {sportFilter === key && <Ionicons name="checkmark" size={18} color="#0FEA95" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={showRadiusModal} transparent animationType="fade" onRequestClose={() => setShowRadiusModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRadiusModal(false)}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Distance</Text>
+            {RADIUS_OPTIONS.map(({ label, km }) => (
+              <TouchableOpacity
+                key={label}
+                style={styles.modalOption}
+                onPress={() => { userLocation.current = null; setRadiusKm(km); setShowRadiusModal(false); }}
+              >
+                <Ionicons name="location-outline" size={20} color="#4F9EFF" />
+                <Text style={[styles.modalOptionText, radiusKm === km && styles.modalOptionSelectedRadius]}>
+                  {label}
+                </Text>
+                {radiusKm === km && <Ionicons name="checkmark" size={18} color="#4F9EFF" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -329,15 +378,21 @@ const styles = StyleSheet.create({
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, paddingHorizontal: 14, height: 48, marginBottom: 14, gap: 10 },
   searchInput: { flex: 1, color: '#FFFFFF', fontSize: 15 },
 
-  filterRow: { marginBottom: 10 },
-  radiusRow: { marginBottom: 18 },
-  filterScroll: { gap: 8, paddingRight: 4 },
-  filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#2C2C2E', borderWidth: 1, borderColor: '#3A3A3C' },
-  filterChipActive: { backgroundColor: '#0FEA95', borderColor: '#0FEA95' },
-  filterText: { color: '#8E8E93', fontSize: 14, fontWeight: '700' },
-  filterTextActive: { color: '#1C1C1E' },
-  radiusChipActive: { backgroundColor: '#4F9EFF22', borderColor: '#4F9EFF' },
-  radiusTextActive: { color: '#4F9EFF' },
+  filterRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
+  selectorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#2C2C2E', borderRadius: 12, paddingHorizontal: 12, height: 42, borderWidth: 1, borderColor: '#3A3A3C' },
+  selectorBtnSportActive: { borderColor: '#0FEA95', backgroundColor: '#0FEA9515' },
+  selectorBtnRadiusActive: { borderColor: '#4F9EFF', backgroundColor: '#4F9EFF15' },
+  selectorText: { flex: 1, color: '#8E8E93', fontSize: 14, fontWeight: '600' },
+  selectorTextSportActive: { color: '#0FEA95' },
+  selectorTextRadiusActive: { color: '#4F9EFF' },
+
+  modalOverlay: { flex: 1, backgroundColor: '#000000BB', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalSheet: { backgroundColor: '#2C2C2E', borderRadius: 20, padding: 16, width: '100%', maxWidth: 340 },
+  modalTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '800', marginBottom: 8 },
+  modalOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 10 },
+  modalOptionText: { flex: 1, color: '#AEAEB2', fontSize: 16, fontWeight: '600' },
+  modalOptionSelected: { color: '#0FEA95', fontWeight: '700' },
+  modalOptionSelectedRadius: { color: '#4F9EFF', fontWeight: '700' },
 
   card: { backgroundColor: '#2C2C2E', borderRadius: 18, padding: 16, marginBottom: 12 },
   cardTop: { flexDirection: 'row', marginBottom: 14 },
