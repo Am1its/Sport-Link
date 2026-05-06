@@ -190,15 +190,7 @@ export default function GameChatScreen() {
 
             return (
               <View key={msg.id} style={styles.bubbleRowOther}>
-                <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
-                  {avatarBase64 ? (
-                    <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
-                  ) : (
-                    <Text style={[styles.avatarSmallLetter, { color }]}>
-                      {msg.username.charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
+                {avatarCircle}
                 <View style={styles.bubbleOtherContent}>
                   <Text style={styles.senderName}>{msg.username}</Text>
                   <View style={[styles.bubble, styles.bubbleOther]}>

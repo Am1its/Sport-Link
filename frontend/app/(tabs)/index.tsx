@@ -230,9 +230,21 @@ function BottomCard({ court, userId, token, onJoined }: {
           </Animated.View>
         )
       ) : (
-        <View style={[styles.joinButton, { backgroundColor: '#2C2C2E' }]}>
-          <Text style={[styles.joinButtonText, { color: '#8E8E93' }]}>Public Court</Text>
-        </View>
+        <TouchableOpacity
+          style={[styles.joinButton, { backgroundColor: '#2C2C2E', flexDirection: 'row', justifyContent: 'center', gap: 6 }]}
+          onPress={() => router.push({
+            pathname: '/court-detail' as any,
+            params: {
+              placeId: court.place_id,
+              name: court.name,
+              sport: court.sport_type ?? '',
+              vicinity: court.vicinity ?? '',
+            },
+          })}
+        >
+          <Ionicons name="information-circle-outline" size={16} color="#0FEA95" />
+          <Text style={[styles.joinButtonText, { color: '#0FEA95' }]}>View Details</Text>
+        </TouchableOpacity>
       )}
     </View>
   );

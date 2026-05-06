@@ -3,7 +3,6 @@ const http = require('http');
 const express = require('express');
 const { Server: IOServer } = require('socket.io');
 const cors = require('cors');
-const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 
@@ -17,10 +16,13 @@ const usersRoutes         = require('./routes/users');
 const ratingsRoutes       = require('./routes/ratings');
 const friendsRoutes       = require('./routes/friends');
 const notificationsRoutes = require('./routes/notifications');
+const courtsRoutes        = require('./routes/courts');
+const dmRoutes            = require('./routes/dm');
 
 const app = express();
 const httpServer = http.createServer(app);
 const io = new IOServer(httpServer, { cors: { origin: '*' } });
+app.set('io', io);
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -49,90 +51,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'SportLink API is running!' });
 });
 
-const detectSportType = (name = '') => {
-  const n = name.toLowerCase();
-  if (n.match(/basket|כדורסל/))                  return 'basketball';
-  if (n.match(/tennis|טניס/))                    return 'tennis';
-  if (n.match(/volley|כדורעף/))                  return 'volleyball';
-  if (n.match(/football|soccer|כדורגל|כדור-גל/)) return 'football';
-  if (n.match(/yoga|יוגה/))                      return 'yoga';
-  if (n.match(/gym|fitness|כושר|חדר כושר/))      return 'gym';
-  if (n.match(/studio|סטודיו/))                  return 'studio';
-  return null;
-};
-
-const classifyVenueType = (place) => {
-  const types = place.types || [];
-  const name  = (place.name || '').toLowerCase();
-  if (types.includes('gym') || name.match(/gym|fitness|כושר/))          return 'gym';
-  if (name.match(/studio|yoga|pilates|dance|סטודיו|יוגה/))              return 'studio';
-  if (types.includes('stadium') || types.includes('sports_complex'))    return 'facility';
-  return 'court';
-};
-
-const MOCK_COURTS = [
-  { place_id: 'mock_sportek_01',  name: 'ספורטק תל אביב - מגרשי כדורסל',  sport_type: 'basketball', venue_type: 'court',   geometry: { location: { lat: 32.09668, lng: 34.78685 } }, vicinity: 'שדרות רוקח, תל אביב-יפו',              rating: 4.6 },
-  { place_id: 'mock_charles_02', name: "פארק צ'ארלס קלור - מגרשי טניס",   sport_type: 'tennis',     venue_type: 'court',   geometry: { location: { lat: 32.06450, lng: 34.76120 } }, vicinity: "פרופ' יחזקאל קויפמן, תל אביב-יפו",   rating: 4.8 },
-  { place_id: 'mock_gordon_03',  name: 'מגרשי כדורעף חופים - חוף גורדון', sport_type: 'volleyball', venue_type: 'court',   geometry: { location: { lat: 32.08370, lng: 34.76810 } }, vicinity: 'חוף גורדון, תל אביב-יפו',             rating: 4.7 },
-  { place_id: 'mock_gym_04',     name: 'Holmes Place Tel Aviv',             sport_type: 'gym',        venue_type: 'gym',     geometry: { location: { lat: 32.07200, lng: 34.77500 } }, vicinity: 'דיזנגוף, תל אביב-יפו',               rating: 4.4 },
-  { place_id: 'mock_yoga_05',    name: 'Yoga Studio Florentin',             sport_type: 'yoga',       venue_type: 'studio',  geometry: { location: { lat: 32.05900, lng: 34.77100 } }, vicinity: 'פלורנטין, תל אביב-יפו',              rating: 4.9 },
-];
-
-app.get('/api/courts/nearby', async (req, res) => {
-  const { lat, lng, radius = 3000 } = req.query;
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-
-  if (!apiKey || apiKey === 'YOUR_API_KEY_HERE' || !lat || !lng) {
-    console.log('📍 Serving mock courts (no API key or location)');
-    return res.json({ success: true, source: 'mock', courts: MOCK_COURTS });
-  }
-
-  try {
-    const [hebrewRes, englishRes, gymRes, studioRes] = await Promise.all([
-      axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
-        params: { location: `${lat},${lng}`, radius, keyword: 'מגרש', key: apiKey },
-      }),
-      axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
-        params: { location: `${lat},${lng}`, radius, keyword: 'sport court', key: apiKey },
-      }),
-      axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
-        params: { location: `${lat},${lng}`, radius, type: 'gym', key: apiKey },
-      }),
-      axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
-        params: { location: `${lat},${lng}`, radius, keyword: 'yoga studio dance', key: apiKey },
-      }),
-    ]);
-
-    const seen = new Set();
-    const courts = [
-      ...hebrewRes.data.results,
-      ...englishRes.data.results,
-      ...gymRes.data.results,
-      ...studioRes.data.results,
-    ]
-      .filter((p) => {
-        if (seen.has(p.place_id)) return false;
-        seen.add(p.place_id);
-        return true;
-      })
-      .map((p) => ({
-        place_id:   p.place_id,
-        name:       p.name,
-        sport_type: detectSportType(p.name),
-        venue_type: classifyVenueType(p),
-        geometry:   { location: { lat: p.geometry.location.lat, lng: p.geometry.location.lng } },
-        vicinity:   p.vicinity,
-        rating:     p.rating ?? 0,
-      }));
-
-    console.log(`📍 Found ${courts.length} venues near (${lat}, ${lng})`);
-    res.json({ success: true, source: 'Google Places', courts });
-  } catch (err) {
-    console.error('Google Places error:', err.message);
-    res.json({ success: true, source: 'mock (fallback)', courts: MOCK_COURTS });
-  }
-});
-
 app.use('/api/auth',          authRoutes);
 app.use('/api/games',         gamesRoutes);
 app.use('/api/chats',         chatsRoutes);
@@ -140,6 +58,8 @@ app.use('/api/users',         usersRoutes);
 app.use('/api/ratings',       ratingsRoutes);
 app.use('/api/friends',       friendsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/courts',        courtsRoutes);
+app.use('/api/dm',            dmRoutes);
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 SportLink Backend running on http://localhost:${PORT}`);
@@ -170,6 +90,9 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
+  // Join personal room for real-time DMs
+  socket.join(`user_${socket.user.id}`);
+
   socket.on('join_game', async (gameId) => {
     const id = parseInt(gameId);
     if (isNaN(id)) return;

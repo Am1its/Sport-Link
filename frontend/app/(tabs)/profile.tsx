@@ -297,6 +297,16 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color="#48484A" />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/player-matching' as any)}>
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.menuIconWrap, { backgroundColor: '#0FEA9522' }]}>
+              <Ionicons name="magnet-outline" size={20} color="#0FEA95" />
+            </View>
+            <Text style={styles.menuText}>Discover Players</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#48484A" />
+        </TouchableOpacity>
+
         <Text style={[styles.menuSection, { marginTop: 24 }]}>Account</Text>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/sport-preferences' as any)}>

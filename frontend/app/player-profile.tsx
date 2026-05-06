@@ -228,7 +228,7 @@ export default function PlayerProfileScreen() {
         </View>
       )}
 
-      {/* ── Friend button ── */}
+      {/* ── Friend + Message buttons ── */}
       {!isMe && (() => {
         const s = profile.friendship_status;
         const btnColor =
@@ -252,20 +252,29 @@ export default function PlayerProfileScreen() {
           s === 'pending_received' ? 'Accept Request' :
                                      'Add Friend';
         return (
-          <TouchableOpacity
-            style={[styles.friendBtn, { backgroundColor: btnColor }]}
-            onPress={handleFriendAction}
-            disabled={friendLoading}
-            activeOpacity={0.8}
-          >
-            {friendLoading
-              ? <ActivityIndicator size="small" color={textColor} />
-              : <>
-                  <Ionicons name={iconName} size={18} color={textColor} />
-                  <Text style={[styles.friendBtnText, { color: textColor }]}>{label}</Text>
-                </>
-            }
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.friendBtn, { backgroundColor: btnColor }]}
+              onPress={handleFriendAction}
+              disabled={friendLoading}
+              activeOpacity={0.8}
+            >
+              {friendLoading
+                ? <ActivityIndicator size="small" color={textColor} />
+                : <>
+                    <Ionicons name={iconName} size={18} color={textColor} />
+                    <Text style={[styles.friendBtnText, { color: textColor }]}>{label}</Text>
+                  </>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.msgBtn}
+              onPress={() => router.push({ pathname: '/direct-chat' as any, params: { userId: String(profile.id), username: profile.username } })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-outline" size={22} color="#0FEA95" />
+            </TouchableOpacity>
+          </View>
         );
       })()}
 
@@ -314,9 +323,11 @@ const styles = StyleSheet.create({
   chipName:      { fontSize: 13, fontWeight: '700' },
   chipLevel:     { fontSize: 11, fontWeight: '600', marginTop: 1 },
 
-  // Friend button
-  friendBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 20, marginTop: 20, paddingVertical: 14, borderRadius: 16 },
+  // Action row (friend + message buttons)
+  actionRow:     { flexDirection: 'row', marginHorizontal: 20, marginTop: 20, gap: 10 },
+  friendBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16 },
   friendBtnText: { fontSize: 15, fontWeight: '700' },
+  msgBtn:        { width: 52, height: 52, borderRadius: 16, backgroundColor: '#2C2C2E', justifyContent: 'center', alignItems: 'center' },
 
   errorText:        { color: '#636366', fontSize: 16, marginTop: 14 },
   backBtnCenter:    { marginTop: 20, backgroundColor: '#2C2C2E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },

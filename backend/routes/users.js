@@ -237,6 +237,134 @@ router.put('/sport-preferences', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/users/suggestions?lat=&lng=&sport= — player matching
+router.get('/suggestions', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const lat    = parseFloat(req.query.lat);
+  const lng    = parseFloat(req.query.lng);
+  const sport  = req.query.sport?.trim() || null;
+  const hasLocation = !isNaN(lat) && !isNaN(lng);
+
+  try {
+    // Check if current user has sport preferences
+    const [[{ prefCount }]] = await pool.execute(
+      'SELECT COUNT(*) AS prefCount FROM SportPreferences WHERE user_id = ?',
+      [userId]
+    );
+
+    let rows;
+
+    if (Number(prefCount) === 0 && !sport) {
+      // Fallback: no preferences — return karma-ranked non-friends
+      const locationClause = hasLocation
+        ? `AND EXISTS (
+             SELECT 1 FROM (
+               SELECT latitude, longitude FROM Games WHERE host_id = u.id
+               UNION ALL
+               SELECT g2.latitude, g2.longitude FROM Games g2
+               JOIN GameParticipants gp2 ON gp2.game_id = g2.id AND gp2.user_id = u.id
+             ) coords
+             WHERE (6371 * acos(GREATEST(-1, LEAST(1,
+               cos(radians(${lat})) * cos(radians(coords.latitude)) *
+               cos(radians(coords.longitude) - radians(${lng})) +
+               sin(radians(${lat})) * sin(radians(coords.latitude))
+             )))) <= 20
+           )`
+        : '';
+      [rows] = await pool.execute(`
+        SELECT
+          u.id, u.username, u.avatar,
+          0 AS shared_count, '' AS shared_sports,
+          COALESCE((SELECT SUM(CASE WHEN r2.attended=1 THEN 1 ELSE -1 END) FROM Ratings r2 WHERE r2.ratee_id=u.id),0) +
+          COALESCE((SELECT SUM(
+            (CASE WHEN pr2.sportsmanship=1 THEN 1 WHEN pr2.sportsmanship=0 THEN -1 ELSE 0 END)+
+            (CASE WHEN pr2.punctuality=1   THEN 1 WHEN pr2.punctuality=0   THEN -1 ELSE 0 END)+
+            (CASE WHEN pr2.communication=1 THEN 1 WHEN pr2.communication=0 THEN -1 ELSE 0 END)
+          ) FROM PeerRatings pr2 WHERE pr2.ratee_id=u.id),0) AS karma
+        FROM Users u
+        WHERE u.id != ?
+          AND NOT EXISTS (
+            SELECT 1 FROM Friends
+            WHERE (requester_id=? AND addressee_id=u.id) OR (requester_id=u.id AND addressee_id=?)
+          )
+          ${locationClause}
+        ORDER BY karma DESC
+        LIMIT 20
+      `, [userId, userId, userId]);
+    } else {
+      // Match by shared sport preferences (or specific sport filter)
+      const sportJoinClause = sport
+        ? `INNER JOIN SportPreferences sp_match ON sp_match.user_id = u.id AND sp_match.sport_type = ?`
+        : `INNER JOIN SportPreferences sp_match ON sp_match.user_id = u.id
+             AND sp_match.sport_type IN (SELECT sport_type FROM SportPreferences WHERE user_id = ?)`;
+
+      const locationClause = hasLocation
+        ? `AND EXISTS (
+             SELECT 1 FROM (
+               SELECT latitude, longitude FROM Games WHERE host_id = u.id
+               UNION ALL
+               SELECT g2.latitude, g2.longitude FROM Games g2
+               JOIN GameParticipants gp2 ON gp2.game_id = g2.id AND gp2.user_id = u.id
+             ) coords
+             WHERE (6371 * acos(GREATEST(-1, LEAST(1,
+               cos(radians(${lat})) * cos(radians(coords.latitude)) *
+               cos(radians(coords.longitude) - radians(${lng})) +
+               sin(radians(${lat})) * sin(radians(coords.latitude))
+             )))) <= 20
+           )`
+        : '';
+
+      const param1 = sport ? sport : userId;
+      [rows] = await pool.execute(`
+        SELECT
+          u.id, u.username, u.avatar,
+          COUNT(DISTINCT sp_match.sport_type) AS shared_count,
+          GROUP_CONCAT(DISTINCT sp_match.sport_type ORDER BY sp_match.sport_type SEPARATOR ',') AS shared_sports,
+          COALESCE((SELECT SUM(CASE WHEN r2.attended=1 THEN 1 ELSE -1 END) FROM Ratings r2 WHERE r2.ratee_id=u.id),0) +
+          COALESCE((SELECT SUM(
+            (CASE WHEN pr2.sportsmanship=1 THEN 1 WHEN pr2.sportsmanship=0 THEN -1 ELSE 0 END)+
+            (CASE WHEN pr2.punctuality=1   THEN 1 WHEN pr2.punctuality=0   THEN -1 ELSE 0 END)+
+            (CASE WHEN pr2.communication=1 THEN 1 WHEN pr2.communication=0 THEN -1 ELSE 0 END)
+          ) FROM PeerRatings pr2 WHERE pr2.ratee_id=u.id),0) AS karma
+        FROM Users u
+        ${sportJoinClause}
+        WHERE u.id != ?
+          AND NOT EXISTS (
+            SELECT 1 FROM Friends
+            WHERE (requester_id=? AND addressee_id=u.id) OR (requester_id=u.id AND addressee_id=?)
+          )
+          ${locationClause}
+        GROUP BY u.id, u.username, u.avatar
+        ORDER BY shared_count DESC, karma DESC
+        LIMIT 20
+      `, [param1, userId, userId, userId]);
+    }
+
+    // Attach top_sport per player
+    const enriched = await Promise.all(rows.map(async (r) => {
+      const [[ts]] = await pool.execute(`
+        SELECT sport_type FROM (
+          SELECT sport_type FROM Games WHERE host_id = ?
+          UNION ALL
+          SELECT g.sport_type FROM Games g JOIN GameParticipants gp ON gp.game_id = g.id AND gp.user_id = ?
+        ) t GROUP BY sport_type ORDER BY COUNT(*) DESC LIMIT 1
+      `, [r.id, r.id]);
+      return {
+        ...r,
+        shared_sports: r.shared_sports ? r.shared_sports.split(',') : [],
+        karma: Number(r.karma),
+        shared_count: Number(r.shared_count),
+        top_sport: ts?.sport_type ?? null,
+      };
+    }));
+
+    res.json({ success: true, suggestions: enriched });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/users/:id — public profile (registered last to avoid shadowing /me /avatars /leaderboard)
 router.get('/:id', authMiddleware, async (req, res) => {
   const targetId = parseInt(req.params.id);

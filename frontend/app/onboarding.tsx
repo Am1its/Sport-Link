@@ -8,30 +8,37 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
+import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 
 const SPORTS = [
-  { key: 'basketball', label: 'Basketball', icon: 'basketball',     color: '#FF8C00' },
-  { key: 'football',   label: 'Football',   icon: 'soccer',         color: '#FFFFFF' },
-  { key: 'tennis',     label: 'Tennis',     icon: 'tennis',         color: '#CCFF00' },
-  { key: 'volleyball', label: 'Volleyball', icon: 'volleyball',     color: '#FFD700' },
-  { key: 'yoga',       label: 'Yoga',       icon: 'yoga',           color: '#A78BFA' },
-  { key: 'gym',        label: 'Gym',        icon: 'dumbbell',       color: '#FB923C' },
-  { key: 'studio',     label: 'Studio',     icon: 'dance-ballroom', color: '#F472B6' },
-  { key: 'footvolley', label: 'Footvolley', icon: 'volleyball',     color: '#22D3EE' },
-] as const;
+  { key: 'basketball', label: 'Basketball' },
+  { key: 'football',   label: 'Football'   },
+  { key: 'tennis',     label: 'Tennis'     },
+  { key: 'volleyball', label: 'Volleyball' },
+  { key: 'swimming',   label: 'Swimming'   },
+  { key: 'gym',        label: 'Gym'        },
+  { key: 'yoga',       label: 'Yoga'       },
+  { key: 'studio',     label: 'Studio'     },
+  { key: 'footvolley', label: 'Footvolley' },
+];
 
-const STEPS = ['avatar', 'bio', 'sports'] as const;
+const LEVEL_NAMES = ['Beginner', 'Casual', 'Intermediate', 'Advanced', 'Elite'];
+
+const STEPS = ['avatar', 'bio', 'sports', 'levels'] as const;
 type Step = typeof STEPS[number];
+
+type SportPref = { level: number; favorite: boolean };
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { token, setOnboardingComplete } = useAuth();
 
-  const [step, setStep] = useState<Step>('avatar');
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [bio, setBio] = useState('');
-  const [selectedSports, setSelectedSports] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState(false);
+  const [step, setStep]           = useState<Step>('avatar');
+  const [avatar, setAvatar]       = useState<string | null>(null);
+  const [bio, setBio]             = useState('');
+  const [selectedSports, setSelectedSports] = useState<string[]>([]);
+  const [sportPrefs, setSportPrefs]         = useState<Record<string, SportPref>>({});
+  const [saving, setSaving]       = useState(false);
 
   const stepIndex = STEPS.indexOf(step);
 
@@ -54,12 +61,20 @@ export default function OnboardingScreen() {
   };
 
   const toggleSport = (key: string) => {
-    setSelectedSports(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    if (selectedSports.includes(key)) {
+      setSelectedSports(prev => prev.filter(s => s !== key));
+    } else {
+      setSelectedSports(prev => [...prev, key]);
+      setSportPrefs(prev => prev[key] ? prev : { ...prev, [key]: { level: 3, favorite: false } });
+    }
+  };
+
+  const setLevel = (sport: string, level: number) => {
+    setSportPrefs(prev => ({ ...prev, [sport]: { ...prev[sport], level } }));
+  };
+
+  const toggleFavorite = (sport: string) => {
+    setSportPrefs(prev => ({ ...prev, [sport]: { ...prev[sport], favorite: !prev[sport]?.favorite } }));
   };
 
   const handleFinish = async () => {
@@ -77,6 +92,20 @@ export default function OnboardingScreen() {
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
 
+      if (selectedSports.length > 0) {
+        await apiFetch('/api/users/sport-preferences', {
+          method: 'PUT',
+          token,
+          body: JSON.stringify({
+            preferences: selectedSports.map(sport => ({
+              sport_type:  sport,
+              skill_level: sportPrefs[sport]?.level ?? 3,
+              is_favorite: sportPrefs[sport]?.favorite ?? false,
+            })),
+          }),
+        });
+      }
+
       await setOnboardingComplete();
       router.replace('/(tabs)');
     } catch {
@@ -88,12 +117,9 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.brand}>SportLink</Text>
         <Text style={styles.subtitle}>Let's set up your profile</Text>
-
-        {/* Progress dots */}
         <View style={styles.dots}>
           {STEPS.map((s, i) => (
             <View key={s} style={[styles.dot, i <= stepIndex && styles.dotActive]} />
@@ -103,7 +129,7 @@ export default function OnboardingScreen() {
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
 
-        {/* ── Step 1: Avatar ── */}
+        {/* ── Step 1: Photo ── */}
         {step === 'avatar' && (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Add a profile photo</Text>
@@ -166,30 +192,28 @@ export default function OnboardingScreen() {
           </View>
         )}
 
-        {/* ── Step 3: Sport Preferences ── */}
+        {/* ── Step 3: Sports ── */}
         {step === 'sports' && (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>What sports do you play?</Text>
-            <Text style={styles.stepHint}>Select all that apply</Text>
+            <Text style={styles.stepTitle}>What do you play?</Text>
+            <Text style={styles.stepHint}>Select all sports you're into</Text>
 
             <View style={styles.sportsGrid}>
-              {SPORTS.map(s => {
-                const active = selectedSports.has(s.key);
+              {SPORTS.map(({ key, label }) => {
+                const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? '#0FEA95';
+                const icon     = SPORT_ICONS[key  as keyof typeof SPORT_ICONS]  ?? 'trophy';
+                const selected = selectedSports.includes(key);
                 return (
                   <TouchableOpacity
-                    key={s.key}
-                    style={[styles.sportTile, active && { borderColor: s.color, backgroundColor: s.color + '22' }]}
-                    onPress={() => toggleSport(s.key)}
+                    key={key}
+                    style={[styles.sportTile, selected && { borderColor: color, backgroundColor: color + '22' }]}
+                    onPress={() => toggleSport(key)}
                     activeOpacity={0.75}
                   >
-                    <MaterialCommunityIcons
-                      name={s.icon as any}
-                      size={32}
-                      color={active ? s.color : '#636366'}
-                    />
-                    <Text style={[styles.sportTileLabel, active && { color: s.color }]}>{s.label}</Text>
-                    {active && (
-                      <View style={[styles.sportCheck, { backgroundColor: s.color }]}>
+                    <MaterialCommunityIcons name={icon as any} size={28} color={selected ? color : '#636366'} />
+                    <Text style={[styles.sportTileLabel, selected && { color }]}>{label}</Text>
+                    {selected && (
+                      <View style={[styles.sportCheck, { backgroundColor: color }]}>
                         <Ionicons name="checkmark" size={10} color="#1C1C1E" />
                       </View>
                     )}
@@ -200,6 +224,68 @@ export default function OnboardingScreen() {
 
             <View style={styles.navRow}>
               <TouchableOpacity style={styles.backBtn} onPress={() => setStep('bio')}>
+                <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+                <Text style={styles.backBtnText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.nextBtn}
+                onPress={() => {
+                  if (selectedSports.length === 0) return Alert.alert('Pick at least one', 'Select the sports you play.');
+                  setStep('levels');
+                }}
+              >
+                <Text style={styles.nextBtnText}>Next</Text>
+                <Ionicons name="arrow-forward" size={18} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ── Step 4: Levels ── */}
+        {step === 'levels' && (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Your skill levels</Text>
+            <Text style={styles.stepHint}>Tap dots to set level · ♥ to mark favorites</Text>
+
+            <View style={styles.levelsContainer}>
+              {selectedSports.map(key => {
+                const sportDef = SPORTS.find(s => s.key === key)!;
+                const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? '#0FEA95';
+                const icon     = SPORT_ICONS[key  as keyof typeof SPORT_ICONS]  ?? 'trophy';
+                const pref     = sportPrefs[key] ?? { level: 3, favorite: false };
+                return (
+                  <View key={key} style={styles.levelRow}>
+                    <MaterialCommunityIcons name={icon as any} size={20} color={color} />
+                    <Text style={styles.levelSportLabel}>{sportDef.label}</Text>
+                    <View style={{ flex: 1 }} />
+                    <View style={styles.levelControl}>
+                      <View style={styles.levelDots}>
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <TouchableOpacity
+                            key={n}
+                            onPress={() => setLevel(key, n)}
+                            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                          >
+                            <View style={[styles.levelDot, n <= pref.level && { backgroundColor: color }]} />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <Text style={styles.levelName}>{LEVEL_NAMES[(pref.level || 1) - 1]}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => toggleFavorite(key)} style={styles.favoriteBtn}>
+                      <Ionicons
+                        name={pref.favorite ? 'heart' : 'heart-outline'}
+                        size={20}
+                        color={pref.favorite ? '#FF6B6B' : '#48484A'}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.navRow}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setStep('sports')}>
                 <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
@@ -223,40 +309,49 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1C1C1E' },
 
-  header: { alignItems: 'center', paddingTop: 70, paddingBottom: 30, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
-  brand: { fontSize: 28, fontWeight: '900', color: '#0FEA95', letterSpacing: 1, marginBottom: 4 },
+  header:   { alignItems: 'center', paddingTop: 70, paddingBottom: 30, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
+  brand:    { fontSize: 28, fontWeight: '900', color: '#0FEA95', letterSpacing: 1, marginBottom: 4 },
   subtitle: { fontSize: 15, color: '#8E8E93', marginBottom: 20 },
-  dots: { flexDirection: 'row', gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3A3A3C' },
+  dots:     { flexDirection: 'row', gap: 8 },
+  dot:      { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3A3A3C' },
   dotActive: { backgroundColor: '#0FEA95', width: 22 },
 
-  body: { padding: 24, paddingBottom: 48 },
+  body:          { padding: 24, paddingBottom: 48 },
   stepContainer: { gap: 0 },
 
   stepTitle: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginBottom: 6, marginTop: 8 },
-  stepHint: { fontSize: 14, color: '#636366', marginBottom: 28 },
+  stepHint:  { fontSize: 14, color: '#636366', marginBottom: 28 },
 
-  avatarWrap: { alignSelf: 'center', width: 130, height: 130, borderRadius: 65, marginBottom: 32, position: 'relative' },
-  avatarImage: { width: 130, height: 130, borderRadius: 65, borderWidth: 3, borderColor: '#0FEA95' },
-  avatarPlaceholder: { width: 130, height: 130, borderRadius: 65, backgroundColor: '#2C2C2E', borderWidth: 2, borderColor: '#3A3A3C', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  avatarWrap:          { alignSelf: 'center', width: 130, height: 130, borderRadius: 65, marginBottom: 32, position: 'relative' },
+  avatarImage:         { width: 130, height: 130, borderRadius: 65, borderWidth: 3, borderColor: '#0FEA95' },
+  avatarPlaceholder:   { width: 130, height: 130, borderRadius: 65, backgroundColor: '#2C2C2E', borderWidth: 2, borderColor: '#3A3A3C', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 6 },
   avatarPlaceholderText: { color: '#636366', fontSize: 12 },
-  avatarEditBadge: { position: 'absolute', bottom: 4, right: 4, width: 28, height: 28, borderRadius: 14, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
+  avatarEditBadge:     { position: 'absolute', bottom: 4, right: 4, width: 28, height: 28, borderRadius: 14, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
 
-  bioInput: { backgroundColor: '#2C2C2E', borderRadius: 16, padding: 16, color: '#FFFFFF', fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#3A3A3C', marginBottom: 6 },
+  bioInput:  { backgroundColor: '#2C2C2E', borderRadius: 16, padding: 16, color: '#FFFFFF', fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#3A3A3C', marginBottom: 6 },
   charCount: { color: '#48484A', fontSize: 12, textAlign: 'right', marginBottom: 28 },
 
-  sportsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
-  sportTile: { width: '47%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#2C2C2E', borderRadius: 14, padding: 14, borderWidth: 1.5, borderColor: '#3A3A3C', position: 'relative' },
-  sportTileLabel: { fontSize: 14, fontWeight: '700', color: '#8E8E93' },
-  sportCheck: { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
+  sportsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 32 },
+  sportTile:      { width: '30%', aspectRatio: 1, backgroundColor: '#2C2C2E', borderRadius: 16, justifyContent: 'center', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#3A3A3C' },
+  sportTileLabel: { fontSize: 11, fontWeight: '700', color: '#636366', textAlign: 'center' },
+  sportCheck:     { position: 'absolute', top: 7, right: 7, width: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
 
-  navRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  skipBtn: { flex: 1, height: 52, justifyContent: 'center', alignItems: 'center' },
-  skipText: { color: '#636366', fontSize: 15, fontWeight: '600' },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 52, paddingHorizontal: 18, backgroundColor: '#2C2C2E', borderRadius: 14 },
+  levelsContainer: { gap: 10, marginBottom: 32 },
+  levelRow:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, padding: 14, gap: 10 },
+  levelSportLabel: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  levelControl:    { alignItems: 'center', gap: 4 },
+  levelDots:       { flexDirection: 'row', gap: 6 },
+  levelDot:        { width: 14, height: 14, borderRadius: 7, backgroundColor: '#3A3A3C' },
+  levelName:       { fontSize: 10, color: '#636366', fontWeight: '600' },
+  favoriteBtn:     { padding: 4 },
+
+  navRow:      { flexDirection: 'row', gap: 12, marginTop: 8 },
+  skipBtn:     { flex: 1, height: 52, justifyContent: 'center', alignItems: 'center' },
+  skipText:    { color: '#636366', fontSize: 15, fontWeight: '600' },
+  backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, height: 52, paddingHorizontal: 18, backgroundColor: '#2C2C2E', borderRadius: 14 },
   backBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
-  nextBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: '#0FEA95', borderRadius: 14 },
+  nextBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: '#0FEA95', borderRadius: 14 },
   nextBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 16 },
-  finishBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: '#0FEA95', borderRadius: 14 },
+  finishBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: '#0FEA95', borderRadius: 14 },
   finishBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 16 },
 });

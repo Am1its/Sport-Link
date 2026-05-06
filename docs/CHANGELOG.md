@@ -4,6 +4,127 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 9] — May 2026 — Court Reviews, Player Matching, Auth Redesign, Unified Onboarding & Direct Messaging
+
+### Court Detail Screen & Reviews
+**Database (`backend/migrations/011_court_reviews.sql`)**
+- New `CourtReviews` table: `(id, place_id VARCHAR 200, user_id FK, rating TINYINT 1-5, comment VARCHAR 500, created_at)`. Unique on `(place_id, user_id)` — one review per user per court. FK → `Users(id) ON DELETE CASCADE`.
+
+**Backend (`backend/routes/courts.js`)** — refactored + extended
+- Moved `/nearby` handler from `server.js` into `routes/courts.js` (detectSportType, classifyVenueType, MOCK_COURTS).
+- `GET /photo?ref=<photoRef>` — server-side proxy for Google Places photos; keeps API key hidden; streams response with 24h cache header.
+- `GET /:placeId` — aggregates Google Places Details (name, address, phone, open_now, weekday_hours, photo_refs) + SportLink stats (`review_count`, `avg_rating`) + last 20 reviews. Graceful fallback if no API key or mock place_id.
+- `GET /:placeId/reviews` — full reviews list with user avatars.
+- `POST /:placeId/reviews` — upsert review via `INSERT … ON DUPLICATE KEY UPDATE`.
+- `DELETE /:placeId/reviews/:reviewId` — delete own review (guards `user_id = caller`).
+
+**Frontend (`frontend/app/court-detail.tsx`)** — new screen
+- Route params: `{ placeId, name?, sport?, vicinity? }`.
+- Hero band (sport color), horizontal Google Places photo strip, info card (open/closed indicator, address, phone, Google rating, collapsible opening hours).
+- Community Reviews section: aggregate avg + star display.
+- Write/edit review inline: tap stars + optional comment TextInput + Submit.
+- Reviews FlatList with delete-own capability. `KeyboardAvoidingView` wraps comment input.
+
+**Frontend (`frontend/app/(tabs)/index.tsx`)**
+- Court bottom card changed from static "Public Court" label to a **"View Details"** `TouchableOpacity` → navigates to `court-detail` with `{ placeId, name, sport, vicinity }`.
+
+---
+
+### Bug Fix — Game Results Duplicate Rows
+**Backend (`backend/routes/ratings.js`)**
+- `GET /api/ratings/game/:gameId/results`: Fixed SQL `GROUP BY` including `r.attended` which caused one row per (user, attended-value) when a host had rated. Fix: `MAX(r.attended) AS attended`, removed `r.attended` from `GROUP BY`, scoped the `Ratings` LEFT JOIN with `AND r.rater_id = ?` (host_id). `ORDER BY MAX(r.attended) DESC, u.username ASC`.
+
+---
+
+### Auth Screens Redesign + Google OAuth Infrastructure
+**Database (`backend/migrations/012_google_auth.sql`)**
+- `ALTER TABLE Users ADD COLUMN google_id VARCHAR(100) NULL` + unique index.
+- `ALTER TABLE Users MODIFY COLUMN password_hash VARCHAR(255) NULL` (allows Google-only accounts).
+
+**Backend (`backend/routes/auth.js`)**
+- `POST /api/auth/login` — now detects Google-only accounts (no `password_hash`) and returns a friendly error.
+- `POST /api/auth/google` — exchanges auth code for tokens via Google OAuth2, fetches profile, creates or links user. Derives clean username from Google name with uniqueness suffix loop.
+
+**Frontend (`frontend/app/login.tsx`)** — full rewrite
+- Dark themed card with background accent circles, logo section, Google button (shows orange "Soon" badge, fires Alert), email/password inputs, show/hide password toggle.
+
+**Frontend (`frontend/app/register.tsx`)** — simplified to single step
+- Account creation only (username + email + password + Google "Coming Soon" button).
+- On success: `login()` + `router.replace('/onboarding')`. All profile setup moved to unified onboarding.
+
+**`frontend/app.json`**
+- `slug`: `"frontend"` → `"sportlink"`, `scheme`: `"frontend"` → `"sportlink"`, `bundleIdentifier`: → `"com.am1its.sportlink"`.
+
+---
+
+### Unified Onboarding Flow
+**Frontend (`frontend/app/onboarding.tsx`)** — complete rewrite
+- **4-step wizard** replacing the previous 3-step (which lacked per-sport skill levels and didn't save preferences):
+  1. **Photo** — avatar picker, skippable.
+  2. **Bio** — 120-char multi-line text area, skippable.
+  3. **Sports** — 3×3 grid of all 9 sports (multi-select, must pick ≥1 to advance).
+  4. **Levels** — one row per selected sport: 5-dot skill selector (defaults to 3/Intermediate) + heart favorite toggle + level name label.
+- On finish: `PUT /api/users/me` (avatar, bio, `onboarding_complete: true`) + `PUT /api/users/sport-preferences` (per-sport skill_level + is_favorite) → `setOnboardingComplete()` → `/(tabs)`.
+- Sport preferences state persists if user navigates back to modify sport selection.
+
+---
+
+### Player Matching
+**Backend (`backend/routes/users.js`)**
+- `GET /api/users/suggestions?sport=&lat=&lng=` — registered before `/:id` to avoid shadowing. Returns `{ suggestions: [{ id, username, avatar, karma, top_sport, shared_count, shared_sports[] }] }`.
+  - If user has sport preferences: `INNER JOIN SportPreferences` to find matching sports, optional sport and location (Haversine) filters, excludes self + existing friends.
+  - Fallback (no preferences): karma-ranked non-friends list.
+
+**Frontend (`frontend/app/player-matching.tsx`)** — new screen
+- `useFocusEffect` + `Location.requestForegroundPermissionsAsync` for location-based matching.
+- Horizontal sport filter chips. FlatList of player cards (avatar, sport badge, colored karma, shared sport chips, Add Friend button).
+- Optimistic `pendingIds` Set for sent friend requests. Empty state with "Set Sport Preferences" button.
+
+**Frontend (`frontend/app/(tabs)/profile.tsx`)**
+- Added "Discover Players" menu item (magnet icon, green) in Community section.
+
+---
+
+### Direct Messaging with Event Sharing
+**Database (`backend/migrations/013_direct_messages.sql`)**
+- New `DirectMessages` table: `(id, sender_id FK, receiver_id FK, content TEXT NULL, type ENUM(text/event) DEFAULT text, event_id INT NULL FK → Games ON DELETE SET NULL, is_read BOOL DEFAULT FALSE, created_at)`. Indexed on `sender_id` and `receiver_id`.
+
+**Backend (`backend/routes/dm.js`)** — new route file
+- `GET /api/dm/` — conversation list with last message + unread count per conversation (uses `MAX(id)` pattern for last message, per-viewer unread subquery).
+- `GET /api/dm/:userId` — messages history (up to 100, ASC). Auto-marks received messages as read. Includes joined game details (`game_title`, `game_sport`, `game_time`, `game_location`, `game_max_players`, `game_current_players`, `game_joined`, `game_is_host`) from **caller's perspective**.
+- `POST /api/dm/:userId` — send text or event message. Validates content/event_id per type. Fetches message from sender's perspective for REST response; fetches again from receiver's perspective for socket emission (correct join/host state for each party). Emits `new_dm` to `user_${receiverId}` room.
+- `PUT /api/dm/:userId/read` — mark all messages from that user as read.
+
+**Backend (`backend/server.js`)**
+- `app.set('io', io)` — exposes io instance to route handlers.
+- Registered `/api/dm` route.
+- Socket.io `connection` handler: `socket.join(`user_${socket.user.id}`)` — every user joins their personal room on connect.
+
+**Frontend (`frontend/app/(tabs)/chat.tsx`)** — Events + Friends tabs
+- Added `tab` state (`'events' | 'friends'`). Tab switcher bar: green pill highlights active tab; Friends tab shows red unread badge when total unread > 0.
+- Events tab: existing game chats list (unchanged).
+- Friends tab: DM conversations FlatList. Each item: avatar + username + last message preview (handles event-type messages: "Shared a game event") + timestamp + unread count badge. Unread dot positioned outside `overflow:hidden` via wrapper `View`.
+- Both lists fetched in parallel via `Promise.all` in `useFocusEffect`.
+
+**Frontend (`frontend/app/direct-chat.tsx`)** — new screen
+- Route params: `{ userId, username }`.
+- Real-time socket.io: listens for `new_dm` events filtered to this conversation; auto-marks read on arrival.
+- Renders text bubbles and **event cards**: sport icon + title + time + location + player count + contextual action ("Join" button / "✓ Joined" / "You host" / "Ended" / "Full").
+- "Join" button calls `POST /api/games/:id/join` and updates all matching messages optimistically.
+- `+` button opens a bottom-sheet Modal listing user's upcoming active games (fetched lazily from `/api/games/mine`, cached for session). Selecting a game sends an `event`-type DM.
+- Header taps → `player-profile`. Non-own avatars tappable → `player-profile`.
+
+**Frontend (`frontend/app/player-profile.tsx`)**
+- Friend button now lives in an `actionRow` (horizontal) paired with a **Message button** (chat-bubble icon, 52×52, dark bg) that navigates to `/direct-chat`. Hidden for own profile.
+
+**Frontend (`frontend/app/game-chat.tsx`)**
+- Fixed: "other user" avatar was a plain `View` — now uses the same tappable `avatarCircle` as own-message avatars, navigating to `player-profile`.
+
+**Frontend (`frontend/app/_layout.tsx`)**
+- Registered `<Stack.Screen name="direct-chat" />` and `<Stack.Screen name="player-matching" />`.
+
+---
+
 ## [Sprint 8] — May 2026 — Sport Preferences, Profile Redesign & Game Results
 
 ### Sport Preferences System

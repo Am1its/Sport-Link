@@ -31,6 +31,9 @@ export default function RootLayout() {
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="game-chat" />
         <Stack.Screen name="friends" />
+        <Stack.Screen name="court-detail" />
+        <Stack.Screen name="player-matching" />
+        <Stack.Screen name="direct-chat" />
       </Stack>
     </AuthProvider>
   );

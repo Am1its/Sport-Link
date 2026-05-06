@@ -58,7 +58,7 @@ router.get('/game/:gameId/results', authMiddleware, async (req, res) => {
         u.id,
         u.username,
         u.avatar,
-        r.attended,
+        MAX(r.attended)                    AS attended,
         COUNT(DISTINCT pr.rater_id)        AS peer_count,
         ROUND(AVG(pr.sportsmanship) * 100) AS sportsmanship_pct,
         ROUND(AVG(pr.punctuality)   * 100) AS punctuality_pct,
@@ -70,11 +70,11 @@ router.get('/game/:gameId/results', authMiddleware, async (req, res) => {
         SELECT user_id FROM GameParticipants WHERE game_id = ?
       ) participants
       JOIN Users u ON u.id = participants.user_id
-      LEFT JOIN Ratings     r  ON r.game_id  = ? AND r.ratee_id  = u.id
+      LEFT JOIN Ratings     r  ON r.game_id  = ? AND r.ratee_id = u.id AND r.rater_id = ?
       LEFT JOIN PeerRatings pr ON pr.game_id = ? AND pr.ratee_id = u.id
-      GROUP BY u.id, u.username, u.avatar, r.attended
-      ORDER BY r.attended DESC, u.username ASC
-    `, [game.host_id, gameId, gameId, gameId]);
+      GROUP BY u.id, u.username, u.avatar
+      ORDER BY MAX(r.attended) DESC, u.username ASC
+    `, [game.host_id, gameId, gameId, game.host_id, gameId]);
 
     res.json({ success: true, can_view: true, results });
   } catch (err) {
