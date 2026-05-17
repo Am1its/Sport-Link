@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 
 type ResultEntry = {
   id: number;
@@ -65,13 +66,15 @@ export default function GameResultsScreen() {
     if (gameId) load();
   }, [gameId]);
 
-  const sportColor = (sport && SPORT_COLORS[sport]) ? SPORT_COLORS[sport] : '#0FEA95';
+  const sportColor = (sport && SPORT_COLORS[sport]) ? SPORT_COLORS[sport] : Colors.accent;
   const sportIcon  = (sport && SPORT_ICONS[sport])  ? SPORT_ICONS[sport]  : 'trophy';
 
   const header = (
     <View style={styles.header}>
+      <View style={[styles.resultOrb1, { backgroundColor: sportColor + '12' }]} />
+      <View style={[styles.resultOrb2, { backgroundColor: sportColor + '08' }]} />
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+        <Ionicons name="chevron-back" size={26} color={Colors.text} />
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>Game Results</Text>
@@ -90,7 +93,7 @@ export default function GameResultsScreen() {
     return (
       <View style={styles.container}>
         {header}
-        <View style={styles.center}><ActivityIndicator size="large" color="#0FEA95" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>
       </View>
     );
   }
@@ -100,7 +103,9 @@ export default function GameResultsScreen() {
       <View style={styles.container}>
         {header}
         <View style={styles.center}>
-          <Ionicons name="lock-closed-outline" size={64} color="#3A3A3C" />
+          <View style={styles.lockCircle}>
+            <Ionicons name="lock-closed-outline" size={64} color={Colors.border} />
+          </View>
           <Text style={styles.lockedTitle}>Results Locked</Text>
           <Text style={styles.lockedSub}>Rate all players in this game to unlock the results.</Text>
           <TouchableOpacity
@@ -110,7 +115,7 @@ export default function GameResultsScreen() {
               params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
             })}
           >
-            <Ionicons name="star-outline" size={16} color="#1C1C1E" />
+            <Ionicons name="star-outline" size={16} color={Colors.bg} />
             <Text style={styles.rateBtnText}>Rate Players</Text>
           </TouchableOpacity>
         </View>
@@ -154,7 +159,7 @@ export default function GameResultsScreen() {
                     <Ionicons
                       name={item.attended ? 'checkmark-circle' : 'close-circle'}
                       size={13}
-                      color={item.attended ? '#1C1C1E' : '#1C1C1E'}
+                      color={Colors.bg}
                     />
                     <Text style={styles.attendBadgeText}>
                       {item.attended ? 'Showed Up' : 'No-Show'}
@@ -169,11 +174,11 @@ export default function GameResultsScreen() {
                   {CATEGORIES.map(cat => {
                     const pct = item[cat.key] as number | null;
                     if (pct === null || pct === undefined) return null;
-                    const barColor = pct >= 70 ? '#0FEA95' : pct >= 40 ? '#FF8C00' : '#FF453A';
+                    const barColor = pct >= 70 ? Colors.accent : pct >= 40 ? Colors.orange : Colors.error;
                     return (
                       <View key={cat.key} style={styles.scoreRow}>
                         <View style={styles.scoreLabelRow}>
-                          <Ionicons name={cat.icon as any} size={13} color="#636366" />
+                          <Ionicons name={cat.icon as any} size={13} color={Colors.textMuted} />
                           <Text style={styles.scoreLabel}>{cat.label}</Text>
                         </View>
                         <View style={styles.scoreRight}>
@@ -188,7 +193,7 @@ export default function GameResultsScreen() {
                   {item.skill_avg !== null && item.skill_avg !== undefined && (
                     <View style={styles.scoreRow}>
                       <View style={styles.scoreLabelRow}>
-                        <Ionicons name="flash-outline" size={13} color="#636366" />
+                        <Ionicons name="flash-outline" size={13} color={Colors.textMuted} />
                         <Text style={styles.scoreLabel}>Skill</Text>
                       </View>
                       <View style={styles.skillRight}>
@@ -197,7 +202,7 @@ export default function GameResultsScreen() {
                             key={n}
                             name={n <= Math.round(item.skill_avg!) ? 'star' : 'star-outline'}
                             size={16}
-                            color={n <= Math.round(item.skill_avg!) ? '#FFD700' : '#3A3A3C'}
+                            color={n <= Math.round(item.skill_avg!) ? Colors.yellow : Colors.border}
                           />
                         ))}
                         <Text style={styles.skillNum}>{Number(item.skill_avg).toFixed(1)}</Text>
@@ -221,50 +226,53 @@ export default function GameResultsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
   center:    { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
 
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
-  backBtn: { marginRight: 12 },
-  title:   { fontSize: 20, fontWeight: '900', color: '#FFFFFF' },
-  subtitle: { fontSize: 12, color: '#8E8E93', marginTop: 2 },
-  sportIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.xl, paddingHorizontal: Spacing.xl, backgroundColor: Colors.bg, overflow: 'hidden' },
+  resultOrb1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, top: -80, right: -60 },
+  resultOrb2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, top: 20, left: -40 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md },
+  title:   { fontSize: 20, fontWeight: '900', color: Colors.text },
+  subtitle: { fontSize: 12, color: Colors.textSub, marginTop: 2 },
+  sportIcon: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
 
-  list: { paddingHorizontal: 20, paddingBottom: 50 },
-  anonymousNote: { fontSize: 12, color: '#48484A', textAlign: 'center', marginVertical: 14, fontStyle: 'italic' },
+  list: { paddingHorizontal: Spacing.xl, paddingBottom: 50 },
+  anonymousNote: { fontSize: 12, color: Colors.textHint, textAlign: 'center', marginVertical: 14, marginHorizontal: Spacing.xl, fontStyle: 'italic' },
 
   // Player card
-  card:       { backgroundColor: '#2C2C2E', borderRadius: 16, padding: 14, marginBottom: 12 },
+  card:       { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: 14, marginBottom: 12, ...Shadow.card },
   playerRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar:     { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   avatarImg:  { width: '100%', height: '100%' },
   avatarLetter: { fontSize: 17, fontWeight: '900' },
-  playerName: { flex: 1, fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  playerName: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.text },
 
   attendBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  attendBadgeYes: { backgroundColor: '#0FEA95' },
-  attendBadgeNo:  { backgroundColor: '#FF453A' },
-  attendBadgeText: { fontSize: 11, fontWeight: '800', color: '#1C1C1E' },
+  attendBadgeYes: { backgroundColor: Colors.accent },
+  attendBadgeNo:  { backgroundColor: Colors.error },
+  attendBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.bg },
 
   // Scores
-  scoresBlock: { borderTopWidth: 1, borderTopColor: '#3A3A3C', paddingTop: 10 },
+  scoresBlock: { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
   scoreRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   scoreLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, width: 120 },
-  scoreLabel:  { fontSize: 12, color: '#AEAEB2', fontWeight: '600' },
+  scoreLabel:  { fontSize: 12, color: Colors.textSub, fontWeight: '600' },
   scoreRight:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bar:         { flex: 1, height: 8, borderRadius: 4, backgroundColor: '#3A3A3C', overflow: 'hidden' },
+  bar:         { flex: 1, height: 6, borderRadius: 4, backgroundColor: Colors.border, overflow: 'hidden' },
   barFill:     { height: '100%', borderRadius: 4 },
   scorePct:    { width: 36, fontSize: 12, fontWeight: '800', textAlign: 'right' },
 
   skillRight:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  skillNum:    { fontSize: 12, color: '#FFD700', fontWeight: '800', marginLeft: 4 },
+  skillNum:    { fontSize: 12, color: Colors.yellow, fontWeight: '800', marginLeft: 4 },
 
-  raterCount:  { fontSize: 11, color: '#48484A', marginTop: 6, textAlign: 'right', fontStyle: 'italic' },
-  noRatings:   { fontSize: 13, color: '#48484A', fontStyle: 'italic', borderTopWidth: 1, borderTopColor: '#3A3A3C', paddingTop: 10 },
+  raterCount:  { fontSize: 11, color: Colors.textHint, marginTop: 6, textAlign: 'right', fontStyle: 'italic' },
+  noRatings:   { fontSize: 13, color: Colors.textHint, fontStyle: 'italic', borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
 
   // Locked state
-  lockedTitle: { fontSize: 22, fontWeight: '900', color: '#FFFFFF', marginTop: 20, marginBottom: 8 },
-  lockedSub:   { fontSize: 14, color: '#636366', textAlign: 'center', lineHeight: 20 },
-  rateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 28, backgroundColor: '#0FEA95', paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 },
-  rateBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 15 },
+  lockCircle:  { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, ...Shadow.card, justifyContent: 'center', alignItems: 'center' },
+  lockedTitle: { fontSize: 22, fontWeight: '900', color: Colors.text, marginTop: 20, marginBottom: 8 },
+  lockedSub:   { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  rateBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 28, backgroundColor: Colors.accent, paddingHorizontal: 28, paddingVertical: 14, borderRadius: Radius.pill, shadowColor: Colors.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  rateBtnText: { color: Colors.bg, fontWeight: '900', fontSize: 15 },
 });

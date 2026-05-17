@@ -11,6 +11,7 @@ import { apiFetch } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { API_BASE } from '../constants/api';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 
 type PlacesData = {
   name: string;
@@ -34,7 +35,7 @@ type Review = {
   created_at: string;
 };
 
-function StarRow({ rating, size = 16, color = '#FFD700', onPress }: {
+function StarRow({ rating, size = 16, color = Colors.yellow, onPress }: {
   rating: number; size?: number; color?: string; onPress?: (n: number) => void;
 }) {
   return (
@@ -44,7 +45,7 @@ function StarRow({ rating, size = 16, color = '#FFD700', onPress }: {
           <Ionicons
             name={n <= rating ? 'star' : 'star-outline'}
             size={size}
-            color={n <= rating ? color : '#3A3A3C'}
+            color={n <= rating ? color : Colors.border}
           />
         </TouchableOpacity>
       ))}
@@ -80,7 +81,7 @@ function ReviewCard({ review, userId, onDelete }: { review: Review; userId: numb
               { text: 'Delete', style: 'destructive', onPress: () => onDelete(review.id) },
             ])}
           >
-            <Ionicons name="trash-outline" size={15} color="#FF453A" />
+            <Ionicons name="trash-outline" size={15} color={Colors.error} />
           </TouchableOpacity>
         )}
       </View>
@@ -107,7 +108,7 @@ export default function CourtDetailScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [hoursExpanded, setHoursExpanded] = useState(false);
 
-  const sportColor = sport && SPORT_COLORS[sport] ? SPORT_COLORS[sport] : '#0FEA95';
+  const sportColor = sport && SPORT_COLORS[sport] ? SPORT_COLORS[sport] : Colors.accent;
   const sportIcon  = sport && SPORT_ICONS[sport]  ? SPORT_ICONS[sport]  : 'trophy';
 
   const myReview = reviews.find(r => r.user_id === user?.id);
@@ -174,8 +175,10 @@ export default function CourtDetailScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* Header */}
       <View style={[styles.heroBand, { backgroundColor: sportColor + '28' }]}>
+        <View style={[styles.heroOrb1, { backgroundColor: sportColor + '18' }]} />
+        <View style={[styles.heroOrb2, { backgroundColor: sportColor + '0C' }]} />
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={26} color={Colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.heroTitle} numberOfLines={2}>{displayName}</Text>
@@ -189,7 +192,7 @@ export default function CourtDetailScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#0FEA95" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -199,7 +202,7 @@ export default function CourtDetailScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.photosStrip}
-              contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}
+              contentContainerStyle={{ gap: 10, paddingHorizontal: Spacing.xl }}
             >
               {placesData.photo_refs.map((ref, i) => (
                 <Image
@@ -216,8 +219,8 @@ export default function CourtDetailScreen() {
             {/* Open / Closed indicator */}
             {placesData?.open_now !== null && placesData?.open_now !== undefined && (
               <View style={styles.openRow}>
-                <View style={[styles.openDot, { backgroundColor: placesData.open_now ? '#0FEA95' : '#FF453A' }]} />
-                <Text style={[styles.openText, { color: placesData.open_now ? '#0FEA95' : '#FF453A' }]}>
+                <View style={[styles.openDot, { backgroundColor: placesData.open_now ? Colors.accent : Colors.error }]} />
+                <Text style={[styles.openText, { color: placesData.open_now ? Colors.accent : Colors.error }]}>
                   {placesData.open_now ? 'Open Now' : 'Closed'}
                 </Text>
               </View>
@@ -226,7 +229,7 @@ export default function CourtDetailScreen() {
             {/* Address */}
             {(placesData?.address ?? vicinity) && (
               <View style={styles.infoRow}>
-                <Ionicons name="location-outline" size={16} color="#636366" />
+                <Ionicons name="location-outline" size={16} color={Colors.textMuted} />
                 <Text style={styles.infoText}>{placesData?.address ?? vicinity}</Text>
               </View>
             )}
@@ -234,7 +237,7 @@ export default function CourtDetailScreen() {
             {/* Phone */}
             {placesData?.phone && (
               <View style={styles.infoRow}>
-                <Ionicons name="call-outline" size={16} color="#636366" />
+                <Ionicons name="call-outline" size={16} color={Colors.textMuted} />
                 <Text style={styles.infoText}>{placesData.phone}</Text>
               </View>
             )}
@@ -242,7 +245,7 @@ export default function CourtDetailScreen() {
             {/* Google rating */}
             {placesData?.google_rating && (
               <View style={styles.infoRow}>
-                <Ionicons name="logo-google" size={16} color="#636366" />
+                <Ionicons name="logo-google" size={16} color={Colors.textMuted} />
                 <StarRow rating={Math.round(placesData.google_rating)} size={14} />
                 <Text style={styles.infoMuted}>
                   {placesData.google_rating.toFixed(1)}
@@ -255,12 +258,12 @@ export default function CourtDetailScreen() {
             {placesData?.weekday_hours && placesData.weekday_hours.length > 0 && (
               <View>
                 <TouchableOpacity style={styles.infoRow} onPress={() => setHoursExpanded(e => !e)}>
-                  <Ionicons name="time-outline" size={16} color="#636366" />
+                  <Ionicons name="time-outline" size={16} color={Colors.textMuted} />
                   <Text style={styles.infoText}>Opening Hours</Text>
                   <Ionicons
                     name={hoursExpanded ? 'chevron-up' : 'chevron-down'}
                     size={14}
-                    color="#636366"
+                    color={Colors.textMuted}
                     style={{ marginLeft: 'auto' }}
                   />
                 </TouchableOpacity>
@@ -294,7 +297,7 @@ export default function CourtDetailScreen() {
             <TextInput
               style={styles.commentInput}
               placeholder="Add a comment (optional)"
-              placeholderTextColor="#48484A"
+              placeholderTextColor={Colors.textHint}
               value={myComment}
               onChangeText={setMyComment}
               multiline
@@ -306,7 +309,7 @@ export default function CourtDetailScreen() {
               disabled={submitting || myRating === 0}
             >
               {submitting
-                ? <ActivityIndicator color="#1C1C1E" size="small" />
+                ? <ActivityIndicator color={Colors.bg} size="small" />
                 : <Text style={styles.submitBtnText}>{myReview ? 'Update Review' : 'Submit Review'}</Text>
               }
             </TouchableOpacity>
@@ -334,51 +337,53 @@ export default function CourtDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
   center:    { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll:    { paddingBottom: 60 },
 
-  heroBand:  { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: 20, paddingHorizontal: 20, gap: 12 },
-  backBtn:   { marginRight: 4 },
-  heroTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', lineHeight: 26 },
+  heroBand:  { flexDirection: 'row', alignItems: 'center', minHeight: 120, paddingTop: 56, paddingBottom: Spacing.xxl, paddingHorizontal: Spacing.xl, gap: 12, overflow: 'hidden' },
+  heroOrb1:  { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: -90, right: -70 },
+  heroOrb2:  { position: 'absolute', width: 140, height: 140, borderRadius: 70, bottom: -50, left: -40 },
+  backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
+  heroTitle: { fontSize: 20, fontWeight: '900', color: Colors.text, lineHeight: 26 },
   sportBadge:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   sportBadgeText: { fontSize: 11, fontWeight: '800' },
 
   photosStrip: { marginVertical: 14 },
-  photo:       { width: 240, height: 160, borderRadius: 14 },
+  photo:       { width: 220, height: 145, borderRadius: Radius.lg },
 
-  infoCard: { marginHorizontal: 20, backgroundColor: '#2C2C2E', borderRadius: 16, padding: 16, marginBottom: 20, gap: 12 },
+  infoCard: { marginHorizontal: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: Spacing.xl, gap: 12, ...Shadow.card },
   openRow:  { flexDirection: 'row', alignItems: 'center', gap: 7 },
   openDot:  { width: 8, height: 8, borderRadius: 4 },
   openText: { fontSize: 13, fontWeight: '800' },
   infoRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { flex: 1, fontSize: 13, color: '#AEAEB2', lineHeight: 18 },
-  infoMuted: { fontSize: 12, color: '#636366', marginLeft: 6 },
+  infoText: { flex: 1, fontSize: 13, color: Colors.textSub, lineHeight: 18 },
+  infoMuted: { fontSize: 12, color: Colors.textMuted, marginLeft: 6 },
   hoursList: { paddingLeft: 26, marginTop: 6, gap: 3 },
-  hoursLine: { fontSize: 12, color: '#636366', lineHeight: 18 },
+  hoursLine: { fontSize: 12, color: Colors.textMuted, lineHeight: 18 },
 
-  sectionHeader: { paddingHorizontal: 20, marginBottom: 12 },
-  sectionTitle:  { fontSize: 18, fontWeight: '900', color: '#FFFFFF', marginBottom: 6 },
+  sectionHeader: { paddingHorizontal: Spacing.xl, marginBottom: Spacing.md },
+  sectionTitle:  { fontSize: 20, fontWeight: '900', color: Colors.text, marginBottom: 6 },
   aggRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aggScore:  { fontSize: 22, fontWeight: '900', color: '#FFD700' },
-  aggCount:  { fontSize: 12, color: '#636366' },
+  aggScore:  { fontSize: 22, fontWeight: '900', color: Colors.yellow },
+  aggCount:  { fontSize: 12, color: Colors.textMuted },
 
-  writeCard:        { marginHorizontal: 20, backgroundColor: '#2C2C2E', borderRadius: 16, padding: 16, marginBottom: 20, gap: 12 },
-  writeTitle:       { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
-  commentInput:     { backgroundColor: '#3A3A3C', borderRadius: 10, padding: 12, color: '#FFFFFF', fontSize: 14, minHeight: 70, textAlignVertical: 'top' },
-  submitBtn:        { backgroundColor: '#0FEA95', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  writeCard:        { marginHorizontal: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: Spacing.xl, gap: 12, ...Shadow.card },
+  writeTitle:       { fontSize: 15, fontWeight: '800', color: Colors.text },
+  commentInput:     { backgroundColor: Colors.surface2, borderRadius: Radius.md, padding: 12, color: Colors.text, fontSize: 14, minHeight: 70, textAlignVertical: 'top' },
+  submitBtn:        { backgroundColor: Colors.accent, borderRadius: Radius.pill, height: 50, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
   submitBtnDisabled: { opacity: 0.4 },
-  submitBtnText:    { color: '#1C1C1E', fontWeight: '900', fontSize: 15 },
+  submitBtnText:    { color: Colors.bg, fontWeight: '900', fontSize: 15 },
 
-  noReviews: { textAlign: 'center', color: '#48484A', fontStyle: 'italic', marginTop: 10, marginBottom: 20 },
+  noReviews: { textAlign: 'center', color: Colors.textHint, fontStyle: 'italic', marginTop: 10, marginBottom: 20 },
 
-  reviewCard:   { marginHorizontal: 20, backgroundColor: '#2C2C2E', borderRadius: 16, padding: 14, marginBottom: 10 },
+  reviewCard:   { marginHorizontal: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, marginBottom: 10, ...Shadow.card },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   reviewAvatar:  { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
   reviewAvatarImg:    { width: '100%', height: '100%' },
   reviewAvatarLetter: { fontSize: 15, fontWeight: '900' },
-  reviewUsername: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
-  reviewDate:     { fontSize: 11, color: '#636366', marginTop: 1 },
-  reviewComment:  { fontSize: 13, color: '#AEAEB2', lineHeight: 19 },
+  reviewUsername: { fontSize: 13, fontWeight: '800', color: Colors.text },
+  reviewDate:     { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
+  reviewComment:  { fontSize: 13, color: Colors.textSub, lineHeight: 19 },
   deleteBtn:      { padding: 4 },
 });

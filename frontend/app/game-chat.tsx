@@ -12,6 +12,7 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
+import { Colors, Radius } from '../constants/theme';
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -31,6 +32,7 @@ export default function GameChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
+  const [inputFocused, setInputFocused] = useState(false);
   const [sending, setSending] = useState(false);
   const [avatarCache, setAvatarCache] = useState<Record<number, string | null>>({});
   const seenUserIds = useRef<Set<number>>(new Set());
@@ -127,7 +129,7 @@ export default function GameChatScreen() {
     >
       <SafeAreaView style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={26} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{name ?? 'Game Chat'}</Text>
         <View style={{ width: 40 }} />
@@ -135,7 +137,7 @@ export default function GameChatScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#0FEA95" size="large" />
+          <ActivityIndicator color={Colors.accent} size="large" />
         </View>
       ) : (
         <ScrollView
@@ -146,7 +148,9 @@ export default function GameChatScreen() {
         >
           {messages.length === 0 && (
             <View style={styles.emptyChat}>
-              <Ionicons name="chatbubbles-outline" size={60} color="#3A3A3C" />
+              <View style={styles.emptyChatIconWrap}>
+                <Ionicons name="chatbubbles-outline" size={38} color={Colors.surface2} />
+              </View>
               <Text style={styles.emptyChatText}>No messages yet. Say hi! 👋</Text>
             </View>
           )}
@@ -205,23 +209,31 @@ export default function GameChatScreen() {
       )}
 
       <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor="#636366"
-          value={input}
-          onChangeText={setInput}
-          multiline
-          maxLength={MAX_MESSAGE_LENGTH}
-          onSubmitEditing={sendMessage}
-          returnKeyType="send"
-        />
+        <View style={[styles.inputWrap, inputFocused && styles.inputWrapFocused]}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type a message..."
+            placeholderTextColor={Colors.textMuted}
+            value={input}
+            onChangeText={setInput}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            multiline
+            maxLength={MAX_MESSAGE_LENGTH}
+            onSubmitEditing={sendMessage}
+            returnKeyType="send"
+          />
+        </View>
         <TouchableOpacity
-          style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
+          style={[
+            styles.sendBtn,
+            (!input.trim() || sending) && styles.sendBtnDisabled,
+            input.trim() && styles.sendBtnActive,
+          ]}
           onPress={sendMessage}
           disabled={!input.trim() || sending}
         >
-          <Ionicons name="send" size={20} color={input.trim() ? '#1C1C1E' : '#636366'} />
+          <Ionicons name="send" size={20} color={input.trim() ? Colors.bg : Colors.textMuted} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -229,11 +241,11 @@ export default function GameChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#1C1C1E' },
+  root: { flex: 1, backgroundColor: Colors.bg },
 
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E', backgroundColor: '#1C1C1E' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.bg },
   backBtn: { width: 40 },
-  headerTitle: { flex: 1, color: '#FFFFFF', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  headerTitle: { flex: 1, color: Colors.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
@@ -241,7 +253,8 @@ const styles = StyleSheet.create({
   messageContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
 
   emptyChat: { flex: 1, alignItems: 'center', paddingTop: 80 },
-  emptyChatText: { color: '#636366', marginTop: 12, fontSize: 15 },
+  emptyChatIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  emptyChatText: { color: Colors.textMuted, fontSize: 15 },
 
   bubbleRowOwn: { flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '85%' },
   bubbleOwnContent: { flex: 1, alignItems: 'flex-end' },
@@ -252,18 +265,28 @@ const styles = StyleSheet.create({
   avatarSmallLetter: { fontSize: 14, fontWeight: '900' },
 
   bubbleOtherContent: { flex: 1 },
-  senderName: { color: '#8E8E93', fontSize: 12, fontWeight: '600', marginBottom: 3, marginLeft: 4 },
+  senderName: { color: Colors.textSub, fontSize: 12, fontWeight: '600', marginBottom: 3, marginLeft: 4 },
 
-  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleOwn:   { backgroundColor: '#0FEA95', borderBottomRightRadius: 4 },
-  bubbleOther: { backgroundColor: '#2C2C2E', borderBottomLeftRadius: 4 },
-  bubbleText:  { color: '#FFFFFF', fontSize: 15, lineHeight: 21 },
-  bubbleTextOwn: { color: '#1C1C1E' },
+  bubble:       { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleOwn:    { backgroundColor: Colors.accent, borderBottomRightRadius: 4 },
+  bubbleOther:  { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 4 },
+  bubbleText:   { color: Colors.text, fontSize: 15, lineHeight: 21 },
+  bubbleTextOwn: { color: Colors.bg },
 
-  timestamp: { color: '#636366', fontSize: 11, marginTop: 3, marginHorizontal: 4 },
+  timestamp: { color: Colors.textMuted, fontSize: 11, marginTop: 3, marginHorizontal: 4 },
 
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#2C2C2E', backgroundColor: '#1C1C1E' },
-  input: { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, color: '#FFFFFF', fontSize: 15, maxHeight: 120, marginRight: 8 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
-  sendBtnDisabled: { backgroundColor: '#2C2C2E' },
+  inputRow:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.bg },
+  inputWrap:  { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 22, backgroundColor: Colors.surface, marginRight: 8 },
+  inputWrapFocused: { borderColor: Colors.accent },
+  input:      { paddingHorizontal: 16, paddingVertical: 10, color: Colors.text, fontSize: 15, maxHeight: 120 },
+  sendBtn:    { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
+  sendBtnDisabled: { backgroundColor: Colors.surface2 },
+  sendBtnActive:   {
+    backgroundColor: Colors.accent,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
 });

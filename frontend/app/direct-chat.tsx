@@ -13,6 +13,7 @@ import { getAvatarColor } from '../utils/avatar';
 import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 
 type DmMessage = {
   id: number;
@@ -108,6 +109,7 @@ export default function DirectChatScreen() {
 
   useEffect(() => {
     if (user?.id) fetchAvatars([user.id]);
+    fetchAvatars([otherId]);
     fetchMessages();
 
     const socket = io(API_BASE, { auth: { token } });
@@ -254,7 +256,7 @@ export default function DirectChatScreen() {
     >
       <SafeAreaView style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={26} color={Colors.text} />
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.headerCenter}
@@ -276,7 +278,7 @@ export default function DirectChatScreen() {
       </SafeAreaView>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color="#0FEA95" size="large" /></View>
+        <View style={styles.center}><ActivityIndicator color={Colors.accent} size="large" /></View>
       ) : (
         <ScrollView
           ref={scrollRef}
@@ -286,7 +288,9 @@ export default function DirectChatScreen() {
         >
           {messages.length === 0 && (
             <View style={styles.emptyChat}>
-              <Ionicons name="chatbubbles-outline" size={60} color="#3A3A3C" />
+              <View style={styles.emptyChatCircle}>
+                <Ionicons name="chatbubbles-outline" size={60} color={Colors.border} />
+              </View>
               <Text style={styles.emptyChatText}>Start the conversation! 👋</Text>
             </View>
           )}
@@ -297,12 +301,12 @@ export default function DirectChatScreen() {
       {/* Input row */}
       <View style={styles.inputRow}>
         <TouchableOpacity style={styles.shareBtn} onPress={openEventPicker}>
-          <Ionicons name="add-circle-outline" size={28} color="#0FEA95" />
+          <Ionicons name="add-circle-outline" size={28} color={Colors.accent} />
         </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder="Message..."
-          placeholderTextColor="#636366"
+          placeholderTextColor={Colors.textMuted}
           value={input}
           onChangeText={setInput}
           multiline
@@ -315,7 +319,7 @@ export default function DirectChatScreen() {
           onPress={sendText}
           disabled={!input.trim() || sending}
         >
-          <Ionicons name="send" size={20} color={input.trim() ? '#1C1C1E' : '#636366'} />
+          <Ionicons name="send" size={20} color={input.trim() ? Colors.bg : Colors.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -327,10 +331,10 @@ export default function DirectChatScreen() {
           <Text style={styles.modalTitle}>Share a Game</Text>
           <Text style={styles.modalSub}>Pick an upcoming game to share with {username}</Text>
           {loadingGames ? (
-            <ActivityIndicator color="#0FEA95" style={{ marginTop: 24 }} />
+            <ActivityIndicator color={Colors.accent} style={{ marginTop: 24 }} />
           ) : myGames.length === 0 ? (
             <View style={styles.pickerEmpty}>
-              <Ionicons name="calendar-outline" size={48} color="#3A3A3C" />
+              <Ionicons name="calendar-outline" size={48} color={Colors.border} />
               <Text style={styles.pickerEmptyText}>No upcoming games to share</Text>
             </View>
           ) : (
@@ -340,7 +344,7 @@ export default function DirectChatScreen() {
               style={{ maxHeight: 360 }}
               showsVerticalScrollIndicator={false}
               renderItem={({ item: g }) => {
-                const color = SPORT_COLORS[g.sport_type as keyof typeof SPORT_COLORS] ?? '#0FEA95';
+                const color = SPORT_COLORS[g.sport_type as keyof typeof SPORT_COLORS] ?? Colors.accent;
                 const icon  = SPORT_ICONS[g.sport_type  as keyof typeof SPORT_ICONS]  ?? 'trophy';
                 return (
                   <TouchableOpacity style={styles.pickerItem} onPress={() => sendEvent(g)} activeOpacity={0.7}>
@@ -351,11 +355,11 @@ export default function DirectChatScreen() {
                       <Text style={styles.pickerGameTitle}>{g.title || `${g.sport_type.charAt(0).toUpperCase() + g.sport_type.slice(1)} Game`}</Text>
                       <Text style={styles.pickerGameInfo}>{formatGameTime(g.scheduled_time)}{g.location_desc ? `  ·  ${g.location_desc}` : ''}</Text>
                     </View>
-                    <Ionicons name="share-outline" size={20} color="#0FEA95" />
+                    <Ionicons name="share-outline" size={20} color={Colors.accent} />
                   </TouchableOpacity>
                 );
               }}
-              ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#3A3A3C' }} />}
+              ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: Colors.border }} />}
             />
           )}
         </View>
@@ -365,7 +369,7 @@ export default function DirectChatScreen() {
 }
 
 function EventCard({ msg, isOwn, onJoin }: { msg: DmMessage; isOwn: boolean; onJoin: () => void }) {
-  const color    = SPORT_COLORS[msg.game_sport as keyof typeof SPORT_COLORS] ?? '#0FEA95';
+  const color    = SPORT_COLORS[msg.game_sport as keyof typeof SPORT_COLORS] ?? Colors.accent;
   const icon     = SPORT_ICONS[msg.game_sport  as keyof typeof SPORT_ICONS]  ?? 'trophy';
   const joined   = !!msg.game_joined;
   const isHost   = !!msg.game_is_host;
@@ -408,23 +412,24 @@ function EventCard({ msg, isOwn, onJoin }: { msg: DmMessage; isOwn: boolean; onJ
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#1C1C1E' },
+  root: { flex: 1, backgroundColor: Colors.bg },
 
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E', backgroundColor: '#1C1C1E' },
+  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.borderSub, backgroundColor: Colors.bg },
   backBtn:      { width: 40 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   headerAvatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   headerAvatarImg:    { width: '100%', height: '100%' },
   headerAvatarLetter: { fontSize: 14, fontWeight: '900' },
-  headerTitle:  { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  headerTitle:  { color: Colors.text, fontSize: 17, fontWeight: '800' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   messageList:    { flex: 1 },
-  messageContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  messageContent: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, gap: 12 },
 
-  emptyChat:     { flex: 1, alignItems: 'center', paddingTop: 80 },
-  emptyChatText: { color: '#636366', marginTop: 12, fontSize: 15 },
+  emptyChat:       { flex: 1, alignItems: 'center', paddingTop: 80 },
+  emptyChatCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.lg },
+  emptyChatText:   { color: Colors.textMuted, fontSize: 15 },
 
   bubbleRowOwn:   { flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '85%' },
   bubbleOwnContent: { flex: 1, alignItems: 'flex-end' },
@@ -435,47 +440,47 @@ const styles = StyleSheet.create({
   avatarSmallImage:  { width: '100%', height: '100%' },
   avatarSmallLetter: { fontSize: 14, fontWeight: '900' },
 
-  bubble:       { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleOwn:    { backgroundColor: '#0FEA95', borderBottomRightRadius: 4 },
-  bubbleOther:  { backgroundColor: '#2C2C2E', borderBottomLeftRadius: 4 },
-  bubbleText:   { color: '#FFFFFF', fontSize: 15, lineHeight: 21 },
-  bubbleTextOwn: { color: '#1C1C1E' },
-  timestamp:    { color: '#636366', fontSize: 11, marginTop: 3, marginHorizontal: 4 },
+  bubble:       { borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleOwn:    { backgroundColor: Colors.accent, borderBottomRightRadius: 4 },
+  bubbleOther:  { backgroundColor: Colors.surface, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: Colors.border },
+  bubbleText:   { color: Colors.text, fontSize: 15, lineHeight: 21 },
+  bubbleTextOwn: { color: Colors.bg },
+  timestamp:    { color: Colors.textMuted, fontSize: 11, marginTop: 3, marginHorizontal: 4 },
 
   // Event card
-  eventCard:       { backgroundColor: '#2C2C2E', borderRadius: 16, padding: 14, borderWidth: 1.5, gap: 6, minWidth: 200 },
+  eventCard:       { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, borderWidth: 1.5, gap: 6, minWidth: 200, ...Shadow.card },
   eventCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   eventCardIcon:   { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  eventCardTitle:  { fontSize: 15, fontWeight: '800', color: '#FFFFFF', flex: 1 },
-  eventCardTime:   { fontSize: 13, color: '#0FEA95', fontWeight: '600' },
-  eventCardLocation: { fontSize: 12, color: '#8E8E93' },
+  eventCardTitle:  { fontSize: 15, fontWeight: '800', color: Colors.text, flex: 1 },
+  eventCardTime:   { fontSize: 13, color: Colors.accent, fontWeight: '600' },
+  eventCardLocation: { fontSize: 12, color: Colors.textSub },
   eventCardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  eventCardPlayers: { fontSize: 12, color: '#636366' },
-  eventCardJoined: { fontSize: 13, color: '#0FEA95', fontWeight: '700' },
-  eventCardHosted: { fontSize: 13, color: '#FF8C00', fontWeight: '700' },
-  eventCardDone:   { fontSize: 13, color: '#636366', fontWeight: '600' },
-  eventCardFull:   { fontSize: 13, color: '#FF3B30', fontWeight: '600' },
-  joinBtn:     { backgroundColor: '#0FEA95', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 },
-  joinBtnText: { color: '#1C1C1E', fontSize: 13, fontWeight: '900' },
+  eventCardPlayers: { fontSize: 12, color: Colors.textMuted },
+  eventCardJoined: { fontSize: 13, color: Colors.accent, fontWeight: '700' },
+  eventCardHosted: { fontSize: 13, color: Colors.orange, fontWeight: '700' },
+  eventCardDone:   { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
+  eventCardFull:   { fontSize: 13, color: Colors.error, fontWeight: '600' },
+  joinBtn:     { backgroundColor: Colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 },
+  joinBtnText: { color: Colors.bg, fontSize: 13, fontWeight: '900' },
 
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#2C2C2E', backgroundColor: '#1C1C1E', gap: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: Spacing.md, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSub, backgroundColor: Colors.bg, gap: 8 },
   shareBtn: { paddingBottom: 2 },
-  input:    { flex: 1, backgroundColor: '#2C2C2E', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, color: '#FFFFFF', fontSize: 15, maxHeight: 120 },
-  sendBtn:         { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
-  sendBtnDisabled: { backgroundColor: '#2C2C2E' },
+  input:    { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingHorizontal: 16, paddingVertical: 10, color: Colors.text, fontSize: 15, maxHeight: 120, borderWidth: 1.5, borderColor: Colors.border },
+  sendBtn:         { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accent, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6 },
+  sendBtnDisabled: { backgroundColor: Colors.surface, shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
 
   // Event picker modal
   modalOverlay: { flex: 1, backgroundColor: '#00000066' },
-  modalSheet:   { backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  modalHandle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: '#3A3A3C', alignSelf: 'center', marginBottom: 20 },
-  modalTitle:   { fontSize: 20, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 },
-  modalSub:     { fontSize: 14, color: '#636366', marginBottom: 20 },
+  modalSheet:   { backgroundColor: Colors.bg, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, padding: Spacing.xxl, paddingBottom: 40 },
+  modalHandle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginBottom: 20 },
+  modalTitle:   { fontSize: 20, fontWeight: '900', color: Colors.text, marginBottom: 4 },
+  modalSub:     { fontSize: 14, color: Colors.textMuted, marginBottom: 20 },
 
   pickerEmpty:     { alignItems: 'center', paddingVertical: 32 },
-  pickerEmptyText: { color: '#636366', fontSize: 15, marginTop: 12 },
+  pickerEmptyText: { color: Colors.textMuted, fontSize: 15, marginTop: 12 },
 
   pickerItem:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
-  pickerIcon:      { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  pickerGameTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 2 },
-  pickerGameInfo:  { fontSize: 12, color: '#636366' },
+  pickerIcon:      { width: 44, height: 44, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
+  pickerGameTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 2 },
+  pickerGameInfo:  { fontSize: 12, color: Colors.textMuted },
 });

@@ -29,6 +29,7 @@ type MapItem = {
   max_players?: number | null;
   participant_count?: number;
   scheduled_time?: string | null;
+  is_joined?: boolean;
 };
 
 type Participant = { id: number; username: string; avatar: string | null; role: string };
@@ -105,7 +106,8 @@ function BottomCard({ court, userId, token, onJoined }: {
   const [joining, setJoining] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const isOwnGame = court.isLocalGame && court.host_id === userId;
+  const isOwnGame  = court.isLocalGame && court.host_id === userId;
+  const [isJoined, setIsJoined] = useState(!!court.is_joined);
   // Host occupies one slot; participants fill max_players - 1 remaining spots
   const participantCount = court.participant_count ?? 0;
   const isFull = court.max_players != null && participantCount >= court.max_players - 1;
@@ -138,6 +140,7 @@ function BottomCard({ court, userId, token, onJoined }: {
         return Alert.alert('Error', data.message);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsJoined(true);
       onJoined(data.participant_count);
       springBack();
       Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
@@ -213,8 +216,14 @@ function BottomCard({ court, userId, token, onJoined }: {
 
       {court.isLocalGame ? (
         isOwnGame ? (
-          <View style={[styles.joinButton, { backgroundColor: '#2C2C2E' }]}>
+          <View style={[styles.joinButton, { backgroundColor: '#2C2C2E', flexDirection: 'row', gap: 6 }]}>
+            <Ionicons name="checkmark-circle" size={18} color="#0FEA95" />
             <Text style={[styles.joinButtonText, { color: '#0FEA95' }]}>Your Game</Text>
+          </View>
+        ) : isJoined ? (
+          <View style={[styles.joinButton, { backgroundColor: '#0FEA9515', borderWidth: 1.5, borderColor: '#0FEA9555', flexDirection: 'row', gap: 6 }]}>
+            <Ionicons name="checkmark-circle" size={18} color="#0FEA95" />
+            <Text style={[styles.joinButtonText, { color: '#0FEA95' }]}>Joined</Text>
           </View>
         ) : isFull ? (
           <View style={[styles.joinButton, { backgroundColor: '#2C2C2E' }]}>
@@ -442,6 +451,7 @@ export default function HomeScreen() {
               </Marker>
             );
           }
+          const joined = !!item.is_joined;
           return (
             <Marker
               key={item.place_id}
@@ -449,11 +459,21 @@ export default function HomeScreen() {
               onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(item); }}
             >
               <View style={styles.markerWrapper}>
-                <View style={[styles.markerIconBgGame, { borderColor: sportStyle.color }]}>
-                  <MaterialCommunityIcons name={sportStyle.icon} size={22} color={sportStyle.color} />
-                  <View style={[styles.markerGameDot, { backgroundColor: sportStyle.color }]} />
+                <View style={[
+                  styles.markerIconBgGame,
+                  { borderColor: joined ? '#0FEA95' : sportStyle.color },
+                  joined && { backgroundColor: '#0FEA9518' },
+                ]}>
+                  <MaterialCommunityIcons name={sportStyle.icon} size={22} color={joined ? '#0FEA95' : sportStyle.color} />
+                  {joined ? (
+                    <View style={styles.markerJoinedBadge}>
+                      <Ionicons name="checkmark" size={7} color="#1C1C1E" />
+                    </View>
+                  ) : (
+                    <View style={[styles.markerGameDot, { backgroundColor: sportStyle.color }]} />
+                  )}
                 </View>
-                <View style={[styles.markerPointer, { backgroundColor: sportStyle.color }]} />
+                <View style={[styles.markerPointer, { backgroundColor: joined ? '#0FEA95' : sportStyle.color }]} />
               </View>
             </Marker>
           );
@@ -539,8 +559,8 @@ export default function HomeScreen() {
           userId={user?.id}
           token={token}
           onJoined={(newCount) => {
-            setGames(prev => prev.map(g => g.id === selectedCourt.id ? { ...g, participant_count: newCount } : g));
-            setSelectedCourt(prev => prev ? { ...prev, participant_count: newCount } : prev);
+            setGames(prev => prev.map(g => g.id === selectedCourt.id ? { ...g, participant_count: newCount, is_joined: true } : g));
+            setSelectedCourt(prev => prev ? { ...prev, participant_count: newCount, is_joined: true } : prev);
           }}
         />
       )}
@@ -641,7 +661,8 @@ const styles = StyleSheet.create({
   markerIconBg: { backgroundColor: 'rgba(255,255,255,0.92)', padding: 4, borderRadius: 14, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 3, elevation: 4 },
   // Game markers — more prominent (primary visual weight)
   markerIconBgGame: { backgroundColor: '#1C1C1E', padding: 6, borderRadius: 20, borderWidth: 2.5, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.45, shadowRadius: 5, elevation: 7 },
-  markerGameDot: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#1C1C1E' },
+  markerGameDot:    { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#1C1C1E' },
+  markerJoinedBadge:{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: 7, backgroundColor: '#0FEA95', borderWidth: 1.5, borderColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center' },
   markerPointer: { width: 3, height: 6, marginTop: -1 },
   clusterMarker: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFFFFF', shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 8 },
   clusterText: { color: '#1C1C1E', fontWeight: '900', fontSize: 15 },

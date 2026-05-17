@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import AvatarCircle from '../components/AvatarCircle';
+import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 
 type Entry = {
   id: number;
@@ -50,7 +51,6 @@ export default function LeaderboardScreen() {
     // Podium order: 2nd (left), 1st (center), 3rd (right)
     const order = [top3[1], top3[0], top3[2]].filter(Boolean);
     const heights = [100, 130, 80];
-    const centerIdx = top3.length > 1 ? 1 : 0;
 
     return (
       <View style={styles.podiumContainer}>
@@ -77,12 +77,13 @@ export default function LeaderboardScreen() {
               </View>
               <Text style={styles.podiumMedal}>{MEDALS[realRank]}</Text>
               <Text style={styles.podiumName} numberOfLines={1}>{entry.username}</Text>
-              <Text style={[styles.podiumKarma, { color: entry.karma >= 0 ? '#0FEA95' : '#FF453A' }]}>
+              <Text style={[styles.podiumKarma, { color: entry.karma >= 0 ? Colors.accent : Colors.error }]}>
                 {karmaStr}
               </Text>
               {/* Platform block */}
               <View style={[
                 styles.podiumBlock,
+                Shadow.card,
                 { height: heights[i], backgroundColor: MEDAL_COLORS[realRank] + '33', borderColor: MEDAL_COLORS[realRank] + '66' },
               ]}>
                 <Text style={[styles.podiumRankNum, { color: MEDAL_COLORS[realRank] }]}>#{realRank + 1}</Text>
@@ -100,19 +101,21 @@ export default function LeaderboardScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Leaderboard</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 36 }} />
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#0FEA95" />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : board.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="trophy-outline" size={70} color="#2C2C2E" />
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="trophy-outline" size={40} color={Colors.surface2} />
+          </View>
           <Text style={styles.emptyText}>No ratings yet — play some games!</Text>
         </View>
       ) : (
@@ -129,7 +132,7 @@ export default function LeaderboardScreen() {
             const totalGames = item.games_hosted + item.games_joined;
             return (
               <TouchableOpacity
-                style={[styles.row, isMe && styles.rowMe]}
+                style={[styles.row, Shadow.card, isMe && styles.rowMe]}
                 onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
                 activeOpacity={0.75}
               >
@@ -142,7 +145,7 @@ export default function LeaderboardScreen() {
                   </View>
                   <Text style={styles.rowGames}>{totalGames} game{totalGames !== 1 ? 's' : ''}</Text>
                 </View>
-                <Text style={[styles.rowKarma, { color: item.karma >= 0 ? '#0FEA95' : '#FF453A' }]}>
+                <Text style={[styles.rowKarma, { color: item.karma >= 0 ? Colors.accent : Colors.error }]}>
                   {karmaStr}
                 </Text>
               </TouchableOpacity>
@@ -155,15 +158,17 @@ export default function LeaderboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20 },
-  backBtn: { width: 40 },
-  title: { flex: 1, textAlign: 'center', fontSize: 22, fontWeight: '900', color: '#FFFFFF' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.lg, paddingHorizontal: Spacing.xl },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
+  title: { flex: 1, textAlign: 'center', fontSize: 22, fontWeight: '900', color: Colors.text },
 
-  list: { paddingHorizontal: 20, paddingBottom: 40 },
-  emptyText: { color: '#636366', fontSize: 15, marginTop: 14, textAlign: 'center' },
+  list: { paddingHorizontal: Spacing.xl, paddingBottom: 40 },
+
+  emptyIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  emptyText: { color: Colors.textMuted, fontSize: 15, textAlign: 'center' },
 
   // Podium
   podiumContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', marginBottom: 28, paddingHorizontal: 10, gap: 10 },
@@ -173,20 +178,20 @@ const styles = StyleSheet.create({
   podiumAvatarImg: { width: '100%', height: '100%' },
   podiumAvatarLetter: { fontWeight: '900' },
   podiumMedal: { fontSize: 20, marginBottom: 2 },
-  podiumName: { fontSize: 12, fontWeight: '800', color: '#FFFFFF', marginBottom: 2, textAlign: 'center' },
+  podiumName: { fontSize: 12, fontWeight: '800', color: Colors.text, marginBottom: 2, textAlign: 'center' },
   podiumKarma: { fontSize: 13, fontWeight: '900', marginBottom: 6 },
   podiumBlock: { width: '100%', borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   podiumRankNum: { fontSize: 20, fontWeight: '900', paddingVertical: 10 },
 
   // List rows (rank 4+)
-  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, padding: 12, marginBottom: 10 },
-  rowMe: { borderWidth: 1.5, borderColor: '#0FEA9555', backgroundColor: '#0FEA9508' },
-  rankNum: { width: 32, fontSize: 14, fontWeight: '800', color: '#636366', textAlign: 'center' },
-  rowInfo: { flex: 1, marginLeft: 12 },
+  row:   { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md, marginBottom: 10 },
+  rowMe: { backgroundColor: Colors.accentFaint, borderWidth: 1.5, borderColor: Colors.accentBorder },
+  rankNum: { width: 32, fontSize: 14, fontWeight: '800', color: Colors.textMuted, textAlign: 'center' },
+  rowInfo: { flex: 1, marginLeft: Spacing.md },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
-  youBadge: { backgroundColor: '#0FEA9533', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  youBadgeText: { color: '#0FEA95', fontSize: 10, fontWeight: '800' },
-  rowGames: { fontSize: 12, color: '#636366', marginTop: 2 },
+  rowName: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  youBadge: { backgroundColor: Colors.accentFaint, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  youBadgeText: { color: Colors.accent, fontSize: 10, fontWeight: '800' },
+  rowGames: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   rowKarma: { fontSize: 18, fontWeight: '900', minWidth: 44, textAlign: 'right' },
 });

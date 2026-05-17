@@ -10,8 +10,34 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
+import { SPORT_COLORS } from '../constants/sports';
+import { Colors, Spacing, Radius, Shadow, Type } from '../constants/theme';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null };
+
+const SPORTS = [
+  { key: 'basketball', icon: 'basketball',     label: 'Basketball' },
+  { key: 'tennis',     icon: 'tennis',         label: 'Tennis' },
+  { key: 'volleyball', icon: 'volleyball',     label: 'Volleyball' },
+  { key: 'football',   icon: 'soccer',         label: 'Football' },
+  { key: 'yoga',       icon: 'yoga',           label: 'Yoga' },
+  { key: 'gym',        icon: 'dumbbell',       label: 'Gym' },
+  { key: 'studio',     icon: 'dance-ballroom', label: 'Studio' },
+  { key: 'footvolley', icon: 'handball',       label: 'Footvolley' },
+  { key: 'swimming',   icon: 'swim',           label: 'Swimming' },
+] as const;
+
+const LEVEL_META = [
+  { n: 1, label: 'Beginner',  color: '#4ADE80' },
+  { n: 2, label: 'Casual',    color: '#A3E635' },
+  { n: 3, label: 'Inter',     color: '#FACC15' },
+  { n: 4, label: 'Advanced',  color: '#FB923C' },
+  { n: 5, label: 'Pro',       color: '#F87171' },
+];
+
+function SectionLabel({ children }: { children: string }) {
+  return <Text style={styles.sectionLabel}>{children}</Text>;
+}
 
 export default function GameFormModal() {
   const router = useRouter();
@@ -21,32 +47,16 @@ export default function GameFormModal() {
   const isEdit = !!params.gameId;
   const gameId = params.gameId ? parseInt(params.gameId as string) : null;
 
-  const [sport, setSport] = useState((params.existingSport as string) || 'basketball');
-  const [level, setLevel] = useState(params.existingLevel ? parseInt(params.existingLevel as string) : 3);
+  const [sport, setSport]             = useState((params.existingSport as string) || 'basketball');
+  const [level, setLevel]             = useState(params.existingLevel ? parseInt(params.existingLevel as string) : 3);
   const [locationDesc, setLocationDesc] = useState((params.existingLocationDesc as string) || '');
-  const [equipment, setEquipment] = useState((params.existingEquipment as string) || '');
-  const [maxPlayers, setMaxPlayers] = useState((params.existingMaxPlayers as string) || '');
-  const [title, setTitle] = useState((params.existingTitle as string) || '');
-  const [photo, setPhoto] = useState<string | null>((params.existingPhoto as string) || null);
-  const [loading, setLoading] = useState(false);
+  const [equipment, setEquipment]     = useState((params.existingEquipment as string) || '');
+  const [maxPlayers, setMaxPlayers]   = useState((params.existingMaxPlayers as string) || '');
+  const [title, setTitle]             = useState((params.existingTitle as string) || '');
+  const [photo, setPhoto]             = useState<string | null>((params.existingPhoto as string) || null);
+  const [loading, setLoading]         = useState(false);
 
-  const pickPhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return Alert.alert('Permission needed', 'Allow photo access to add a game photo.');
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.6,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0].base64) {
-      setPhoto(result.assets[0].base64);
-    }
-  };
-
-  // Friends for pre-inviting (create mode only)
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friends, setFriends]                 = useState<Friend[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -57,21 +67,34 @@ export default function GameFormModal() {
       .catch(() => {});
   }, [isEdit]);
 
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Permission needed', 'Allow photo access to add a game photo.');
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) setPhoto(result.assets[0].base64);
+  };
+
   const parseInitialDate = (): Date | null => {
     if (!params.existingTime) return null;
     const d = new Date(params.existingTime as string);
     return isNaN(d.getTime()) ? null : d;
   };
   const [scheduledDate, setScheduledDate] = useState<Date | null>(parseInitialDate);
-  const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
+  const [pickerMode, setPickerMode]       = useState<'date' | 'time' | null>(null);
 
   const pad = (n: number) => String(n).padStart(2, '0');
   const dateLabel = scheduledDate
-    ? scheduledDate.toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-    : 'בחר תאריך';
+    ? scheduledDate.toLocaleDateString('he-IL', { weekday: 'short', day: 'numeric', month: 'short' })
+    : 'Pick date';
   const timeLabel = scheduledDate
     ? `${pad(scheduledDate.getHours())}:${pad(scheduledDate.getMinutes())}`
-    : 'בחר שעה';
+    : 'Pick time';
   const scheduledTimeStr = scheduledDate
     ? `${scheduledDate.getFullYear()}-${pad(scheduledDate.getMonth() + 1)}-${pad(scheduledDate.getDate())} ${pad(scheduledDate.getHours())}:${pad(scheduledDate.getMinutes())}`
     : null;
@@ -79,8 +102,7 @@ export default function GameFormModal() {
   const toggleFriend = (id: number) => {
     setSelectedFriendIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
@@ -108,16 +130,10 @@ export default function GameFormModal() {
       if (!isEdit) {
         body.latitude  = parseFloat(params.lat as string);
         body.longitude = parseFloat(params.lng as string);
-        if (selectedFriendIds.size > 0) {
-          body.invited_friends = Array.from(selectedFriendIds);
-        }
+        if (selectedFriendIds.size > 0) body.invited_friends = Array.from(selectedFriendIds);
       }
 
-      const res = await apiFetch(isEdit ? `/api/games/${gameId}` : '/api/games', {
-        method,
-        token,
-        body: JSON.stringify(body),
-      });
+      const res  = await apiFetch(isEdit ? `/api/games/${gameId}` : '/api/games', { method, token, body: JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       router.back();
@@ -129,99 +145,138 @@ export default function GameFormModal() {
     }
   };
 
-  const SPORTS = [
-    { key: 'basketball', icon: 'basketball' },
-    { key: 'tennis',     icon: 'tennis' },
-    { key: 'volleyball', icon: 'volleyball' },
-    { key: 'football',   icon: 'soccer' },
-    { key: 'yoga',       icon: 'yoga' },
-    { key: 'gym',        icon: 'dumbbell' },
-    { key: 'studio',     icon: 'dance-ballroom' },
-    { key: 'footvolley', icon: 'volleyball' },
-  ] as const;
+  const sportColor = SPORT_COLORS[sport] ?? Colors.accent;
+  const selectedSport = SPORTS.find(s => s.key === sport)!;
+  const selectedLevel = LEVEL_META[level - 1];
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
+        {/* ── Header ── */}
         <View style={styles.header}>
-          <Text style={styles.title}>{isEdit ? 'Edit Game' : 'Create New Game'}</Text>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="close-circle" size={32} color="#3A3A3C" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+            <Ionicons name="close" size={20} color={Colors.textSub} />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>{isEdit ? 'Edit Game' : 'New Game'}</Text>
+          <View style={{ width: 36 }} />
         </View>
 
-        {/* Title */}
-        <Text style={styles.label}>Game Title (optional)</Text>
-        <View style={styles.inputContainer}>
-          <Ionicons name="trophy-outline" size={20} color="#8E8E93" style={styles.inputIcon} />
+        {/* ── Sport hero banner ── */}
+        <View style={[styles.heroBanner, { backgroundColor: sportColor + '18', borderColor: sportColor + '40' }]}>
+          <View style={[styles.heroIconRing, { backgroundColor: sportColor + '22', borderColor: sportColor + '55' }]}>
+            <MaterialCommunityIcons name={selectedSport.icon as any} size={32} color={sportColor} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.heroSportName, { color: sportColor }]}>{selectedSport.label.toUpperCase()}</Text>
+            <Text style={styles.heroSportSub}>Level {level} · {selectedLevel.label}</Text>
+          </View>
+          {scheduledDate && (
+            <View style={styles.heroBadge}>
+              <Ionicons name="calendar" size={12} color={sportColor} />
+              <Text style={[styles.heroBadgeText, { color: sportColor }]}>
+                {scheduledDate.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── Sport picker ── */}
+        <SectionLabel>What sport?</SectionLabel>
+        <View style={styles.sportsGrid}>
+          {SPORTS.map(s => {
+            const c = SPORT_COLORS[s.key] ?? Colors.accent;
+            const active = sport === s.key;
+            return (
+              <TouchableOpacity
+                key={s.key}
+                style={[
+                  styles.sportTile,
+                  active
+                    ? { backgroundColor: c + '22', borderColor: c, borderWidth: 2 }
+                    : { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1.5 },
+                ]}
+                onPress={() => setSport(s.key)}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons name={s.icon as any} size={26} color={active ? c : Colors.textMuted} />
+                <Text style={[styles.sportTileLabel, active && { color: c }]}>{s.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* ── Skill level ── */}
+        <SectionLabel>Skill Level</SectionLabel>
+        <View style={styles.levelRow}>
+          {LEVEL_META.map(lv => {
+            const active = level === lv.n;
+            return (
+              <TouchableOpacity
+                key={lv.n}
+                style={[
+                  styles.levelChip,
+                  active
+                    ? { backgroundColor: lv.color + '22', borderColor: lv.color, borderWidth: 2 }
+                    : { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1.5 },
+                ]}
+                onPress={() => setLevel(lv.n)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.levelNum, active && { color: lv.color }]}>{lv.n}</Text>
+                <Text style={[styles.levelLabel, active && { color: lv.color }]}>{lv.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* ── Title ── */}
+        <SectionLabel>Title (optional)</SectionLabel>
+        <View style={styles.inputRow}>
+          <Ionicons name="trophy-outline" size={18} color={Colors.textMuted} />
           <TextInput
-            style={styles.input}
-            placeholder="e.g. Friday night pickup 🏀"
-            placeholderTextColor="#8E8E93"
+            style={styles.inputField}
+            placeholder="e.g. Friday night pickup"
+            placeholderTextColor={Colors.textHint}
             value={title}
             onChangeText={setTitle}
             maxLength={100}
           />
         </View>
 
-        {/* Sport */}
-        <Text style={styles.label}>What sport?</Text>
-        <View style={styles.sportsRow}>
-          {SPORTS.map((s) => (
-            <TouchableOpacity
-              key={s.key}
-              style={[styles.sportBtn, sport === s.key && styles.sportBtnActive]}
-              onPress={() => setSport(s.key)}
-            >
-              <MaterialCommunityIcons
-                name={s.icon as any}
-                size={26}
-                color={sport === s.key ? '#1C1C1E' : '#8E8E93'}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Level */}
-        <Text style={styles.label}>Skill Level (1–5)</Text>
-        <View style={styles.levelContainer}>
-          {[1, 2, 3, 4, 5].map((num) => (
-            <TouchableOpacity
-              key={num}
-              style={[styles.levelBtn, level === num && styles.levelBtnActive]}
-              onPress={() => setLevel(num)}
-            >
-              <Text style={[styles.levelText, level === num && styles.levelTextActive]}>{num}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Location */}
-        <Text style={styles.label}>Location Notes (e.g. North court)</Text>
-        <View style={styles.inputContainer}>
-          <Ionicons name="location-outline" size={20} color="#8E8E93" style={styles.inputIcon} />
+        {/* ── Location ── */}
+        <SectionLabel>Location Notes</SectionLabel>
+        <View style={styles.inputRow}>
+          <Ionicons name="location-outline" size={18} color={Colors.textMuted} />
           <TextInput
-            style={styles.input}
-            placeholder="Add a short description"
-            placeholderTextColor="#8E8E93"
+            style={styles.inputField}
+            placeholder="e.g. North court, building entrance"
+            placeholderTextColor={Colors.textHint}
             value={locationDesc}
             onChangeText={setLocationDesc}
           />
         </View>
 
-        {/* Date / Time */}
-        <Text style={styles.label}>When does it start?</Text>
+        {/* ── Date & Time ── */}
+        <SectionLabel>When does it start?</SectionLabel>
         <View style={styles.dateTimeRow}>
-          <TouchableOpacity style={styles.pickerBtn} onPress={() => setPickerMode('date')}>
-            <Ionicons name="calendar-outline" size={18} color="#8E8E93" />
-            <Text style={[styles.pickerBtnText, scheduledDate != null && styles.pickerBtnTextSet]}>
+          <TouchableOpacity
+            style={[styles.dateBtn, scheduledDate != null && { borderColor: sportColor, backgroundColor: sportColor + '10' }]}
+            onPress={() => setPickerMode('date')}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="calendar-outline" size={18} color={scheduledDate ? sportColor : Colors.textMuted} />
+            <Text style={[styles.dateBtnText, scheduledDate != null && { color: Colors.text, fontWeight: '700' }]}>
               {dateLabel}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.pickerBtn} onPress={() => setPickerMode('time')}>
-            <Ionicons name="time-outline" size={18} color="#8E8E93" />
-            <Text style={[styles.pickerBtnText, scheduledDate != null && styles.pickerBtnTextSet]}>
+          <TouchableOpacity
+            style={[styles.dateBtn, styles.dateBtnTime, scheduledDate != null && { borderColor: sportColor, backgroundColor: sportColor + '10' }]}
+            onPress={() => setPickerMode('time')}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="time-outline" size={18} color={scheduledDate ? sportColor : Colors.textMuted} />
+            <Text style={[styles.dateBtnText, scheduledDate != null && { color: Colors.text, fontWeight: '700' }]}>
               {timeLabel}
             </Text>
           </TouchableOpacity>
@@ -237,105 +292,119 @@ export default function GameFormModal() {
             onChange={(_, selected) => {
               if (Platform.OS === 'android') setPickerMode(null);
               if (!selected) return;
-              setScheduledDate((prev) => {
+              setScheduledDate(prev => {
                 const base = new Date(prev ?? Date.now() + 3_600_000);
-                if (pickerMode === 'date') {
-                  base.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-                } else {
-                  base.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
-                }
+                if (pickerMode === 'date') base.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+                else base.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
                 return base;
               });
             }}
           />
         )}
         {pickerMode != null && Platform.OS === 'ios' && (
-          <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setPickerMode(null)}>
-            <Text style={styles.pickerDoneBtnText}>Done</Text>
+          <TouchableOpacity style={styles.pickerDone} onPress={() => setPickerMode(null)}>
+            <Text style={styles.pickerDoneText}>Done</Text>
           </TouchableOpacity>
         )}
 
-        {/* Max Players */}
-        <Text style={styles.label}>Max Players</Text>
-        <View style={styles.inputContainer}>
-          <Ionicons name="people-outline" size={20} color="#8E8E93" style={styles.inputIcon} />
+        {/* ── Max Players ── */}
+        <SectionLabel>Max Players</SectionLabel>
+        <View style={styles.inputRow}>
+          <Ionicons name="people-outline" size={18} color={Colors.textMuted} />
           <TextInput
-            style={styles.input}
+            style={styles.inputField}
             placeholder="e.g. 10"
-            placeholderTextColor="#8E8E93"
+            placeholderTextColor={Colors.textHint}
             value={maxPlayers}
             onChangeText={setMaxPlayers}
             keyboardType="number-pad"
           />
         </View>
 
-        {/* Equipment */}
-        <Text style={styles.label}>Equipment Notes (optional)</Text>
-        <View style={styles.inputContainer}>
-          <Ionicons name="bag-add-outline" size={20} color="#8E8E93" style={styles.inputIcon} />
+        {/* ── Equipment ── */}
+        <SectionLabel>Equipment Notes (optional)</SectionLabel>
+        <View style={styles.inputRow}>
+          <Ionicons name="bag-add-outline" size={18} color={Colors.textMuted} />
           <TextInput
-            style={styles.input}
-            placeholder="e.g. No ball — who's bringing one?"
-            placeholderTextColor="#8E8E93"
+            style={styles.inputField}
+            placeholder="e.g. Who's bringing the ball?"
+            placeholderTextColor={Colors.textHint}
             value={equipment}
             onChangeText={setEquipment}
           />
         </View>
 
-        {/* Game Photo (optional) */}
-        <Text style={styles.label}>Game Photo (optional)</Text>
+        {/* ── Photo ── */}
+        <SectionLabel>Game Photo (optional)</SectionLabel>
         {photo ? (
-          <View style={styles.photoPreviewWrapper}>
+          <View style={styles.photoWrap}>
             <Image source={{ uri: `data:image/jpeg;base64,${photo}` }} style={styles.photoPreview} resizeMode="cover" />
-            <TouchableOpacity style={styles.photoRemoveBtn} onPress={() => setPhoto(null)}>
-              <Ionicons name="close-circle" size={26} color="#FF453A" />
+            <TouchableOpacity style={styles.photoRemove} onPress={() => setPhoto(null)}>
+              <Ionicons name="close-circle" size={28} color={Colors.error} />
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={styles.photoPickerBtn} onPress={pickPhoto} activeOpacity={0.75}>
-            <Ionicons name="camera-outline" size={22} color="#8E8E93" />
+          <TouchableOpacity style={styles.photoPicker} onPress={pickPhoto} activeOpacity={0.75}>
+            <View style={styles.photoPickerIcon}>
+              <Ionicons name="camera-outline" size={22} color={Colors.textMuted} />
+            </View>
             <Text style={styles.photoPickerText}>Add a court or action photo</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textHint} />
           </TouchableOpacity>
         )}
 
-        {/* Invite Friends (create mode only) */}
+        {/* ── Invite Friends ── */}
         {!isEdit && friends.length > 0 && (
           <>
-            <Text style={styles.label}>Invite Friends</Text>
+            <SectionLabel>Invite Friends</SectionLabel>
             <View style={styles.friendsRow}>
               {friends.map(f => {
                 const selected = selectedFriendIds.has(f.id);
-                const color = getAvatarColor(f.username);
+                const c = getAvatarColor(f.username);
                 return (
                   <TouchableOpacity
                     key={f.id}
-                    style={[styles.friendChip, selected && { borderColor: '#0FEA95', backgroundColor: '#0FEA9515' }]}
+                    style={[styles.friendChip, selected && { borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint }]}
                     onPress={() => toggleFriend(f.id)}
                     activeOpacity={0.75}
                   >
-                    <View style={[styles.friendChipAvatar, { backgroundColor: color + '22', borderColor: color }]}>
+                    <View style={[styles.friendAvatar, { backgroundColor: c + '22', borderColor: c }]}>
                       {f.avatar
-                        ? <Image source={{ uri: `data:image/jpeg;base64,${f.avatar}` }} style={styles.friendChipAvatarImg} />
-                        : <Text style={[styles.friendChipLetter, { color }]}>{f.username.charAt(0).toUpperCase()}</Text>}
+                        ? <Image source={{ uri: `data:image/jpeg;base64,${f.avatar}` }} style={styles.friendAvatarImg} />
+                        : <Text style={[styles.friendAvatarLetter, { color: c }]}>{f.username.charAt(0).toUpperCase()}</Text>}
                     </View>
-                    <Text style={[styles.friendChipName, selected && { color: '#0FEA95' }]} numberOfLines={1}>{f.username}</Text>
-                    {selected && <Ionicons name="checkmark-circle" size={16} color="#0FEA95" />}
+                    <Text style={[styles.friendName, selected && { color: Colors.accent }]} numberOfLines={1}>{f.username}</Text>
+                    {selected && <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />}
                   </TouchableOpacity>
                 );
               })}
             </View>
             {selectedFriendIds.size > 0 && (
-              <Text style={styles.inviteNote}>
-                {selectedFriendIds.size} friend{selectedFriendIds.size > 1 ? 's' : ''} will be added automatically
-              </Text>
+              <View style={styles.inviteNote}>
+                <Ionicons name="people" size={14} color={Colors.accent} />
+                <Text style={styles.inviteNoteText}>
+                  {selectedFriendIds.size} friend{selectedFriendIds.size > 1 ? 's' : ''} will be added automatically
+                </Text>
+              </View>
             )}
           </>
         )}
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
-          {loading
-            ? <ActivityIndicator color="#1C1C1E" />
-            : <Text style={styles.submitButtonText}>{isEdit ? 'Save Changes' : 'Post Game on Map'}</Text>}
+        {/* ── Submit ── */}
+        <TouchableOpacity
+          style={[styles.submitBtn, loading && { opacity: 0.75 }, { shadowColor: sportColor }]}
+          onPress={handleSubmit}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator color={Colors.bg} size="small" />
+          ) : (
+            <>
+              <Text style={styles.submitBtnText}>{isEdit ? 'Save Changes' : 'Post on Map'}</Text>
+              <Ionicons name="arrow-forward-circle" size={22} color={Colors.bg} />
+            </>
+          )}
         </TouchableOpacity>
 
       </ScrollView>
@@ -344,47 +413,71 @@ export default function GameFormModal() {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#1C1C1E' },
-  scrollContent:{ padding: 20, paddingBottom: 40 },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30, marginTop: 10 },
-  title:        { fontSize: 26, fontWeight: '900', color: '#FFFFFF' },
-  label:        { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  scroll:    { padding: Spacing.xl, paddingBottom: 60 },
 
-  sportsRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 30 },
-  sportBtn:     { width: 58, height: 58, borderRadius: 18, backgroundColor: '#2C2C2E', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#3A3A3C' },
-  sportBtnActive: { backgroundColor: '#0FEA95', borderColor: '#0FEA95' },
+  // Header
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.xl, marginTop: Spacing.sm },
+  closeBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '900', color: Colors.text },
 
-  levelContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 },
-  levelBtn:     { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#2C2C2E', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#3A3A3C' },
-  levelBtnActive: { backgroundColor: '#0FEA95', borderColor: '#0FEA95' },
-  levelText:    { color: '#8E8E93', fontSize: 16, fontWeight: 'bold' },
-  levelTextActive: { color: '#1C1C1E' },
+  // Hero banner
+  heroBanner:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, borderRadius: Radius.xl, borderWidth: 1.5, padding: Spacing.md, marginBottom: Spacing.xxl, overflow: 'hidden' },
+  heroIconRing:{ width: 56, height: 56, borderRadius: Radius.lg, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  heroSportName: { fontSize: 15, fontWeight: '900', letterSpacing: 1.2 },
+  heroSportSub:  { fontSize: 12, color: Colors.textMuted, marginTop: 2, fontWeight: '600' },
+  heroBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.surface, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 4 },
+  heroBadgeText: { fontSize: 11, fontWeight: '700' },
 
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 15, marginBottom: 25, paddingHorizontal: 15, height: 55 },
-  inputIcon:    { marginRight: 10 },
-  input:        { flex: 1, color: '#FFFFFF', fontSize: 16 },
+  // Section label
+  sectionLabel: { ...Type.sectionLabel, color: Colors.textMuted, marginBottom: Spacing.sm, marginTop: 2 },
 
-  dateTimeRow:  { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  pickerBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#2C2C2E', borderRadius: 15, paddingHorizontal: 14, height: 55 },
-  pickerBtnText:    { color: '#636366', fontSize: 13, flex: 1 },
-  pickerBtnTextSet: { color: '#FFFFFF', fontWeight: '600' },
-  pickerDoneBtn:    { alignSelf: 'flex-end', marginBottom: 20, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#0FEA95', borderRadius: 10 },
-  pickerDoneBtnText:{ color: '#1C1C1E', fontWeight: '800', fontSize: 14 },
+  // Sport grid — 3 columns
+  sportsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.xl },
+  sportTile:   { width: '30.5%', aspectRatio: 1, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center', gap: 6 },
+  sportTileLabel: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, textAlign: 'center' },
 
-  friendsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
-  friendChip:   { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#2C2C2E', borderRadius: 24, paddingVertical: 7, paddingHorizontal: 12, borderWidth: 1.5, borderColor: '#3A3A3C', maxWidth: 160 },
-  friendChipAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
-  friendChipAvatarImg: { width: '100%', height: '100%' },
-  friendChipLetter: { fontSize: 12, fontWeight: '900' },
-  friendChipName: { color: '#AEAEB2', fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  inviteNote:   { color: '#0FEA95', fontSize: 13, fontWeight: '600', marginBottom: 20 },
+  // Level chips
+  levelRow:   { flexDirection: 'row', gap: 6, marginBottom: Spacing.xl },
+  levelChip:  { flex: 1, height: 58, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', gap: 3 },
+  levelNum:   { fontSize: 16, fontWeight: '900', color: Colors.textMuted },
+  levelLabel: { fontSize: 9, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  photoPickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#2C2C2E', borderRadius: 15, height: 55, paddingHorizontal: 16, marginBottom: 25, borderWidth: 1, borderColor: '#3A3A3C', borderStyle: 'dashed' },
-  photoPickerText: { color: '#636366', fontSize: 15 },
-  photoPreviewWrapper: { position: 'relative', marginBottom: 25 },
-  photoPreview: { width: '100%', height: 180, borderRadius: 15 },
-  photoRemoveBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: '#1C1C1E', borderRadius: 13 },
+  // Inputs
+  inputRow:   { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: Spacing.md, height: 52, borderWidth: 1.5, borderColor: Colors.border, marginBottom: Spacing.lg },
+  inputField: { flex: 1, color: Colors.text, fontSize: 15 },
 
-  submitButton: { backgroundColor: '#0FEA95', height: 60, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 10, shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 5 },
-  submitButtonText: { color: '#1C1C1E', fontSize: 18, fontWeight: 'bold' },
+  // Date / Time
+  dateTimeRow:  { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
+  dateBtn:      { flex: 1.5, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: Spacing.md, height: 52, borderWidth: 1.5, borderColor: Colors.border },
+  dateBtnTime:  { flex: 1 },
+  dateBtnText:  { flex: 1, color: Colors.textMuted, fontSize: 13, fontWeight: '600' },
+  pickerDone:   { alignSelf: 'flex-end', marginBottom: Spacing.lg, paddingHorizontal: Spacing.xl, paddingVertical: 9, backgroundColor: Colors.accent, borderRadius: Radius.pill },
+  pickerDoneText: { color: Colors.bg, fontWeight: '800', fontSize: 14 },
+
+  // Photo
+  photoPicker:    { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.lg, height: 56, paddingHorizontal: Spacing.md, marginBottom: Spacing.xl, borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed' },
+  photoPickerIcon:{ width: 34, height: 34, borderRadius: Radius.sm, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
+  photoPickerText:{ flex: 1, color: Colors.textMuted, fontSize: 14, fontWeight: '600' },
+  photoWrap:      { position: 'relative', marginBottom: Spacing.xl },
+  photoPreview:   { width: '100%', height: 185, borderRadius: Radius.lg },
+  photoRemove:    { position: 'absolute', top: 8, right: 8, backgroundColor: Colors.bg, borderRadius: 14 },
+
+  // Friends
+  friendsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
+  friendChip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radius.pill, paddingVertical: 7, paddingHorizontal: 12, borderWidth: 1.5, borderColor: Colors.border, maxWidth: 160 },
+  friendAvatar:      { width: 26, height: 26, borderRadius: 13, borderWidth: 1, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  friendAvatarImg:   { width: '100%', height: '100%' },
+  friendAvatarLetter:{ fontSize: 12, fontWeight: '900' },
+  friendName:   { color: Colors.textSub, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  inviteNote:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.xl },
+  inviteNoteText: { color: Colors.accent, fontSize: 13, fontWeight: '600' },
+
+  // Submit
+  submitBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.accent, height: 56, borderRadius: Radius.pill, marginTop: Spacing.md,
+    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+  },
+  submitBtnText: { color: Colors.bg, fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
 });

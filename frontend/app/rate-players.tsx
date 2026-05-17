@@ -8,6 +8,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
+import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 
 type Player = { id: number; username: string; avatar: string | null };
 
@@ -144,13 +145,15 @@ export default function RatePlayersScreen() {
   };
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#0FEA95" /></View>;
+    return <View style={styles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>;
   }
 
   if (done) {
     return (
       <View style={styles.center}>
-        <Ionicons name="checkmark-circle" size={80} color="#0FEA95" />
+        <View style={styles.doneIconWrap}>
+          <Ionicons name="checkmark-circle" size={56} color={Colors.accent} />
+        </View>
         <Text style={styles.doneTitle}>{isHost ? 'Attendance Saved!' : 'Ratings Submitted!'}</Text>
         <Text style={styles.doneSubtitle}>
           {isHost ? 'Player karma has been updated.' : 'Your feedback helps build a trustworthy community.'}
@@ -175,7 +178,7 @@ export default function RatePlayersScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={26} color={Colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{isHost ? 'Mark Attendance' : 'Rate Players'}</Text>
@@ -188,7 +191,9 @@ export default function RatePlayersScreen() {
 
       {players.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="checkmark-done-circle" size={70} color="#0FEA95" />
+          <View style={styles.doneIconWrap}>
+            <Ionicons name="checkmark-done-circle" size={48} color={Colors.accent} />
+          </View>
           <Text style={styles.emptyTitle}>All done!</Text>
           <Text style={styles.emptySubtitle}>
             {isHost ? "You've already marked attendance for everyone." : "You've already rated everyone."}
@@ -220,7 +225,7 @@ export default function RatePlayersScreen() {
               if (isHost) {
                 const status = attendance[item.id]; // null | true | false
                 return (
-                  <View style={styles.playerCard}>
+                  <View style={[styles.playerCard, Shadow.card]}>
                     <View style={styles.playerLeft}>
                       <AvatarCircle player={item} onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })} />
                       <Text style={styles.username}>{item.username}</Text>
@@ -235,14 +240,14 @@ export default function RatePlayersScreen() {
                         style={[styles.attendBtn, status === true && styles.attendBtnArrived]}
                         onPress={() => setAttended(item.id, true)}
                       >
-                        <Ionicons name="checkmark-circle" size={20} color={status === true ? '#1C1C1E' : '#8E8E93'} />
+                        <Ionicons name="checkmark-circle" size={20} color={status === true ? Colors.bg : Colors.textSub} />
                         <Text style={[styles.attendText, status === true && styles.attendTextArrived]}>Arrived</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.attendBtn, status === false && styles.attendBtnNoShow]}
                         onPress={() => setAttended(item.id, false)}
                       >
-                        <Ionicons name="close-circle" size={20} color={status === false ? '#1C1C1E' : '#8E8E93'} />
+                        <Ionicons name="close-circle" size={20} color={status === false ? Colors.bg : Colors.textSub} />
                         <Text style={[styles.attendText, status === false && styles.attendTextNoShow]}>No-Show</Text>
                       </TouchableOpacity>
                     </View>
@@ -253,7 +258,7 @@ export default function RatePlayersScreen() {
               // Non-host: thumbs + skill stars
               const ratings = peerRatings[item.id] ?? { sportsmanship: true, punctuality: true, communication: true, skill: 3 };
               return (
-                <View style={styles.playerCard}>
+                <View style={[styles.playerCard, Shadow.card]}>
                   <View style={styles.playerLeft}>
                     <AvatarCircle player={item} onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })} />
                     <Text style={styles.username}>{item.username}</Text>
@@ -264,7 +269,7 @@ export default function RatePlayersScreen() {
                     return (
                       <View key={cat.key} style={styles.categoryRow}>
                         <View style={styles.categoryLabelRow}>
-                          <Ionicons name={cat.icon as any} size={14} color="#8E8E93" />
+                          <Ionicons name={cat.icon as any} size={14} color={Colors.textSub} />
                           <Text style={styles.categoryLabel}>{cat.label}</Text>
                         </View>
                         <View style={styles.thumbRow}>
@@ -272,13 +277,13 @@ export default function RatePlayersScreen() {
                             style={[styles.thumbBtn, positive && styles.thumbBtnUp]}
                             onPress={() => setPeer(item.id, { [cat.key]: true })}
                           >
-                            <Ionicons name={positive ? 'thumbs-up' : 'thumbs-up-outline'} size={17} color={positive ? '#1C1C1E' : '#8E8E93'} />
+                            <Ionicons name={positive ? 'thumbs-up' : 'thumbs-up-outline'} size={17} color={positive ? Colors.bg : Colors.textSub} />
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.thumbBtn, !positive && styles.thumbBtnDown]}
                             onPress={() => setPeer(item.id, { [cat.key]: false })}
                           >
-                            <Ionicons name={!positive ? 'thumbs-down' : 'thumbs-down-outline'} size={17} color={!positive ? '#1C1C1E' : '#8E8E93'} />
+                            <Ionicons name={!positive ? 'thumbs-down' : 'thumbs-down-outline'} size={17} color={!positive ? Colors.bg : Colors.textSub} />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -288,7 +293,7 @@ export default function RatePlayersScreen() {
                   {/* Skill 1–5 stars */}
                   <View style={styles.categoryRow}>
                     <View style={styles.categoryLabelRow}>
-                      <Ionicons name="flash-outline" size={14} color="#8E8E93" />
+                      <Ionicons name="flash-outline" size={14} color={Colors.textSub} />
                       <Text style={styles.categoryLabel}>Skill Level</Text>
                     </View>
                     <View style={styles.starsRow}>
@@ -297,7 +302,7 @@ export default function RatePlayersScreen() {
                           <Ionicons
                             name={star <= ratings.skill ? 'star' : 'star-outline'}
                             size={26}
-                            color={star <= ratings.skill ? '#FFD700' : '#3A3A3C'}
+                            color={star <= ratings.skill ? Colors.yellow : Colors.surface2}
                           />
                         </TouchableOpacity>
                       ))}
@@ -311,7 +316,7 @@ export default function RatePlayersScreen() {
           <View style={styles.footer}>
             <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitting}>
               {submitting
-                ? <ActivityIndicator color="#1C1C1E" />
+                ? <ActivityIndicator color={Colors.bg} />
                 : <Text style={styles.submitBtnText}>{isHost ? 'Save Attendance' : 'Submit Ratings'}</Text>}
             </TouchableOpacity>
           </View>
@@ -322,59 +327,107 @@ export default function RatePlayersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
-  center: { flex: 1, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', padding: 30 },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  center: { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center', padding: 30 },
 
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: 20, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
-  backBtn: { marginRight: 12 },
-  title: { fontSize: 22, fontWeight: '900', color: '#FFFFFF' },
-  subtitle: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.xl, paddingHorizontal: Spacing.xl, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn: { marginRight: Spacing.md },
+  title: { fontSize: 22, fontWeight: '900', color: Colors.text },
+  subtitle: { fontSize: 13, color: Colors.textSub, marginTop: 2 },
 
-  instructions: { color: '#8E8E93', fontSize: 14, fontWeight: '600', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
-  list: { paddingHorizontal: 20, paddingBottom: 130 },
+  instructions: { color: Colors.textSub, fontSize: 14, fontWeight: '600', paddingHorizontal: Spacing.xl, paddingTop: 18, paddingBottom: 10 },
+  list: { paddingHorizontal: Spacing.xl, paddingBottom: 130 },
 
-  playerCard: { backgroundColor: '#2C2C2E', borderRadius: 16, padding: 14, marginBottom: 12 },
+  playerCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, marginBottom: 12 },
   playerLeft: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  avatar: { width: 38, height: 38, borderRadius: 19, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  avatar: { width: 42, height: 42, borderRadius: 21, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   avatarImage: { width: '100%', height: '100%' },
   avatarLetter: { fontSize: 16, fontWeight: '900' },
-  username: { fontSize: 16, fontWeight: '700', color: '#FFFFFF', flex: 1 },
+  username: { fontSize: 16, fontWeight: '700', color: Colors.text, flex: 1 },
 
-  pendingBadge: { backgroundColor: '#FF8C0022', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#FF8C0055' },
-  pendingBadgeText: { color: '#FF8C00', fontSize: 11, fontWeight: '700' },
+  pendingBadge:     { backgroundColor: Colors.warningFaint, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.warningBorder },
+  pendingBadgeText: { color: Colors.warning, fontSize: 11, fontWeight: '700' },
 
   // Host attendance
   attendanceRow: { flexDirection: 'row', gap: 10 },
-  attendBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 12, backgroundColor: '#3A3A3C' },
-  attendBtnArrived: { backgroundColor: '#0FEA95' },
-  attendBtnNoShow:  { backgroundColor: '#FF453A' },
-  attendText: { fontSize: 14, fontWeight: '700', color: '#8E8E93' },
-  attendTextArrived: { color: '#1C1C1E' },
-  attendTextNoShow:  { color: '#1C1C1E' },
+  attendBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: Radius.md, backgroundColor: Colors.surface2 },
+  attendBtnArrived: { backgroundColor: Colors.accent },
+  attendBtnNoShow:  { backgroundColor: Colors.error },
+  attendText: { fontSize: 14, fontWeight: '700', color: Colors.textSub },
+  attendTextArrived: { color: Colors.bg },
+  attendTextNoShow:  { color: Colors.bg },
 
   // Peer thumb categories
   categoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   categoryLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  categoryLabel: { fontSize: 13, color: '#AEAEB2', fontWeight: '600' },
+  categoryLabel: { fontSize: 13, color: Colors.textSub, fontWeight: '600' },
   thumbRow: { flexDirection: 'row', gap: 8 },
-  thumbBtn: { width: 40, height: 36, borderRadius: 10, backgroundColor: '#3A3A3C', justifyContent: 'center', alignItems: 'center' },
-  thumbBtnUp:   { backgroundColor: '#0FEA95' },
-  thumbBtnDown: { backgroundColor: '#FF453A' },
+  thumbBtn: { width: 44, height: 40, borderRadius: Radius.sm, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
+  thumbBtnUp:   { backgroundColor: Colors.accent },
+  thumbBtnDown: { backgroundColor: Colors.error },
 
   // Skill stars
   starsRow: { flexDirection: 'row', gap: 4 },
 
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 40, backgroundColor: '#1C1C1E', borderTopWidth: 1, borderTopColor: '#2C2C2E' },
-  submitBtn: { backgroundColor: '#0FEA95', height: 56, borderRadius: 15, justifyContent: 'center', alignItems: 'center', shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
-  submitBtnText: { color: '#1C1C1E', fontSize: 17, fontWeight: '900' },
+  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: Spacing.xl, paddingBottom: 40, backgroundColor: Colors.bg, borderTopWidth: 1, borderTopColor: Colors.border },
+  submitBtn: {
+    backgroundColor: Colors.accent,
+    height: 56,
+    borderRadius: Radius.pill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  submitBtnText: { color: Colors.bg, fontSize: 17, fontWeight: '900' },
 
-  doneTitle: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginTop: 20 },
-  doneSubtitle: { fontSize: 14, color: '#8E8E93', marginTop: 8, textAlign: 'center' },
-  doneBtn: { marginTop: 30, backgroundColor: '#0FEA95', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  doneBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 16 },
-  doneSecondaryBtn: { marginTop: 12, paddingHorizontal: 24, paddingVertical: 10 },
-  doneSecondaryBtnText: { color: '#636366', fontWeight: '700', fontSize: 14 },
+  // Done / celebration screen
+  doneIconWrap: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: Colors.successFaint,
+    borderWidth: 2,
+    borderColor: Colors.accentBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  doneTitle:    { fontSize: 24, fontWeight: '900', color: Colors.text, marginTop: 20 },
+  doneSubtitle: { fontSize: 14, color: Colors.textSub, marginTop: 8, textAlign: 'center' },
+  doneBtn: {
+    marginTop: 30,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: Radius.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  doneBtnText: { color: Colors.bg, fontWeight: '900', fontSize: 16 },
+  doneSecondaryBtn: {
+    marginTop: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  doneSecondaryBtnText: { color: Colors.textSub, fontWeight: '700', fontSize: 14 },
 
-  emptyTitle: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', marginTop: 16 },
-  emptySubtitle: { fontSize: 14, color: '#8E8E93', marginTop: 8, textAlign: 'center' },
+  emptyTitle:    { fontSize: 20, fontWeight: '900', color: Colors.text, marginTop: 16 },
+  emptySubtitle: { fontSize: 14, color: Colors.textSub, marginTop: 8, textAlign: 'center' },
 });

@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
@@ -106,7 +107,10 @@ export default function PlayerProfileScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0FEA95" />
+        <View style={styles.loadingCircle}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+        </View>
+        <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
   }
@@ -114,7 +118,7 @@ export default function PlayerProfileScreen() {
   if (!profile) {
     return (
       <View style={styles.center}>
-        <Ionicons name="person-outline" size={60} color="#3A3A3C" />
+        <Ionicons name="person-outline" size={60} color={Colors.surface2} />
         <Text style={styles.errorText}>Player not found</Text>
         <TouchableOpacity style={styles.backBtnCenter} onPress={() => router.back()}>
           <Text style={styles.backBtnCenterText}>Go Back</Text>
@@ -126,7 +130,7 @@ export default function PlayerProfileScreen() {
   const isMe = me?.id === profile.id;
   const color = (profile.top_sport ? SPORT_COLORS[profile.top_sport] : null) ?? getAvatarColor(profile.username);
   const karmaStr = profile.karma > 0 ? `+${profile.karma}` : `${profile.karma}`;
-  const karmaColor = profile.karma > 0 ? '#0FEA95' : profile.karma < 0 ? '#FF453A' : '#8E8E93';
+  const karmaColor = profile.karma > 0 ? Colors.accent : profile.karma < 0 ? Colors.error : Colors.textMuted;
   const totalGames = profile.games_hosted + profile.games_joined;
   const prefs = profile.sport_preferences ?? [];
 
@@ -135,11 +139,12 @@ export default function PlayerProfileScreen() {
 
       {/* ── Hero band ── */}
       <View style={[styles.heroBand, { backgroundColor: color + '28' }]}>
-        <View style={[styles.heroCircle1, { backgroundColor: color + '35' }]} />
-        <View style={[styles.heroCircle2, { backgroundColor: color + '20' }]} />
+        <View style={[styles.heroBlob1, { backgroundColor: color + '40' }]} />
+        <View style={[styles.heroBlob2, { backgroundColor: color + '28' }]} />
+        <View style={[styles.heroBlob3, { backgroundColor: color + '18' }]} />
         {/* Back button inside hero */}
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={22} color={Colors.text} />
         </TouchableOpacity>
         {isMe && (
           <View style={styles.youTag}>
@@ -151,7 +156,7 @@ export default function PlayerProfileScreen() {
       {/* ── Avatar section ── */}
       <View style={styles.avatarSection}>
         <View style={styles.avatarWrapper}>
-          <View style={[styles.avatarRing, { borderColor: color }]}>
+          <View style={[styles.avatarRing, { borderColor: color, ...Shadow.medium }]}>
             <View style={styles.avatarInner}>
               {profile.avatar ? (
                 <Image source={{ uri: `data:image/jpeg;base64,${profile.avatar}` }} style={styles.avatarImage} />
@@ -178,19 +183,19 @@ export default function PlayerProfileScreen() {
       </View>
 
       {/* ── Stats bar ── */}
-      <View style={styles.statsBar}>
+      <View style={[styles.statsBar, Shadow.card]}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{totalGames}</Text>
+          <Text style={[styles.statValue, { color: Colors.text }]}>{totalGames}</Text>
           <Text style={styles.statLabel}>Games</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: '#0FEA95' }]}>{profile.games_hosted}</Text>
+          <Text style={[styles.statValue, { color: Colors.accent }]}>{profile.games_hosted}</Text>
           <Text style={styles.statLabel}>Hosted</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: '#4F9EFF' }]}>{profile.games_joined}</Text>
+          <Text style={[styles.statValue, { color: Colors.blue }]}>{profile.games_joined}</Text>
           <Text style={styles.statLabel}>Joined</Text>
         </View>
         <View style={styles.statDivider} />
@@ -206,7 +211,7 @@ export default function PlayerProfileScreen() {
           <Text style={styles.sportsSectionTitle}>Sports</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportsScroll}>
             {prefs.map(pref => {
-              const c = SPORT_COLORS[pref.sport_type] ?? '#636366';
+              const c = SPORT_COLORS[pref.sport_type] ?? Colors.textMuted;
               const ic = SPORT_ICONS[pref.sport_type] ?? 'help-circle';
               const lvl = SKILL_LABELS[pref.skill_level] ?? '';
               return (
@@ -217,7 +222,7 @@ export default function PlayerProfileScreen() {
                       <Text style={[styles.chipName, { color: c }]}>
                         {pref.sport_type.charAt(0).toUpperCase() + pref.sport_type.slice(1)}
                       </Text>
-                      {!!pref.is_favorite && <Ionicons name="heart" size={11} color="#FF453A" />}
+                      {!!pref.is_favorite && <Ionicons name="heart" size={11} color={Colors.error} />}
                     </View>
                     <Text style={[styles.chipLevel, { color: c + 'AA' }]}>{lvl}</Text>
                   </View>
@@ -231,16 +236,19 @@ export default function PlayerProfileScreen() {
       {/* ── Friend + Message buttons ── */}
       {!isMe && (() => {
         const s = profile.friendship_status;
-        const btnColor =
-          s === 'friends'          ? '#2C2C2E' :
-          s === 'pending_sent'     ? '#2C2C2E' :
-          s === 'pending_received' ? '#4F9EFF' :
-                                     '#0FEA95';
+        const btnStyle =
+          s === 'friends'
+            ? { backgroundColor: Colors.errorFaint, borderWidth: 1, borderColor: Colors.errorBorder }
+            : s === 'pending_sent'
+            ? { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }
+            : s === 'pending_received'
+            ? { backgroundColor: Colors.blue }
+            : { backgroundColor: Colors.accent };
         const textColor =
-          s === 'friends'          ? '#FF453A' :
-          s === 'pending_sent'     ? '#8E8E93' :
-          s === 'pending_received' ? '#FFFFFF' :
-                                     '#1C1C1E';
+          s === 'friends'          ? Colors.error :
+          s === 'pending_sent'     ? Colors.textMuted :
+          s === 'pending_received' ? Colors.text :
+                                     Colors.bg;
         const iconName: any =
           s === 'friends'          ? 'person-remove-outline' :
           s === 'pending_sent'     ? 'time-outline' :
@@ -254,7 +262,7 @@ export default function PlayerProfileScreen() {
         return (
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={[styles.friendBtn, { backgroundColor: btnColor }]}
+              style={[styles.friendBtn, btnStyle]}
               onPress={handleFriendAction}
               disabled={friendLoading}
               activeOpacity={0.8}
@@ -272,7 +280,7 @@ export default function PlayerProfileScreen() {
               onPress={() => router.push({ pathname: '/direct-chat' as any, params: { userId: String(profile.id), username: profile.username } })}
               activeOpacity={0.8}
             >
-              <Ionicons name="chatbubble-outline" size={22} color="#0FEA95" />
+              <Ionicons name="chatbubble-outline" size={22} color={Colors.accent} />
             </TouchableOpacity>
           </View>
         );
@@ -284,52 +292,56 @@ export default function PlayerProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
-  center:    { flex: 1, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', padding: 30 },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  center:    { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center', padding: 30 },
 
-  // Hero
-  heroBand:    { height: 130, width: '100%', overflow: 'hidden', justifyContent: 'flex-end', paddingBottom: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'flex-end' },
-  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, top: -80, right: -40 },
-  heroCircle2: { position: 'absolute', width: 160, height: 160, borderRadius: 80, top: -40, left: -50 },
-  backBtn:     { position: 'absolute', top: 60, left: 20, width: 40 },
-  youTag:      { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
-  youTagText:  { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  loadingCircle: { width: 76, height: 76, borderRadius: 38, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  loadingText:   { color: Colors.textMuted, fontSize: 14, fontWeight: '600' },
+
+  // Hero — 3-orb design
+  heroBand:  { height: 140, width: '100%', overflow: 'hidden' },
+  heroBlob1: { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: -90,  right: -50 },
+  heroBlob2: { position: 'absolute', width: 180, height: 180, borderRadius: 90,  top: -50,  left: -60 },
+  heroBlob3: { position: 'absolute', width: 140, height: 140, borderRadius: 70,  bottom: -60, right: 60 },
+  backBtn:   { position: 'absolute', top: 56, left: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
+  youTag:    { position: 'absolute', bottom: 12, right: 20, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
+  youTagText: { color: Colors.text, fontSize: 12, fontWeight: '800' },
 
   // Avatar
-  avatarSection: { alignItems: 'center', marginTop: -52, paddingBottom: 20 },
+  avatarSection: { alignItems: 'center', marginTop: -56, paddingBottom: 20 },
   avatarWrapper: { position: 'relative', marginBottom: 14 },
-  avatarRing:    { width: 100, height: 100, borderRadius: 50, borderWidth: 3, padding: 3, backgroundColor: '#1C1C1E' },
+  avatarRing:    { width: 100, height: 100, borderRadius: 50, borderWidth: 3.5, padding: 3, backgroundColor: Colors.bg },
   sportBadge:    { position: 'absolute', bottom: 2, right: -2, width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
-  avatarInner:   { flex: 1, borderRadius: 46, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#2C2C2E' },
+  avatarInner:   { flex: 1, borderRadius: 46, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   avatarImage:   { width: '100%', height: '100%' },
   avatarLetter:  { fontSize: 42, fontWeight: '900' },
-  username:  { fontSize: 26, fontWeight: '900', color: '#FFFFFF', marginBottom: 6 },
-  bio:       { fontSize: 14, color: '#8E8E93', textAlign: 'center', paddingHorizontal: 40 },
-  bioEmpty:  { fontSize: 14, color: '#48484A', textAlign: 'center' },
+  username:  { ...Type.name, color: Colors.text, marginBottom: 6 },
+  bio:       { ...Type.body, color: Colors.textSub, textAlign: 'center', paddingHorizontal: 40 },
+  bioEmpty:  { ...Type.body, color: Colors.textHint, textAlign: 'center' },
 
   // Stats bar
-  statsBar:    { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#2C2C2E', borderRadius: 18, padding: 16, marginBottom: 6 },
+  statsBar:    { flexDirection: 'row', marginHorizontal: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: 6 },
   statItem:    { flex: 1, alignItems: 'center' },
-  statDivider: { width: 1, backgroundColor: '#3A3A3C' },
-  statValue:   { fontSize: 22, fontWeight: '900', color: '#FFFFFF', marginBottom: 2 },
-  statLabel:   { fontSize: 11, color: '#636366', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statDivider: { width: 1, backgroundColor: Colors.border },
+  statValue:   { ...Type.stat, marginBottom: 2 },
+  statLabel:   { ...Type.statLabel, color: Colors.textMuted },
 
   // Sports
-  sportsSection:      { marginHorizontal: 20, marginTop: 16, marginBottom: 6 },
-  sportsSectionTitle: { fontSize: 12, color: '#636366', fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
+  sportsSection:      { marginHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: 6 },
+  sportsSectionTitle: { ...Type.sectionLabel, color: Colors.textMuted, marginBottom: 10 },
   sportsScroll:  { gap: 8 },
-  sportChip:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: 1 },
+  sportChip:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.lg, borderWidth: 1 },
   chipNameRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chipName:      { fontSize: 13, fontWeight: '700' },
   chipLevel:     { fontSize: 11, fontWeight: '600', marginTop: 1 },
 
-  // Action row (friend + message buttons)
-  actionRow:     { flexDirection: 'row', marginHorizontal: 20, marginTop: 20, gap: 10 },
-  friendBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16 },
+  // Action row
+  actionRow:     { flexDirection: 'row', marginHorizontal: Spacing.xl, marginTop: Spacing.xl, gap: 10 },
+  friendBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: Radius.lg },
   friendBtnText: { fontSize: 15, fontWeight: '700' },
-  msgBtn:        { width: 52, height: 52, borderRadius: 16, backgroundColor: '#2C2C2E', justifyContent: 'center', alignItems: 'center' },
+  msgBtn:        { width: 52, height: 52, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint, justifyContent: 'center', alignItems: 'center' },
 
-  errorText:        { color: '#636366', fontSize: 16, marginTop: 14 },
-  backBtnCenter:    { marginTop: 20, backgroundColor: '#2C2C2E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-  backBtnCenterText: { color: '#FFFFFF', fontWeight: '700' },
+  errorText:         { color: Colors.textMuted, fontSize: 16, marginTop: 14 },
+  backBtnCenter:     { marginTop: 20, backgroundColor: Colors.surface, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.md },
+  backBtnCenterText: { color: Colors.text, fontWeight: '700' },
 });

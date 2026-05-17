@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { Colors, Spacing, Radius, Type } from '../constants/theme';
 
 const SPORTS = [
   { key: 'basketball', label: 'Basketball' },
@@ -36,6 +37,7 @@ export default function OnboardingScreen() {
   const [step, setStep]           = useState<Step>('avatar');
   const [avatar, setAvatar]       = useState<string | null>(null);
   const [bio, setBio]             = useState('');
+  const [bioFocused, setBioFocused] = useState(false);
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [sportPrefs, setSportPrefs]         = useState<Record<string, SportPref>>({});
   const [saving, setSaving]       = useState(false);
@@ -49,7 +51,7 @@ export default function OnboardingScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.35,
@@ -120,9 +122,17 @@ export default function OnboardingScreen() {
       <View style={styles.header}>
         <Text style={styles.brand}>SportLink</Text>
         <Text style={styles.subtitle}>Let's set up your profile</Text>
-        <View style={styles.dots}>
+
+        {/* Segmented progress bar */}
+        <View style={styles.progressBar}>
           {STEPS.map((s, i) => (
-            <View key={s} style={[styles.dot, i <= stepIndex && styles.dotActive]} />
+            <View
+              key={s}
+              style={[
+                styles.progressSegment,
+                i <= stepIndex ? styles.progressSegmentActive : styles.progressSegmentInactive,
+              ]}
+            />
           ))}
         </View>
       </View>
@@ -140,12 +150,12 @@ export default function OnboardingScreen() {
                 <Image source={{ uri: `data:image/jpeg;base64,${avatar}` }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="camera" size={40} color="#636366" />
+                  <Ionicons name="camera" size={40} color={Colors.textMuted} />
                   <Text style={styles.avatarPlaceholderText}>Tap to upload</Text>
                 </View>
               )}
               <View style={styles.avatarEditBadge}>
-                <Ionicons name="pencil" size={14} color="#1C1C1E" />
+                <Ionicons name="pencil" size={14} color={Colors.bg} />
               </View>
             </TouchableOpacity>
 
@@ -155,7 +165,7 @@ export default function OnboardingScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.nextBtn} onPress={() => setStep('bio')}>
                 <Text style={styles.nextBtnText}>Next</Text>
-                <Ionicons name="arrow-forward" size={18} color="#1C1C1E" />
+                <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
               </TouchableOpacity>
             </View>
           </View>
@@ -168,11 +178,13 @@ export default function OnboardingScreen() {
             <Text style={styles.stepHint}>A short bio helps others know who you are</Text>
 
             <TextInput
-              style={styles.bioInput}
+              style={[styles.bioInput, bioFocused && styles.bioInputFocused]}
               placeholder="e.g. Basketball fanatic, always up for a game 🏀"
-              placeholderTextColor="#48484A"
+              placeholderTextColor={Colors.textHint}
               value={bio}
               onChangeText={setBio}
+              onFocus={() => setBioFocused(true)}
+              onBlur={() => setBioFocused(false)}
               multiline
               maxLength={120}
               autoFocus
@@ -181,12 +193,12 @@ export default function OnboardingScreen() {
 
             <View style={styles.navRow}>
               <TouchableOpacity style={styles.backBtn} onPress={() => setStep('avatar')}>
-                <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+                <Ionicons name="arrow-back" size={18} color={Colors.text} />
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.nextBtn} onPress={() => setStep('sports')}>
                 <Text style={styles.nextBtnText}>Next</Text>
-                <Ionicons name="arrow-forward" size={18} color="#1C1C1E" />
+                <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
               </TouchableOpacity>
             </View>
           </View>
@@ -200,21 +212,24 @@ export default function OnboardingScreen() {
 
             <View style={styles.sportsGrid}>
               {SPORTS.map(({ key, label }) => {
-                const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? '#0FEA95';
+                const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? Colors.accent;
                 const icon     = SPORT_ICONS[key  as keyof typeof SPORT_ICONS]  ?? 'trophy';
                 const selected = selectedSports.includes(key);
                 return (
                   <TouchableOpacity
                     key={key}
-                    style={[styles.sportTile, selected && { borderColor: color, backgroundColor: color + '22' }]}
+                    style={[
+                      styles.sportTile,
+                      selected ? { borderColor: color, backgroundColor: color + '22' } : { borderColor: Colors.border },
+                    ]}
                     onPress={() => toggleSport(key)}
                     activeOpacity={0.75}
                   >
-                    <MaterialCommunityIcons name={icon as any} size={28} color={selected ? color : '#636366'} />
+                    <MaterialCommunityIcons name={icon as any} size={28} color={selected ? color : Colors.textMuted} />
                     <Text style={[styles.sportTileLabel, selected && { color }]}>{label}</Text>
                     {selected && (
                       <View style={[styles.sportCheck, { backgroundColor: color }]}>
-                        <Ionicons name="checkmark" size={10} color="#1C1C1E" />
+                        <Ionicons name="checkmark" size={10} color={Colors.bg} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -224,7 +239,7 @@ export default function OnboardingScreen() {
 
             <View style={styles.navRow}>
               <TouchableOpacity style={styles.backBtn} onPress={() => setStep('bio')}>
-                <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+                <Ionicons name="arrow-back" size={18} color={Colors.text} />
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -235,7 +250,7 @@ export default function OnboardingScreen() {
                 }}
               >
                 <Text style={styles.nextBtnText}>Next</Text>
-                <Ionicons name="arrow-forward" size={18} color="#1C1C1E" />
+                <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
               </TouchableOpacity>
             </View>
           </View>
@@ -250,7 +265,7 @@ export default function OnboardingScreen() {
             <View style={styles.levelsContainer}>
               {selectedSports.map(key => {
                 const sportDef = SPORTS.find(s => s.key === key)!;
-                const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? '#0FEA95';
+                const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? Colors.accent;
                 const icon     = SPORT_ICONS[key  as keyof typeof SPORT_ICONS]  ?? 'trophy';
                 const pref     = sportPrefs[key] ?? { level: 3, favorite: false };
                 return (
@@ -276,7 +291,7 @@ export default function OnboardingScreen() {
                       <Ionicons
                         name={pref.favorite ? 'heart' : 'heart-outline'}
                         size={20}
-                        color={pref.favorite ? '#FF6B6B' : '#48484A'}
+                        color={pref.favorite ? '#FF6B6B' : Colors.textHint}
                       />
                     </TouchableOpacity>
                   </View>
@@ -286,15 +301,15 @@ export default function OnboardingScreen() {
 
             <View style={styles.navRow}>
               <TouchableOpacity style={styles.backBtn} onPress={() => setStep('sports')}>
-                <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+                <Ionicons name="arrow-back" size={18} color={Colors.text} />
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
                 {saving
-                  ? <ActivityIndicator color="#1C1C1E" size="small" />
+                  ? <ActivityIndicator color={Colors.bg} size="small" />
                   : <>
                       <Text style={styles.finishBtnText}>Let's Play!</Text>
-                      <Ionicons name="rocket" size={18} color="#1C1C1E" />
+                      <Ionicons name="rocket" size={18} color={Colors.bg} />
                     </>}
               </TouchableOpacity>
             </View>
@@ -307,51 +322,55 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
 
-  header:   { alignItems: 'center', paddingTop: 70, paddingBottom: 30, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
-  brand:    { fontSize: 28, fontWeight: '900', color: '#0FEA95', letterSpacing: 1, marginBottom: 4 },
-  subtitle: { fontSize: 15, color: '#8E8E93', marginBottom: 20 },
-  dots:     { flexDirection: 'row', gap: 8 },
-  dot:      { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3A3A3C' },
-  dotActive: { backgroundColor: '#0FEA95', width: 22 },
+  header:   { alignItems: 'center', paddingTop: 70, paddingBottom: 30, borderBottomWidth: 1, borderBottomColor: Colors.surface },
+  brand:    { fontSize: 28, fontWeight: '900', color: Colors.accent, letterSpacing: 1, marginBottom: 4 },
+  subtitle: { fontSize: 15, color: Colors.textMuted, marginBottom: 20 },
 
-  body:          { padding: 24, paddingBottom: 48 },
+  // Segmented progress bar
+  progressBar: { flexDirection: 'row', gap: 5, width: '60%' },
+  progressSegment: { flex: 1, height: 4, borderRadius: 3 },
+  progressSegmentActive:   { backgroundColor: Colors.accent },
+  progressSegmentInactive: { backgroundColor: Colors.surface2 },
+
+  body:          { padding: Spacing.xxl, paddingBottom: 48 },
   stepContainer: { gap: 0 },
 
-  stepTitle: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginBottom: 6, marginTop: 8 },
-  stepHint:  { fontSize: 14, color: '#636366', marginBottom: 28 },
+  stepTitle: { fontSize: 24, fontWeight: '900', color: Colors.text, marginBottom: 6, marginTop: 8 },
+  stepHint:  { fontSize: 14, color: Colors.textMuted, marginBottom: 28 },
 
-  avatarWrap:          { alignSelf: 'center', width: 130, height: 130, borderRadius: 65, marginBottom: 32, position: 'relative' },
-  avatarImage:         { width: 130, height: 130, borderRadius: 65, borderWidth: 3, borderColor: '#0FEA95' },
-  avatarPlaceholder:   { width: 130, height: 130, borderRadius: 65, backgroundColor: '#2C2C2E', borderWidth: 2, borderColor: '#3A3A3C', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 6 },
-  avatarPlaceholderText: { color: '#636366', fontSize: 12 },
-  avatarEditBadge:     { position: 'absolute', bottom: 4, right: 4, width: 28, height: 28, borderRadius: 14, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
+  avatarWrap:            { alignSelf: 'center', width: 130, height: 130, borderRadius: 65, marginBottom: 32, position: 'relative' },
+  avatarImage:           { width: 130, height: 130, borderRadius: 65, borderWidth: 3, borderColor: Colors.accent },
+  avatarPlaceholder:     { width: 130, height: 130, borderRadius: 65, backgroundColor: Colors.surface, borderWidth: 2, borderColor: Colors.border, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  avatarPlaceholderText: { color: Colors.textMuted, fontSize: 12 },
+  avatarEditBadge:       { position: 'absolute', bottom: 4, right: 4, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.accent, justifyContent: 'center', alignItems: 'center' },
 
-  bioInput:  { backgroundColor: '#2C2C2E', borderRadius: 16, padding: 16, color: '#FFFFFF', fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#3A3A3C', marginBottom: 6 },
-  charCount: { color: '#48484A', fontSize: 12, textAlign: 'right', marginBottom: 28 },
+  bioInput:        { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, color: Colors.text, fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: Colors.border, marginBottom: 6 },
+  bioInputFocused: { borderColor: Colors.accent },
+  charCount:       { color: Colors.textHint, fontSize: 12, textAlign: 'right', marginBottom: 28 },
 
   sportsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 32 },
-  sportTile:      { width: '30%', aspectRatio: 1, backgroundColor: '#2C2C2E', borderRadius: 16, justifyContent: 'center', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#3A3A3C' },
-  sportTileLabel: { fontSize: 11, fontWeight: '700', color: '#636366', textAlign: 'center' },
+  sportTile:      { width: '30%', aspectRatio: 1.1, backgroundColor: Colors.surface, borderRadius: Radius.xl, justifyContent: 'center', alignItems: 'center', gap: 6, borderWidth: 1.5 },
+  sportTileLabel: { ...Type.label, color: Colors.textMuted, textAlign: 'center' },
   sportCheck:     { position: 'absolute', top: 7, right: 7, width: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
 
   levelsContainer: { gap: 10, marginBottom: 32 },
-  levelRow:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, padding: 14, gap: 10 },
-  levelSportLabel: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  levelRow:        { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 14, gap: 10 },
+  levelSportLabel: { fontSize: 14, fontWeight: '700', color: Colors.text },
   levelControl:    { alignItems: 'center', gap: 4 },
-  levelDots:       { flexDirection: 'row', gap: 6 },
-  levelDot:        { width: 14, height: 14, borderRadius: 7, backgroundColor: '#3A3A3C' },
-  levelName:       { fontSize: 10, color: '#636366', fontWeight: '600' },
+  levelDots:       { flexDirection: 'row', gap: 8 },
+  levelDot:        { width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.surface2 },
+  levelName:       { fontSize: 10, color: Colors.textMuted, fontWeight: '600' },
   favoriteBtn:     { padding: 4 },
 
   navRow:      { flexDirection: 'row', gap: 12, marginTop: 8 },
   skipBtn:     { flex: 1, height: 52, justifyContent: 'center', alignItems: 'center' },
-  skipText:    { color: '#636366', fontSize: 15, fontWeight: '600' },
-  backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, height: 52, paddingHorizontal: 18, backgroundColor: '#2C2C2E', borderRadius: 14 },
-  backBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
-  nextBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: '#0FEA95', borderRadius: 14 },
-  nextBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 16 },
-  finishBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: '#0FEA95', borderRadius: 14 },
-  finishBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 16 },
+  skipText:    { color: Colors.textMuted, fontSize: 15, fontWeight: '600' },
+  backBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, height: 52, paddingHorizontal: 18, backgroundColor: Colors.surface, borderRadius: Radius.pill },
+  backBtnText: { color: Colors.text, fontWeight: '700', fontSize: 15 },
+  nextBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: Colors.accent, borderRadius: Radius.pill },
+  nextBtnText: { color: Colors.bg, fontWeight: '900', fontSize: 16 },
+  finishBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: Colors.accent, borderRadius: Radius.pill },
+  finishBtnText: { color: Colors.bg, fontWeight: '900', fontSize: 16 },
 });

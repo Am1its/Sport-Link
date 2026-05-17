@@ -25,13 +25,13 @@ export const SPORT_ICONS: Record<string, string> = {
 // { key, label } pairs used by map and discover filter rows
 export const SPORT_FILTER_ITEMS = [
   { key: 'all',        label: 'All Sports' },
-  { key: 'basketball', label: '🏀' },
-  { key: 'football',   label: '⚽' },
-  { key: 'tennis',     label: '🎾' },
-  { key: 'volleyball', label: '🏐' },
-  { key: 'yoga',       label: '🧘' },
-  { key: 'gym',        label: '🏋️' },
-  { key: 'studio',     label: '💃' },
-  { key: 'footvolley', label: '🏖️' },
-  { key: 'swimming',   label: '🏊' },
+  { key: 'basketball', label: 'Basketball' },
+  { key: 'football',   label: 'Football' },
+  { key: 'tennis',     label: 'Tennis' },
+  { key: 'volleyball', label: 'Volleyball' },
+  { key: 'yoga',       label: 'Yoga' },
+  { key: 'gym',        label: 'Gym' },
+  { key: 'studio',     label: 'Studio' },
+  { key: 'footvolley', label: 'Footvolley' },
+  { key: 'swimming',   label: 'Swimming' },
 ] as const;

@@ -6,27 +6,33 @@ This document details the complete architecture, implementation, and end-to-end 
 
 ## 🗺️ 1. What Was Built
 
-| Layer | PoC (Sprint 1) | Full Prototype (Current) |
+| Layer | PoC (Sprint 1) | Full Prototype (Sprint 11) |
 | :--- | :--- | :--- |
-| **Database** | None | MySQL — 8 relational tables |
-| **Auth** | Hardcoded `isLoggedIn` | JWT (90-day expiry), persisted via AsyncStorage |
-| **Courts** | 3 hardcoded mock pins | Google Places API — 4 parallel queries, deduped |
-| **Games** | Local React state | DB-persisted with full CRUD + photo attachment |
-| **Join Game** | Alert placeholder | Transaction + row-lock (race-condition safe) |
-| **Chat** | Static placeholder | socket.io real-time (REST fallback) |
-| **My Games** | Empty screen | Upcoming/History with host controls (edit/delete/leave) |
-| **Discover** | Empty screen | Searchable + sport filter + radius filter |
-| **Ratings** | None | Host attendance (±karma) + peer category ratings |
+| **Database** | None | MySQL — 11 relational tables |
+| **Auth** | Hardcoded `isLoggedIn` | JWT (90-day expiry), persisted via AsyncStorage; Google OAuth infrastructure |
+| **Courts** | 3 hardcoded mock pins | Google Places API — 4 parallel queries, deduped; court detail + photo proxy + reviews |
+| **Games** | Local React state | DB-persisted with full CRUD + photo + `is_joined` auth-optional flag |
+| **Join Game** | Alert placeholder | Transaction + row-lock (race-condition safe); `is_joined` state persisted in-session |
+| **Chat** | Static placeholder | socket.io real-time (REST fallback); game chat + DMs on separate screens |
+| **My Games** | Empty screen | Upcoming/History with host controls; accent bar cards; skeleton loader |
+| **Discover** | Empty screen | Searchable + modal sport/radius filter; GameCard with accent bar; skeleton loader |
+| **Ratings** | None | Host attendance (±karma) + peer category ratings; celebratory done screen |
+| **Game Results** | None | Per-player score bars + skill stars; sport-color hero band; locked state |
 | **Push Notifs** | None | Expo push on join/cancel/friend/reminder |
 | **Notification Inbox** | None | Persisted in DB, unread badge, mark-as-read |
-| **Friends** | None | Send/accept/decline, profile friend button |
-| **Leaderboard** | None | Top 20 by karma, podium for top 3 |
-| **Onboarding** | None | 3-step wizard (avatar → bio → sport prefs) |
-| **Avatars** | None | Base64 — picker in profile + onboarding |
+| **Friends** | None | Card-row tabs (Friends/Requests/Add); push on request/accept |
+| **Leaderboard** | None | Top 20 by karma, podium top 3, shadow cards |
+| **Onboarding** | None | 4-step wizard (photo → bio → sports → levels); progress bar; pill buttons |
+| **Avatars** | None | Base64 — picker in profile + onboarding (`['images']` API) |
 | **Game Photo** | None | 16:9 base64 photo on game cards |
 | **Radius Search** | None | Haversine filter on Discover screen |
-| **Player Profiles** | None | Public profile with Add/Remove Friend button |
-| **Profile** | Hardcoded name | Live stats + edit (username, bio, avatar) |
+| **Player Profiles** | None | 3-orb hero, friend + message buttons, sport chips |
+| **Profile** | Hardcoded name | 3-orb hero, sport chips, 4-stat bar, inline edit; skeleton loader |
+| **Court Reviews** | None | Aggregate rating + per-review cards; submit/edit/delete own |
+| **Sport Preferences** | None | Per-sport skill level (1-5) + favorite toggle; drives player matching |
+| **Player Matching** | None | Suggestion engine by shared sport + location; friend request from list |
+| **Direct Messaging** | None | Full DM screen; pill bubbles; event card sharing; real-time via socket.io |
+| **Design System** | Scattered hex values | `theme.ts` tokens (Colors/Spacing/Radius/Type/Shadow); skeleton loaders; orb hero bands; pill buttons |
 
 ---
 
@@ -50,7 +56,7 @@ Games
   id              INT PK AUTO_INCREMENT
   host_id         INT FK → Users(id)
   sport_type      ENUM('basketball','tennis','volleyball','football',
-                       'yoga','footvolley','studio','gym')
+                       'yoga','footvolley','studio','gym','swimming')
   level           TINYINT(1–5)
   latitude        DECIMAL(10,8)
   longitude       DECIMAL(11,8)
@@ -116,6 +122,35 @@ Notifications
   is_read    BOOLEAN DEFAULT FALSE
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   INDEX (user_id)
+
+CourtReviews
+  id         INT PK AUTO_INCREMENT
+  place_id   VARCHAR(200) NOT NULL
+  user_id    INT FK → Users(id) ON DELETE CASCADE
+  rating     TINYINT(1–5) NOT NULL
+  comment    VARCHAR(500)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  UNIQUE (place_id, user_id)
+
+SportPreferences
+  id          INT PK AUTO_INCREMENT
+  user_id     INT FK → Users(id) ON DELETE CASCADE
+  sport_type  VARCHAR(50) NOT NULL
+  skill_level TINYINT(1–5) NOT NULL
+  is_favorite BOOLEAN DEFAULT FALSE
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  UNIQUE (user_id, sport_type)
+
+DirectMessages
+  id          INT PK AUTO_INCREMENT
+  sender_id   INT FK → Users(id)
+  receiver_id INT FK → Users(id)
+  content     TEXT NULL
+  type        ENUM('text','event') DEFAULT 'text'
+  event_id    INT NULL FK → Games(id) ON DELETE SET NULL
+  is_read     BOOLEAN DEFAULT FALSE
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  INDEX (sender_id), INDEX (receiver_id)
 ```
 
 **Karma formula** (computed at query time, never stored):

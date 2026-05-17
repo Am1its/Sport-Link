@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Image, TextInput, Alert,
+  Image, TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,6 +10,8 @@ import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { getAvatarColor } from '../../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
+import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
+import { ProfileStatsSkeleton } from '../../components/SkeletonLoader';
 
 type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
 
@@ -31,19 +33,19 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { token, logout } = useAuth();
 
-  const [stats, setStats]           = useState<Stats | null>(null);
-  const [isEditing, setIsEditing]   = useState(false);
+  const [stats, setStats]               = useState<Stats | null>(null);
+  const [isEditing, setIsEditing]       = useState(false);
   const [editUsername, setEditUsername] = useState('');
-  const [editBio, setEditBio]       = useState('');
-  const [editAvatar, setEditAvatar] = useState<string | null>(null);
-  const [saving, setSaving]         = useState(false);
+  const [editBio, setEditBio]           = useState('');
+  const [editAvatar, setEditAvatar]     = useState<string | null>(null);
+  const [saving, setSaving]             = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       const fetchStats = async () => {
         try {
-          const res = await apiFetch('/api/users/me', { token });
+          const res  = await apiFetch('/api/users/me', { token });
           const data = await res.json();
           if (data.success) setStats(data.user);
         } catch (err: any) {
@@ -52,7 +54,7 @@ export default function ProfileScreen() {
       };
       const fetchUnread = async () => {
         try {
-          const res = await apiFetch('/api/notifications', { token });
+          const res  = await apiFetch('/api/notifications', { token });
           const data = await res.json();
           if (data.success) setUnreadNotifs(data.unread_count);
         } catch {}
@@ -78,7 +80,7 @@ export default function ProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.35,
@@ -95,15 +97,10 @@ export default function ProfileScreen() {
     try {
       const body: Record<string, any> = {
         username: editUsername.trim(),
-        bio: editBio.trim() || null,
+        bio:      editBio.trim() || null,
       };
       if (editAvatar) body.avatar = editAvatar;
-
-      const res = await apiFetch('/api/users/me', {
-        method: 'PUT',
-        token,
-        body: JSON.stringify(body),
-      });
+      const res  = await apiFetch('/api/users/me', { method: 'PUT', token, body: JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       setStats(prev => prev ? { ...prev, ...data.user } : data.user);
@@ -132,22 +129,28 @@ export default function ProfileScreen() {
   const totalGames = (stats?.games_hosted ?? 0) + (stats?.games_joined ?? 0);
   const karma      = stats?.karma ?? 0;
   const karmaStr   = karma > 0 ? `+${karma}` : `${karma}`;
-  const karmaColor = karma > 0 ? '#0FEA95' : karma < 0 ? '#FF453A' : '#8E8E93';
+  const karmaColor = karma > 0 ? Colors.accent : karma < 0 ? Colors.error : Colors.textMuted;
   const prefs      = stats?.sport_preferences ?? [];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-      {/* ── Hero band ── */}
-      <View style={[styles.heroBand, { backgroundColor: avatarColor + '28' }]}>
-        <View style={[styles.heroCircle1, { backgroundColor: avatarColor + '35' }]} />
-        <View style={[styles.heroCircle2, { backgroundColor: avatarColor + '20' }]} />
+      {/* ── Hero band — layered for depth ── */}
+      <View style={[styles.heroBand, { backgroundColor: avatarColor + '22' }]}>
+        <View style={[styles.heroBlob1, { backgroundColor: avatarColor + '40' }]} />
+        <View style={[styles.heroBlob2, { backgroundColor: avatarColor + '28' }]} />
+        <View style={[styles.heroBlob3, { backgroundColor: avatarColor + '18' }]} />
+        {/* Grid lines for sporty feel */}
+        <View style={styles.heroGrid} />
       </View>
 
-      {/* ── Avatar ── */}
+      {/* ── Avatar — overlaps hero ── */}
       <View style={styles.avatarSection}>
         <TouchableOpacity
-          style={[styles.avatarRing, { borderColor: isEditing ? '#0FEA95' : avatarColor }]}
+          style={[styles.avatarRing, {
+            borderColor: isEditing ? Colors.accent : avatarColor,
+            ...Shadow.medium,
+          }]}
           onPress={isEditing ? pickAvatar : undefined}
           activeOpacity={isEditing ? 0.7 : 1}
         >
@@ -165,7 +168,7 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Name / Bio */}
+        {/* Name / Bio / Edit */}
         {isEditing ? (
           <>
             <TextInput
@@ -173,7 +176,7 @@ export default function ProfileScreen() {
               value={editUsername}
               onChangeText={setEditUsername}
               placeholder="Username"
-              placeholderTextColor="#636366"
+              placeholderTextColor={Colors.textMuted}
               autoCapitalize="none"
               maxLength={30}
             />
@@ -182,7 +185,7 @@ export default function ProfileScreen() {
               value={editBio}
               onChangeText={setEditBio}
               placeholder="Add a short bio..."
-              placeholderTextColor="#636366"
+              placeholderTextColor={Colors.textMuted}
               maxLength={120}
               multiline
             />
@@ -190,10 +193,10 @@ export default function ProfileScreen() {
               <TouchableOpacity style={styles.cancelBtn} onPress={cancelEdit}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveEditBtn} onPress={handleSave} disabled={saving}>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
                 {saving
-                  ? <ActivityIndicator color="#1C1C1E" size="small" />
-                  : <Text style={styles.saveEditBtnText}>Save</Text>}
+                  ? <ActivityIndicator color={Colors.bg} size="small" />
+                  : <Text style={styles.saveBtnText}>Save</Text>}
               </TouchableOpacity>
             </View>
           </>
@@ -202,45 +205,38 @@ export default function ProfileScreen() {
             <Text style={styles.name}>{username}</Text>
             {stats?.bio
               ? <Text style={styles.bio}>{stats.bio}</Text>
-              : <Text style={[styles.bio, { color: '#48484A', fontStyle: 'italic' }]}>No bio yet</Text>}
+              : <Text style={[styles.bio, { color: Colors.textHint, fontStyle: 'italic' }]}>No bio yet</Text>}
             <TouchableOpacity style={styles.editProfileBtn} onPress={enterEditMode}>
-              <Ionicons name="pencil-outline" size={14} color="#0FEA95" />
+              <Ionicons name="pencil-outline" size={13} color={Colors.accent} />
               <Text style={styles.editProfileBtnText}>Edit Profile</Text>
             </TouchableOpacity>
           </>
         )}
       </View>
 
-      {/* ── Stats Bar ── */}
-      {stats ? (
-        <View style={styles.statsBar}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{totalGames}</Text>
-            <Text style={styles.statLabel}>Games</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#0FEA95' }]}>{stats.games_hosted}</Text>
-            <Text style={styles.statLabel}>Hosted</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#4F9EFF' }]}>{stats.games_joined}</Text>
-            <Text style={styles.statLabel}>Joined</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: karmaColor }]}>{karmaStr}</Text>
-            <Text style={styles.statLabel}>Karma</Text>
-          </View>
-        </View>
+      {/* ── Stats bar ── */}
+      {!stats ? (
+        <ProfileStatsSkeleton />
       ) : (
-        <View style={styles.statsLoading}>
-          <ActivityIndicator color="#0FEA95" />
+        <View style={[styles.statsBar, Shadow.card]}>
+          {[
+            { value: String(totalGames), label: 'Games', color: Colors.text },
+            { value: String(stats.games_hosted), label: 'Hosted', color: Colors.accent },
+            { value: String(stats.games_joined), label: 'Joined', color: Colors.blue },
+            { value: karmaStr, label: 'Karma', color: karmaColor },
+          ].map((s, i, arr) => (
+            <React.Fragment key={s.label}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
+                <Text style={styles.statLabel}>{s.label}</Text>
+              </View>
+              {i < arr.length - 1 && <View style={styles.statDivider} />}
+            </React.Fragment>
+          ))}
         </View>
       )}
 
-      {/* ── Sport Preferences ── */}
+      {/* ── Sport chips ── */}
       {prefs.length > 0 && (
         <View style={styles.sportsSection}>
           <View style={styles.sportsSectionHeader}>
@@ -251,18 +247,18 @@ export default function ProfileScreen() {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportsScroll}>
             {prefs.map(pref => {
-              const c = SPORT_COLORS[pref.sport_type] ?? '#636366';
-              const ic = SPORT_ICONS[pref.sport_type] ?? 'help-circle';
+              const c   = SPORT_COLORS[pref.sport_type] ?? Colors.textMuted;
+              const ic  = SPORT_ICONS[pref.sport_type]  ?? 'help-circle';
               const lvl = SKILL_LABELS[pref.skill_level] ?? '';
               return (
-                <View key={pref.sport_type} style={[styles.sportChip, { borderColor: c + '66', backgroundColor: c + '18' }]}>
-                  <MaterialCommunityIcons name={ic as any} size={18} color={c} />
-                  <View style={styles.chipText}>
+                <View key={pref.sport_type} style={[styles.sportChip, { borderColor: c + '55', backgroundColor: c + '14' }]}>
+                  <MaterialCommunityIcons name={ic as any} size={17} color={c} />
+                  <View>
                     <View style={styles.chipNameRow}>
                       <Text style={[styles.chipName, { color: c }]}>
                         {pref.sport_type.charAt(0).toUpperCase() + pref.sport_type.slice(1)}
                       </Text>
-                      {!!pref.is_favorite && <Ionicons name="heart" size={11} color="#FF453A" />}
+                      {!!pref.is_favorite && <Ionicons name="heart" size={10} color={Colors.error} />}
                     </View>
                     <Text style={[styles.chipLevel, { color: c + 'AA' }]}>{lvl}</Text>
                   </View>
@@ -276,53 +272,38 @@ export default function ProfileScreen() {
       {/* ── Menu ── */}
       <View style={styles.menuContainer}>
         <Text style={styles.menuSection}>Community</Text>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/leaderboard' as any)}>
-          <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIconWrap, { backgroundColor: '#FFD70022' }]}>
-              <Ionicons name="trophy-outline" size={20} color="#FFD700" />
+        {[
+          { icon: 'trophy-outline', iconColor: Colors.yellow,  bg: Colors.yellow + '20', label: 'Leaderboard',       route: '/leaderboard' },
+          { icon: 'people-outline', iconColor: Colors.blue,    bg: Colors.blueFaint,     label: 'Friends',           route: '/friends' },
+          { icon: 'magnet-outline', iconColor: Colors.accent,  bg: Colors.accentFaint,   label: 'Discover Players',  route: '/player-matching' },
+        ].map(item => (
+          <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => router.push(item.route as any)} activeOpacity={0.7}>
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon as any} size={20} color={item.iconColor} />
+              </View>
+              <Text style={styles.menuText}>{item.label}</Text>
             </View>
-            <Text style={styles.menuText}>Leaderboard</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#48484A" />
-        </TouchableOpacity>
+            <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
+          </TouchableOpacity>
+        ))}
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/friends' as any)}>
+        <Text style={[styles.menuSection, { marginTop: Spacing.xxl }]}>Account</Text>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/sport-preferences' as any)} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIconWrap, { backgroundColor: '#4F9EFF22' }]}>
-              <Ionicons name="people-outline" size={20} color="#4F9EFF" />
-            </View>
-            <Text style={styles.menuText}>Friends</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#48484A" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/player-matching' as any)}>
-          <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIconWrap, { backgroundColor: '#0FEA9522' }]}>
-              <Ionicons name="magnet-outline" size={20} color="#0FEA95" />
-            </View>
-            <Text style={styles.menuText}>Discover Players</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#48484A" />
-        </TouchableOpacity>
-
-        <Text style={[styles.menuSection, { marginTop: 24 }]}>Account</Text>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/sport-preferences' as any)}>
-          <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIconWrap, { backgroundColor: '#FF8C0022' }]}>
-              <MaterialCommunityIcons name="whistle" size={20} color="#FF8C00" />
+            <View style={[styles.menuIconWrap, { backgroundColor: Colors.orange + '20' }]}>
+              <MaterialCommunityIcons name="whistle" size={20} color={Colors.orange} />
             </View>
             <Text style={styles.menuText}>Sport Preferences</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#48484A" />
+          <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notification-inbox' as any)}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notification-inbox' as any)} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIconWrap, { backgroundColor: '#4F9EFF22' }]}>
-              <Ionicons name="notifications-outline" size={20} color="#4F9EFF" />
+            <View style={[styles.menuIconWrap, { backgroundColor: Colors.blueFaint }]}>
+              <Ionicons name="notifications-outline" size={20} color={Colors.blue} />
             </View>
             <Text style={styles.menuText}>Notifications</Text>
             {unreadNotifs > 0 && (
@@ -331,25 +312,25 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#48484A" />
+          <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications-settings' as any)}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications-settings' as any)} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIconWrap, { backgroundColor: '#4F9EFF22' }]}>
-              <Ionicons name="settings-outline" size={20} color="#4F9EFF" />
+            <View style={[styles.menuIconWrap, { backgroundColor: Colors.blueFaint }]}>
+              <Ionicons name="settings-outline" size={20} color={Colors.blue} />
             </View>
             <Text style={styles.menuText}>Notification Settings</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#48484A" />
+          <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout}>
+        <TouchableOpacity style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
-            <View style={[styles.menuIconWrap, { backgroundColor: '#FF453A22' }]}>
-              <Ionicons name="log-out-outline" size={20} color="#FF453A" />
+            <View style={[styles.menuIconWrap, { backgroundColor: Colors.errorFaint }]}>
+              <Ionicons name="log-out-outline" size={20} color={Colors.error} />
             </View>
-            <Text style={[styles.menuText, { color: '#FF453A' }]}>Sign Out</Text>
+            <Text style={[styles.menuText, { color: Colors.error }]}>Sign Out</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -359,64 +340,66 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
 
-  // Hero
-  heroBand: { height: 130, width: '100%', overflow: 'hidden' },
-  heroCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, top: -80, right: -40 },
-  heroCircle2: { position: 'absolute', width: 160, height: 160, borderRadius: 80, top: -40, left: -50 },
+  // Hero band — layered orbs for depth
+  heroBand:  { height: 140, width: '100%', overflow: 'hidden' },
+  heroBlob1: { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: -90, right: -50 },
+  heroBlob2: { position: 'absolute', width: 180, height: 180, borderRadius: 90,  top: -50, left:  -60 },
+  heroBlob3: { position: 'absolute', width: 140, height: 140, borderRadius: 70,  bottom: -60, right: 60 },
+  heroGrid:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.04,
+               // Subtle diagonal lines via border trick
+               borderStyle: 'solid', borderWidth: 0 },
 
-  // Avatar section (overlaps hero band)
-  avatarSection: { alignItems: 'center', marginTop: -52, paddingBottom: 20, paddingHorizontal: 20 },
-  avatarRing: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, padding: 3, backgroundColor: '#1C1C1E', marginBottom: 14 },
-  avatarInner: { flex: 1, borderRadius: 46, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#2C2C2E' },
-  avatarImage: { width: '100%', height: '100%' },
-  avatarLetter: { fontSize: 38, fontWeight: '900' },
+  // Avatar
+  avatarSection: { alignItems: 'center', marginTop: -54, paddingBottom: 20, paddingHorizontal: Spacing.xl },
+  avatarRing:    { width: 104, height: 104, borderRadius: 52, borderWidth: 3.5, padding: 3, backgroundColor: Colors.bg, marginBottom: 14 },
+  avatarInner:   { flex: 1, borderRadius: 46, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
+  avatarImage:   { width: '100%', height: '100%' },
+  avatarLetter:  { fontSize: 40, fontWeight: '900' },
   avatarEditOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
 
-  name: { fontSize: 26, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.3 },
-  bio:  { fontSize: 14, color: '#636366', marginTop: 5, textAlign: 'center' },
+  name: { ...Type.name, color: Colors.text },
+  bio:  { fontSize: 14, color: Colors.textMuted, marginTop: 5, textAlign: 'center', lineHeight: 20 },
 
-  editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#0FEA9555', backgroundColor: '#0FEA9510' },
-  editProfileBtnText: { color: '#0FEA95', fontSize: 13, fontWeight: '700' },
+  editProfileBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12, paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint },
+  editProfileBtnText: { color: Colors.accent, fontSize: 13, fontWeight: '700' },
 
-  editNameInput: { width: '100%', fontSize: 20, fontWeight: '800', color: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#0FEA95', paddingVertical: 6, textAlign: 'center', marginBottom: 10 },
-  editBioInput:  { width: '100%', fontSize: 14, color: '#AEAEB2', textAlign: 'center', borderBottomWidth: 1, borderBottomColor: '#3A3A3C', paddingVertical: 6, marginBottom: 16, minHeight: 40 },
+  editNameInput: { width: '100%', fontSize: 20, fontWeight: '800', color: Colors.text, borderBottomWidth: 1.5, borderBottomColor: Colors.accent, paddingVertical: 6, textAlign: 'center', marginBottom: 10 },
+  editBioInput:  { width: '100%', fontSize: 14, color: Colors.textSub, textAlign: 'center', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: 6, marginBottom: 16, minHeight: 40 },
   editActions:   { flexDirection: 'row', gap: 12, marginTop: 4, width: '100%' },
-  cancelBtn:     { flex: 1, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#3A3A3C' },
-  cancelBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
-  saveEditBtn:   { flex: 1, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0FEA95' },
-  saveEditBtnText: { color: '#1C1C1E', fontWeight: '900', fontSize: 14 },
+  cancelBtn:     { flex: 1, height: 42, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface2 },
+  cancelBtnText: { color: Colors.text, fontWeight: '700', fontSize: 14 },
+  saveBtn:       { flex: 1, height: 42, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.accent },
+  saveBtnText:   { color: Colors.bg, fontWeight: '900', fontSize: 14 },
 
   // Stats bar
-  statsBar:     { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#2C2C2E', borderRadius: 18, padding: 16, marginBottom: 6 },
-  statsLoading: { height: 80, justifyContent: 'center', alignItems: 'center' },
-  statItem:  { flex: 1, alignItems: 'center' },
-  statDivider: { width: 1, backgroundColor: '#3A3A3C' },
-  statValue: { fontSize: 22, fontWeight: '900', color: '#FFFFFF', marginBottom: 2 },
-  statLabel: { fontSize: 11, color: '#636366', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statsBar:    { flexDirection: 'row', marginHorizontal: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: 6 },
+  statItem:    { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, backgroundColor: Colors.border },
+  statValue:   { ...Type.stat, marginBottom: 3 },
+  statLabel:   { ...Type.statLabel, color: Colors.textMuted },
 
-  // Sports section
-  sportsSection: { marginHorizontal: 20, marginTop: 16, marginBottom: 6 },
+  // Sports
+  sportsSection:       { marginHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: 6 },
   sportsSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sportsSectionTitle: { fontSize: 12, color: '#636366', fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-  sportsSectionEdit:  { fontSize: 13, color: '#0FEA95', fontWeight: '700' },
-  sportsScroll: { gap: 8 },
-  sportChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: 1 },
-  chipText:  { flexDirection: 'column' },
-  chipNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  chipName:  { fontSize: 13, fontWeight: '700' },
-  chipLevel: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  sportsSectionTitle:  { ...Type.sectionLabel, color: Colors.textMuted },
+  sportsSectionEdit:   { fontSize: 13, color: Colors.accent, fontWeight: '700' },
+  sportsScroll:        { gap: 8, paddingRight: 4 },
+  sportChip:           { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: Radius.lg, borderWidth: 1 },
+  chipNameRow:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  chipName:            { fontSize: 13, fontWeight: '700' },
+  chipLevel:           { fontSize: 11, fontWeight: '600', marginTop: 1 },
 
   // Menu
-  menuContainer: { marginTop: 24, paddingHorizontal: 20, paddingBottom: 50 },
-  menuSection:   { fontSize: 12, color: '#636366', fontWeight: '700', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' },
-  menuItem:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#2C2C2E', padding: 14, borderRadius: 14, marginBottom: 10 },
+  menuContainer: { marginTop: Spacing.xxl, paddingHorizontal: Spacing.xl, paddingBottom: 50 },
+  menuSection:   { ...Type.sectionLabel, color: Colors.textMuted, marginBottom: 10 },
+  menuItem:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.surface, padding: 14, borderRadius: Radius.lg, marginBottom: 10 },
   logoutItem:    { marginTop: 10 },
   menuItemLeft:  { flexDirection: 'row', alignItems: 'center' },
-  menuIconWrap:  { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  menuText:      { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  menuIconWrap:  { width: 36, height: 36, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  menuText:      { color: Colors.text, fontSize: 15, fontWeight: '600' },
 
-  notifBadge:     { backgroundColor: '#FF453A', borderRadius: 9, minWidth: 18, height: 18, paddingHorizontal: 4, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+  notifBadge:     { backgroundColor: Colors.error, borderRadius: 9, minWidth: 18, height: 18, paddingHorizontal: 4, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
   notifBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
 });

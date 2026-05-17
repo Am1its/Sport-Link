@@ -2,7 +2,7 @@
 
 > **Note:** This technical design is derived from the User Personas and Stories defined in [Product Definitions](PRODUCT_DEFINITIONS.md). The architecture is optimized for location-based discovery (Persona: "Newcomer") and real-time event management (Persona: "Organizer").
 >
-> **Status:** Reflects the live prototype as of Sprint 7.
+> **Status:** Reflects the live prototype as of Sprint 11.
 
 ---
 
@@ -59,14 +59,17 @@ Users ────────────────────────�
 
 | Table | Primary Key | Notable Columns |
 | :--- | :--- | :--- |
-| `Users` | `id` | `avatar MEDIUMTEXT`, `push_token`, `onboarding_complete` |
-| `Games` | `id` | `sport_type ENUM(8)`, `level 1-5`, `photo MEDIUMTEXT`, `status ENUM(3)` |
+| `Users` | `id` | `avatar MEDIUMTEXT`, `push_token`, `onboarding_complete`, `google_id` |
+| `Games` | `id` | `sport_type ENUM(9)`, `level 1-5`, `photo MEDIUMTEXT`, `status ENUM(3)`, `title VARCHAR(100)` |
 | `GameParticipants` | `id` | Unique `(game_id, user_id)` |
 | `Messages` | `id` | `username` denormalized for display stability |
 | `Ratings` | `id` | `attended BOOL`; unique `(game_id, rater_id, ratee_id)` |
 | `PeerRatings` | `id` | `sportsmanship/punctuality/communication TINYINT 0/1`, `skill 1-5` |
 | `Friends` | `id` | `status ENUM('pending','accepted')`; unique `(requester_id, addressee_id)` |
 | `Notifications` | `id` | `data JSON`, `is_read BOOL`; indexed on `user_id` |
+| `CourtReviews` | `id` | `place_id VARCHAR(200)`, `rating TINYINT 1-5`; unique `(place_id, user_id)` |
+| `SportPreferences` | `id` | `sport_type`, `skill_level TINYINT 1-5`, `is_favorite BOOL`; unique `(user_id, sport_type)` |
+| `DirectMessages` | `id` | `type ENUM(text/event)`, `event_id FK → Games`, `is_read BOOL`; indexed on sender+receiver |
 
 ### Karma (computed, never stored)
 ```sql
@@ -112,32 +115,47 @@ Auth: `socket.handshake.auth.token` verified with `jwt.verify` on every connecti
 
 ```
 app/
-├── _layout.tsx          ← AuthProvider, setUnauthorizedHandler, push token registration
-├── index.tsx            ← Routing gate (login / onboarding / tabs)
+├── _layout.tsx              ← AuthProvider, setUnauthorizedHandler, push token registration
+├── index.tsx                ← Routing gate (login / onboarding / tabs)
+├── login.tsx                ← Hero + FocusInput + bottom-sheet form card
+├── register.tsx             ← Single-step account creation
+├── onboarding.tsx           ← 4-step wizard (photo / bio / sports / levels)
 ├── (tabs)/
-│   ├── index.tsx        ← Map: courts + game markers, clustering, FAB
-│   ├── discover.tsx     ← Game list, sport + radius filter, search
-│   ├── games.tsx        ← My schedule (upcoming/history), host controls
-│   ├── chat.tsx         ← Chat list with last-message preview
-│   └── profile.tsx      ← Stats, edit, notification badge, menu
-├── game-chat.tsx        ← socket.io real-time chat, avatar cache
-├── modal.tsx            ← Create/Edit game (date picker, photo picker, invite friends)
-├── player-profile.tsx   ← Public profile + friend button
-├── friends.tsx          ← Friends / Requests / Search tabs
-├── notification-inbox.tsx ← Notification list, mark-as-read
-├── rate-players.tsx     ← Host attendance / peer category ratings
-├── leaderboard.tsx      ← Top 20 by karma, podium
-├── onboarding.tsx       ← 3-step wizard (avatar / bio / sport prefs)
-├── sport-preferences.tsx
+│   ├── _layout.tsx          ← Dark tab bar, height 62
+│   ├── index.tsx            ← Map: courts + game markers, clustering, FAB
+│   ├── discover.tsx         ← GameCard with accent bar, skeleton, modal filters
+│   ├── games.tsx            ← My schedule, skeleton, accent bar cards
+│   ├── chat.tsx             ← Events + Friends tabs, skeleton, unread badge
+│   └── profile.tsx          ← 3-orb hero, skeleton, sport chips, inline edit
+├── game-chat.tsx            ← socket.io real-time chat, avatar cache, tappable avatars
+├── direct-chat.tsx          ← DM screen, pill bubbles, event cards, game sharing modal
+├── modal.tsx                ← Create/Edit game (date picker, photo picker, invite friends)
+├── player-profile.tsx       ← 3-orb hero, friend + message buttons
+├── friends.tsx              ← Card-row tabs (Friends / Requests / Add)
+├── notification-inbox.tsx   ← Notification list, mark-as-read
+├── rate-players.tsx         ← Host attendance / peer ratings, celebratory done screen
+├── game-results.tsx         ← Sport-color hero band, score bars, locked state
+├── leaderboard.tsx          ← Podium + ranked list, shadow cards
+├── court-detail.tsx         ← Orb hero, photo strip, reviews, pill submit
+├── player-matching.tsx      ← Suggestions by shared sport + location
+├── sport-preferences.tsx    ← Per-sport skill + favorite toggles
 └── notifications-settings.tsx
 ```
+
+### Design System
+
+| File | Purpose |
+| :--- | :--- |
+| `constants/theme.ts` | `Colors`, `Spacing`, `Radius`, `Type`, `Shadow` — all visual tokens |
+| `components/SkeletonLoader.tsx` | Shimmer skeletons: `DiscoverSkeleton`, `GamesSkeleton`, `ProfileStatsSkeleton`, `ChatSkeleton` |
+| `components/AvatarCircle.tsx` | Reusable avatar (base64 or initial letter, tappable) |
 
 ### State Management
 
 - **Auth state:** `AuthContext` (React Context) — token, user, login, logout, `setOnboardingComplete`.
 - **Screen data:** Local `useState` + `useFocusEffect` for re-fetch on navigate-back.
-- **Chat:** `socketRef` (socket.io) + `useState` message list; deduplication guard on `new_message`.
-- **Preferences:** `AsyncStorage` for sport prefs and notification settings (device-local, no sync).
+- **Chat:** `socketRef` (socket.io) + `useState` message list; deduplication guard on `new_message` / `new_dm`.
+- **Notification settings:** `AsyncStorage` (device-local).
 
 ### Key Utilities
 
@@ -147,7 +165,7 @@ app/
 | `utils/avatar.ts` | `getAvatarColor(name)` — deterministic color from 8-color palette |
 | `utils/time.ts` | `isPastGame`, `formatTime`, `formatChatTimestamp` |
 | `constants/api.ts` | `API_BASE` from `EXPO_PUBLIC_API_URL` env var |
-| `constants/sports.ts` | `SPORT_COLORS`, `SPORT_ICONS`, `SPORT_FILTER_ITEMS` |
+| `constants/sports.ts` | `SPORT_COLORS`, `SPORT_ICONS`, `SPORT_FILTER_ITEMS` (9 sports, text labels) |
 
 ---
 

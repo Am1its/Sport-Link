@@ -8,6 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
+import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null; karma: number };
 type Request = { friendship_id: number; id: number; username: string; avatar: string | null };
@@ -112,17 +113,17 @@ export default function FriendsScreen() {
     requests.some(r => r.id === userId);
 
   const karmaStr = (k: number) => k > 0 ? `+${k}` : `${k}`;
-  const karmaColor = (k: number) => k > 0 ? '#0FEA95' : k < 0 ? '#FF453A' : '#8E8E93';
+  const karmaColor = (k: number) => k > 0 ? Colors.accent : k < 0 ? Colors.error : Colors.textMuted;
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={26} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Friends</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 36 }} />
       </View>
 
       {/* Tabs */}
@@ -142,7 +143,7 @@ export default function FriendsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#0FEA95" />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : (
         <>
@@ -150,7 +151,7 @@ export default function FriendsScreen() {
           {activeTab === 'friends' && (
             friends.length === 0 ? (
               <View style={styles.center}>
-                <Ionicons name="people-outline" size={70} color="#2C2C2E" />
+                <Ionicons name="people-outline" size={70} color={Colors.textMuted} />
                 <Text style={styles.emptyText}>No friends yet</Text>
                 <Text style={styles.emptySubtext}>Search for players to add them</Text>
                 <TouchableOpacity style={styles.addFriendBtn} onPress={() => setActiveTab('search')}>
@@ -163,7 +164,7 @@ export default function FriendsScreen() {
                 keyExtractor={item => String(item.friendship_id)}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchAll(true)} tintColor="#0FEA95" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchAll(true)} tintColor={Colors.accent} />}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.row}
@@ -178,7 +179,7 @@ export default function FriendsScreen() {
                       </Text>
                     </View>
                     <TouchableOpacity style={styles.removeBtn} onPress={() => removeFriend(item.friendship_id, item.username)}>
-                      <Ionicons name="person-remove-outline" size={18} color="#FF453A" />
+                      <Ionicons name="person-remove-outline" size={18} color={Colors.error} />
                     </TouchableOpacity>
                   </TouchableOpacity>
                 )}
@@ -190,7 +191,7 @@ export default function FriendsScreen() {
           {activeTab === 'requests' && (
             requests.length === 0 ? (
               <View style={styles.center}>
-                <Ionicons name="mail-outline" size={70} color="#2C2C2E" />
+                <Ionicons name="mail-outline" size={70} color={Colors.textMuted} />
                 <Text style={styles.emptyText}>No pending requests</Text>
               </View>
             ) : (
@@ -199,7 +200,7 @@ export default function FriendsScreen() {
                 keyExtractor={item => String(item.friendship_id)}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchAll(true)} tintColor="#0FEA95" />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchAll(true)} tintColor={Colors.accent} />}
                 renderItem={({ item }) => (
                   <View style={styles.row}>
                     <AvatarCircle username={item.username} avatar={item.avatar} />
@@ -209,10 +210,10 @@ export default function FriendsScreen() {
                     </View>
                     <View style={styles.requestBtns}>
                       <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptRequest(item.friendship_id)}>
-                        <Ionicons name="checkmark" size={18} color="#1C1C1E" />
+                        <Ionicons name="checkmark" size={18} color={Colors.bg} />
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.declineBtn} onPress={() => removeFriend(item.friendship_id, item.username)}>
-                        <Ionicons name="close" size={18} color="#FF453A" />
+                        <Ionicons name="close" size={18} color={Colors.error} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -225,20 +226,20 @@ export default function FriendsScreen() {
           {activeTab === 'search' && (
             <View style={styles.searchContainer}>
               <View style={styles.searchBox}>
-                <Ionicons name="search" size={18} color="#8E8E93" />
+                <Ionicons name="search" size={18} color={Colors.textSub} />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search by username..."
-                  placeholderTextColor="#636366"
+                  placeholderTextColor={Colors.textMuted}
                   value={searchQuery}
                   onChangeText={handleSearch}
                   autoCapitalize="none"
                   autoFocus
                 />
-                {searching && <ActivityIndicator size="small" color="#0FEA95" />}
+                {searching && <ActivityIndicator size="small" color={Colors.accent} />}
                 {searchQuery.length > 0 && !searching && (
                   <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-                    <Ionicons name="close-circle" size={18} color="#636366" />
+                    <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -270,7 +271,7 @@ export default function FriendsScreen() {
                         </View>
                       ) : (
                         <TouchableOpacity style={styles.addBtn} onPress={() => sendRequest(item.id)}>
-                          <Ionicons name="person-add" size={16} color="#1C1C1E" />
+                          <Ionicons name="person-add" size={16} color={Colors.bg} />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -286,42 +287,42 @@ export default function FriendsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
 
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 16 },
-  backBtn: { width: 40 },
-  title: { fontSize: 22, fontWeight: '900', color: '#FFFFFF' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.lg },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 22, fontWeight: '900', color: Colors.text },
 
-  tabRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 8, marginBottom: 16 },
-  tab: { flex: 1, paddingVertical: 9, borderRadius: 12, backgroundColor: '#2C2C2E', alignItems: 'center' },
-  tabActive: { backgroundColor: '#0FEA95' },
-  tabText: { color: '#636366', fontWeight: '700', fontSize: 13 },
-  tabTextActive: { color: '#1C1C1E' },
+  tabRow: { flexDirection: 'row', paddingHorizontal: Spacing.xl, gap: Spacing.sm, marginBottom: Spacing.lg },
+  tab: { flex: 1, paddingVertical: 9, borderRadius: Radius.md, backgroundColor: Colors.surface, alignItems: 'center' },
+  tabActive: { backgroundColor: Colors.accent },
+  tabText: { color: Colors.textMuted, fontWeight: '700', fontSize: 13 },
+  tabTextActive: { color: Colors.bg },
 
-  list: { paddingHorizontal: 20, paddingBottom: 30 },
+  list: { paddingHorizontal: Spacing.xl, paddingBottom: 30 },
 
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, marginBottom: 8, ...Shadow.card },
   rowBody: { flex: 1, marginLeft: 12 },
-  rowName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  rowName: { fontSize: 15, fontWeight: '700', color: Colors.text },
   rowKarma: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  rowSub: { fontSize: 12, color: '#636366', marginTop: 2 },
+  rowSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
 
   removeBtn: { padding: 8 },
   requestBtns: { flexDirection: 'row', gap: 8 },
-  acceptBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
-  declineBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#FF453A22', borderWidth: 1, borderColor: '#FF453A55', justifyContent: 'center', alignItems: 'center' },
+  acceptBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.accent, justifyContent: 'center', alignItems: 'center' },
+  declineBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.errorFaint, borderWidth: 1, borderColor: Colors.errorBorder, justifyContent: 'center', alignItems: 'center' },
 
-  addBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
-  sentBadge: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#3A3A3C', borderRadius: 10 },
-  sentBadgeText: { color: '#8E8E93', fontSize: 12, fontWeight: '700' },
+  addBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.accent, justifyContent: 'center', alignItems: 'center' },
+  sentBadge: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.surface2, borderRadius: Radius.md },
+  sentBadgeText: { color: Colors.textSub, fontSize: 12, fontWeight: '700' },
 
   searchContainer: { flex: 1, paddingTop: 4 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2C2C2E', borderRadius: 14, marginHorizontal: 20, paddingHorizontal: 14, height: 48, marginBottom: 12, gap: 10 },
-  searchInput: { flex: 1, color: '#FFFFFF', fontSize: 15 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: 14, marginHorizontal: Spacing.xl, paddingHorizontal: 14, height: 48, marginBottom: 12, gap: 10, borderWidth: 1.5, borderColor: Colors.border },
+  searchInput: { flex: 1, color: Colors.text, fontSize: 15 },
 
-  emptyText: { color: '#636366', fontSize: 16, marginTop: 14, fontWeight: '600' },
-  emptySubtext: { color: '#48484A', fontSize: 13, marginTop: 6 },
-  addFriendBtn: { marginTop: 20, backgroundColor: '#0FEA95', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-  addFriendBtnText: { color: '#1C1C1E', fontWeight: '800', fontSize: 15 },
+  emptyText: { color: Colors.textMuted, fontSize: 16, marginTop: 14, fontWeight: '600' },
+  emptySubtext: { color: Colors.textHint, fontSize: 13, marginTop: 6 },
+  addFriendBtn: { marginTop: 20, backgroundColor: Colors.accent, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.pill },
+  addFriendBtnText: { color: Colors.bg, fontWeight: '800', fontSize: 15 },
 });

@@ -4,6 +4,96 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 11] — May 2026 — Full UI/UX Overhaul & Design System
+
+### Design Token System
+**`frontend/constants/theme.ts`** — new file, single source of truth for all visual tokens.
+- `Colors` — full semantic palette: `bg`, `surface`, `surface2`, text hierarchy (`text`, `textSub`, `textMuted`, `textHint`), `border`/`borderSub`, accent (`#0FEA95`) with `accentFaint`/`accentBorder`, `blue`, semantic states (`success`, `warning`, `error`) each with faint + border variants, utility accents (`orange`, `yellow`, `purple`).
+- `Spacing` — 8-step incremental scale (`xs:4` → `huge:48`).
+- `Radius` — consistent corner radii (`sm:8` → `pill:100`).
+- `Type` — named text styles (`screenTitle`, `cardTitle`, `meta`, `btnPrimary`, etc.).
+- `Shadow` — `card` (elevation 4) and `medium` (elevation 6) presets.
+
+**Rule:** All screens now import from `theme.ts`. Raw hex values in `StyleSheet` are forbidden.
+
+---
+
+### Skeleton Loaders
+**`frontend/components/SkeletonLoader.tsx`** — new file.
+- `DiscoverSkeleton`, `GamesSkeleton`, `ProfileStatsSkeleton`, `ChatSkeleton` — each matches the exact shape of its real content using `Animated` pulse loop.
+- Replaces all `ActivityIndicator` loading states in the four tab screens.
+
+---
+
+### Auth Screens Polish
+**`frontend/app/login.tsx`** — full visual redesign.
+- Hero section (height 240): 16 faint rotated sport icons from `MaterialCommunityIcons` as background grid; 2 glow orbs; logo in rounded square with `accentBorder` + glow shadow; tagline row with accent dots.
+- Form card as bottom sheet: `borderTopLeftRadius/RightRadius: Radius.xxl`, `flex:1`.
+- `FocusInput` component: `Animated.Value` interpolates border from `Colors.border` → `Colors.accent` on focus; return-key chains email → password → submit.
+- Sign In / Create Account buttons: pill shape (`Radius.pill`) + green glow shadow.
+
+**`frontend/app/register.tsx`** — same `FocusInput` pattern; back button now a 36×36 `Colors.surface` circle.
+
+---
+
+### Tab Screens Redesign
+**`frontend/app/(tabs)/_layout.tsx`**
+- Tab bar: `backgroundColor: '#1C1C1E'`, `borderTopWidth:1`, `borderTopColor: '#2C2C2E'`, `height:62`. Inactive tint: `Colors.textMuted`.
+
+**`frontend/app/(tabs)/discover.tsx`**
+- `GameCard`: 3px sport-color accent bar (absolute left edge, `overflow:hidden`), photo at top, sport label in sport color, compact meta row, full-width pill Join button.
+- `DiscoverSkeleton` replaces spinner.
+
+**`frontend/app/(tabs)/games.tsx`**
+- Game cards use same 3px accent bar pattern. `GamesSkeleton` replaces spinner.
+
+**`frontend/app/(tabs)/chat.tsx`**
+- `ChatSkeleton` replaces spinner. Unread rows: `Colors.text` + `fontWeight:'800'`.
+
+**`frontend/app/(tabs)/profile.tsx`**
+- Hero band: 3-orb design (layered blobs tinted by `top_sport` color). `ProfileStatsSkeleton` during load. Avatar picker uses `['images']` (not deprecated `MediaTypeOptions.Images`).
+
+---
+
+### Screen-by-Screen Polish
+All screens migrated to `theme.ts` tokens. Specific additions per screen:
+
+**`frontend/app/onboarding.tsx`**
+- 4-segment progress bar (flex-fill segments, height 4) replaces dots. Pill buttons. Sport tile `aspectRatio:1.1`.
+
+**`frontend/app/friends.tsx`**
+- Friend rows: elevated cards (`Shadow.card`, `Radius.lg`) instead of flat dividers.
+- Back button: 36×36 circle. "Find Players": pill shape. Search box: `borderWidth:1.5`.
+
+**`frontend/app/game-chat.tsx`**
+- Bubbles: `borderRadius:20`. Other-bubble: `borderWidth:1`. Input bar focus state. Send button: green glow when active. Empty state: 80×80 icon circle.
+
+**`frontend/app/rate-players.tsx`**
+- Done screen: 100×100 checkmark circle with `successFaint` bg + green glow. "View Results": pill + glow. "Back to My Games": ghost button. Submit: pill.
+
+**`frontend/app/game-results.tsx`**
+- Header: sport-color hero band with 2 orbs. Back button: 36×36 semi-transparent circle. Locked state: 80×80 lock icon circle + pill "Rate Players" with glow. Score bar height: 6px.
+
+**`frontend/app/leaderboard.tsx`**
+- Podium blocks and list rows: `Shadow.card`. Back button: 36×36 circle. "You" badge: `accentFaint/accentBorder`. Empty state: 80×80 icon circle.
+
+**`frontend/app/player-profile.tsx`**
+- Hero: 3-orb design. Back button: 36×36 `rgba(0,0,0,0.35)` circle. Avatar ring: `borderWidth:3.5`, `Shadow.medium`, `marginTop:-56`. Loading state: 76×76 circle + spinner.
+
+**`frontend/app/court-detail.tsx`**
+- Hero band: 2 sport-color orbs. Submit review: pill + green glow. Info/write/review cards: `Shadow.card`. Photos: 220×145.
+
+**`frontend/app/direct-chat.tsx`**
+- Bubbles: `Radius.pill`. Input: pill-shaped with `borderWidth:1.5`. Send button: green glow. Event cards: `Shadow.card`. Empty state: 80×80 icon circle.
+
+---
+
+### Bug Fix — Direct Chat Header Avatar
+**`frontend/app/direct-chat.tsx`**
+- `fetchAvatars([otherId])` now called at mount alongside the current user's own avatar fetch. Previously, the friend's avatar in the header was only populated if they appeared as a `sender_id` in the message list — meaning it was blank for new conversations or when only the current user had sent messages.
+
+---
+
 ## [Sprint 10] — May 2026 — Discover Screen Joined-Game State
 
 ### "✓ Joined" Button State in Find Games

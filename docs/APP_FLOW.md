@@ -1,11 +1,21 @@
 # SportLink - App Flow & Core Features
 
-**Status:** Full Prototype — Sprint 7 complete  
+**Status:** Full Prototype — Sprint 11 complete  
 **Target Audience:** Tel Aviv Amateur Athletes
 
 ---
 
+## 🎨 Design System
+All screens use tokens from `frontend/constants/theme.ts` — never raw hex values.
+- **Colors:** semantic palette (bg, surface, surface2, text hierarchy, accent #0FEA95, error, warning, etc.)
+- **Spacing:** 8-step scale (xs:4 → huge:48). **Radius:** sm:8 → pill:100. **Shadow:** card + medium presets.
+- **Skeletons:** `SkeletonLoader.tsx` exports shaped shimmer loaders for Discover, Games, Profile, Chat — replace `ActivityIndicator` in all tab screens.
+
+---
+
 ## 📱 Core Application Screens (Bottom Navigation)
+
+Tab bar: dark (`#1C1C1E`) with subtle border, height 62.
 
 ### 1. 🗺️ Map (Home)
 - Real GPS location via `expo-location`; fallback to Tel Aviv center.
@@ -14,34 +24,34 @@
   - Outdoor courts: hollow dashed ring with sport color.
   - Gyms/studios: filled tinted circle.
   - Community games: sport-colored marker with level badge; clusters into a green count-circle at low zoom.
-- **Filter bar:** All / Games / Courts + 8 sport sub-chips (Basketball, Tennis, Volleyball, Football, Yoga, Gym, Studio, Footvolley).
+- **Filter bar:** All / Games / Courts + 9 sport sub-chips (Basketball, Tennis, Volleyball, Football, Yoga, Gym, Studio, Footvolley, Swimming).
 - **FAB:** "Drop Pin" (tap map to place) or "Choose Court" (bottom-sheet court picker).
 - **Bottom card states:** Your Game / Join Game (spring haptic animation) / Full / Public Court.
-- Past games hidden from map.
+- Past games hidden from map. Court markers → "View Details" → `court-detail` screen.
 
 ### 2. 🔍 Discover
 - Searchable, filterable game list (title, location, sport type).
-- **Sport filter chips** (8 sports) + **radius chips** (Any / 1 km / 5 km / 10 km / 20 km) using Haversine distance on the backend.
-- Game cards show: sport, title, location, time, player count (amber urgency badge for ≤2 spots), level, equipment notes, and a 16:9 game photo if the host added one.
-- Join Game button with spring animation + haptics; optimistic update with rollback on failure.
-- Pull-to-refresh.
+- **Modal-based filters:** sport + radius buttons open centered Modal overlays. 9 sports. Radius: Any/1km/5km/10km/20km.
+- **GameCard:** 3px sport-color accent bar (left edge), photo top, sport label in sport color, compact meta row, full-width pill Join button. Urgency badge for ≤2 spots.
+- Button states (priority): "Your Game" → "✓ Joined" → "Full" → "Join Game". `is_joined` seeded from backend, persisted on join.
+- `DiscoverSkeleton` during load. Pull-to-refresh.
 
 ### 3. 📅 My Schedule
-- **Upcoming** section: host games (Edit / Delete / Chat) + joined games (Leave / Chat).
-- **History** section: past games with "Rate Players" button.
-- Pull-to-refresh.
+- **Upcoming** section: game cards with 3px accent bar. Host: Edit / Delete / Chat. Joined: Leave / Chat.
+- **History** section: past games — host → "Close & Rate"; completed → "Rate Players" + "Results".
+- `GamesSkeleton` during load. Pull-to-refresh.
 
 ### 4. 💬 Chat
-- List of all game chats the user is part of; last message preview + sender.
-- Tapping navigates to the **Game Chat** screen (socket.io real-time).
+- Two tabs: **Events** (game chats with sport icon + last message) and **Friends** (DM conversations, unread badge on tab).
+- `ChatSkeleton` during load. Unread rows bold (`fontWeight:'800'`). Unread dot rendered outside `overflow:hidden`.
 
 ### 5. 👤 Profile
-- Real avatar (base64) or deterministic colored initial letter.
-- Inline edit mode: username, bio, avatar (image picker).
-- 2×2 stat grid: Total Games / Hosted / Joined / Karma (green + / red -).
-- **Menu:**
-  - Community: Leaderboard, Friends.
-  - Account: Notifications (with unread badge), Notification Settings, Sport Preferences, Sign Out.
+- **Hero band** with 3-orb design (layered blobs tinted by top sport color). Overlapping avatar (marginTop: -52).
+- `ProfileStatsSkeleton` during load.
+- Horizontal 4-stat bar: Total Games / Hosted / Joined / Karma.
+- **Sport chips** (horizontal scroll): active preferences with skill level + favorite heart.
+- Inline edit: username, bio, avatar (picker uses `['images']`).
+- **Menu:** Leaderboard, Friends, Discover Players, Sport Preferences, Notifications (unread badge), Notification Settings, Sign Out.
 
 ---
 
@@ -88,8 +98,9 @@
 - Friend requests and acceptances each trigger a push notification.
 
 ### Onboarding
-- 3-step wizard on first login: upload avatar, write bio, select sport preferences.
-- Each step skippable; completes by setting `onboarding_complete = true`.
+- 4-step wizard on first login: **Photo** → **Bio** → **Sports** (9 options, ≥1 required) → **Levels** (per-sport 5-dot skill + heart favorite, defaults to 3).
+- 4-segment progress bar at top. Pill buttons. Sport tiles 1.1 aspect ratio.
+- Completes by `PUT /me` (avatar, bio, `onboarding_complete:true`) + `PUT /sport-preferences`.
 
 ### Leaderboard
 - Top 20 users by karma.
