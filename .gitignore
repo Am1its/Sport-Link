@@ -5,3 +5,6 @@ claude.md
 .env
 .env.local
 .env*.local
+/assets/AppFlow
+/assets/Mockup
+MockUpVideo
