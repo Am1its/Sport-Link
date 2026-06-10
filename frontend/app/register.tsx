@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Radius } from '../constants/theme';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
 
 function FocusInput({
   icon, placeholder, value, onChangeText, keyboardType,
@@ -86,9 +87,7 @@ export default function RegisterScreen() {
   const emailRef    = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
-  const handleGooglePress = () => {
-    Alert.alert('Coming Soon', 'Google sign-in will be available in a future update.');
-  };
+  const { promptAsync, loading: googleLoading, disabled: googleDisabled } = useGoogleAuth();
 
   const handleRegister = async () => {
     if (!username.trim())     return Alert.alert('Required', 'Please enter a username.');
@@ -139,12 +138,18 @@ export default function RegisterScreen() {
           <Text style={styles.cardSub}>Join thousands of players near you</Text>
 
           {/* Google */}
-          <TouchableOpacity style={styles.googleBtn} onPress={handleGooglePress} activeOpacity={0.85}>
-            <Ionicons name="logo-google" size={19} color="#DB4437" />
-            <Text style={styles.googleBtnText}>Continue with Google</Text>
-            <View style={styles.soonBadge}>
-              <Text style={styles.soonText}>SOON</Text>
-            </View>
+          <TouchableOpacity
+            style={[styles.googleBtn, googleDisabled && { opacity: 0.6 }]}
+            onPress={() => promptAsync()}
+            activeOpacity={0.85}
+            disabled={googleDisabled}
+          >
+            {googleLoading
+              ? <ActivityIndicator size="small" color="#DB4437" />
+              : <>
+                  <Ionicons name="logo-google" size={19} color="#DB4437" />
+                  <Text style={styles.googleBtnText}>Continue with Google</Text>
+                </>}
           </TouchableOpacity>
 
           {/* Divider */}
@@ -234,9 +239,6 @@ const styles = StyleSheet.create({
 
   googleBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.text, borderRadius: Radius.lg, height: 52, gap: 10, paddingHorizontal: 16 },
   googleBtnText: { fontSize: 15, fontWeight: '700', color: Colors.bg, flex: 1 },
-  soonBadge:     { backgroundColor: Colors.orange, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  soonText:      { fontSize: 9, fontWeight: '900', color: Colors.text, letterSpacing: 0.5 },
-
   divider:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
   dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
   dividerText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },

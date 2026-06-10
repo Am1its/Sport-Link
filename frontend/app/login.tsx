@@ -9,6 +9,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Radius } from '../constants/theme';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
 
 const SPORT_ICONS = [
   'basketball', 'soccer', 'tennis', 'volleyball',
@@ -129,9 +130,7 @@ export default function LoginScreen() {
   const [loading, setLoading]   = useState(false);
   const passwordRef = useRef<TextInput>(null);
 
-  const handleGooglePress = () => {
-    Alert.alert('Coming Soon', 'Google sign-in will be available in a future update.');
-  };
+  const { promptAsync, loading: googleLoading, disabled: googleDisabled } = useGoogleAuth();
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -184,12 +183,18 @@ export default function LoginScreen() {
       {/* ── Form card ── */}
       <View style={styles.card}>
         {/* Google */}
-        <TouchableOpacity style={styles.googleBtn} onPress={handleGooglePress} activeOpacity={0.85}>
-          <Ionicons name="logo-google" size={19} color="#DB4437" />
-          <Text style={styles.googleBtnText}>Continue with Google</Text>
-          <View style={styles.soonBadge}>
-            <Text style={styles.soonText}>SOON</Text>
-          </View>
+        <TouchableOpacity
+          style={[styles.googleBtn, googleDisabled && { opacity: 0.6 }]}
+          onPress={() => promptAsync()}
+          activeOpacity={0.85}
+          disabled={googleDisabled}
+        >
+          {googleLoading
+            ? <ActivityIndicator size="small" color="#DB4437" />
+            : <>
+                <Ionicons name="logo-google" size={19} color="#DB4437" />
+                <Text style={styles.googleBtnText}>Continue with Google</Text>
+              </>}
         </TouchableOpacity>
 
         {/* Divider */}
@@ -307,8 +312,6 @@ const styles = StyleSheet.create({
   // Google
   googleBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderRadius: Radius.lg, height: 52, gap: 10, paddingHorizontal: 16 },
   googleBtnText: { fontSize: 15, fontWeight: '700', color: '#1C1C1E', flex: 1 },
-  soonBadge:     { backgroundColor: Colors.orange, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  soonText:      { fontSize: 9, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 },
 
   // Divider
   divider:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
