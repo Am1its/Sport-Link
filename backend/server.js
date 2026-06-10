@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 
 const pool                 = require('./db');
 const sendPushNotifications = require('./utils/sendPushNotification');
+const { isUserInGame }     = require('./utils/gameUtils');
 
 const authRoutes          = require('./routes/auth');
 const gamesRoutes         = require('./routes/games');
@@ -66,18 +67,6 @@ httpServer.listen(PORT, () => {
 });
 
 // --- socket.io chat ---
-const isUserInGame = async (gameId, userId) => {
-  const [[row]] = await pool.execute(
-    `SELECT id FROM Games
-     WHERE id = ? AND status = 'active'
-       AND (host_id = ? OR EXISTS (
-         SELECT 1 FROM GameParticipants WHERE game_id = ? AND user_id = ?
-       ))`,
-    [gameId, userId, gameId, userId]
-  );
-  return !!row;
-};
-
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('No token'));

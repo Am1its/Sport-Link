@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const { KARMA_SQL } = require('../utils/karmaSQL');
 
 const router = express.Router();
 
@@ -21,18 +22,7 @@ const fetchUser = async (userId) => {
        u.avatar,
        (SELECT COUNT(*) FROM Games            WHERE host_id  = u.id) AS games_hosted,
        (SELECT COUNT(*) FROM GameParticipants WHERE user_id  = u.id) AS games_joined,
-       COALESCE((
-         SELECT SUM(CASE WHEN attended = 1 THEN 1 ELSE -1 END)
-         FROM Ratings WHERE ratee_id = u.id
-       ), 0) +
-       COALESCE((
-         SELECT SUM(
-           CASE WHEN sportsmanship = 1 THEN 1 WHEN sportsmanship = 0 THEN -1 ELSE 0 END +
-           CASE WHEN punctuality   = 1 THEN 1 WHEN punctuality   = 0 THEN -1 ELSE 0 END +
-           CASE WHEN communication = 1 THEN 1 WHEN communication = 0 THEN -1 ELSE 0 END
-         )
-         FROM PeerRatings WHERE ratee_id = u.id
-       ), 0) AS karma,
+       ${KARMA_SQL} AS karma,
        (
          SELECT g2.sport_type
          FROM GameParticipants gp2
@@ -89,18 +79,7 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
         u.avatar,
         (SELECT COUNT(*) FROM Games            WHERE host_id = u.id) AS games_hosted,
         (SELECT COUNT(*) FROM GameParticipants WHERE user_id = u.id) AS games_joined,
-        COALESCE((
-          SELECT SUM(CASE WHEN attended = 1 THEN 1 ELSE -1 END)
-          FROM Ratings WHERE ratee_id = u.id
-        ), 0) +
-        COALESCE((
-          SELECT SUM(
-            CASE WHEN sportsmanship = 1 THEN 1 WHEN sportsmanship = 0 THEN -1 ELSE 0 END +
-            CASE WHEN punctuality   = 1 THEN 1 WHEN punctuality   = 0 THEN -1 ELSE 0 END +
-            CASE WHEN communication = 1 THEN 1 WHEN communication = 0 THEN -1 ELSE 0 END
-          )
-          FROM PeerRatings WHERE ratee_id = u.id
-        ), 0) AS karma
+        ${KARMA_SQL} AS karma
       FROM Users u
       ORDER BY karma DESC
       LIMIT 20
@@ -118,6 +97,8 @@ router.put('/me', authMiddleware, async (req, res) => {
   const userId = req.user.id;
 
   try {
+    if (bio !== undefined && bio && bio.length > 200)
+      return res.status(400).json({ success: false, message: 'bio must be 200 characters or less' });
     if (username !== undefined) {
       if (!username.trim()) return res.status(400).json({ success: false, message: 'Username cannot be empty' });
       const [[taken]] = await pool.execute(
@@ -275,12 +256,15 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
         SELECT
           u.id, u.username, u.avatar,
           0 AS shared_count, '' AS shared_sports,
-          COALESCE((SELECT SUM(CASE WHEN r2.attended=1 THEN 1 ELSE -1 END) FROM Ratings r2 WHERE r2.ratee_id=u.id),0) +
-          COALESCE((SELECT SUM(
-            (CASE WHEN pr2.sportsmanship=1 THEN 1 WHEN pr2.sportsmanship=0 THEN -1 ELSE 0 END)+
-            (CASE WHEN pr2.punctuality=1   THEN 1 WHEN pr2.punctuality=0   THEN -1 ELSE 0 END)+
-            (CASE WHEN pr2.communication=1 THEN 1 WHEN pr2.communication=0 THEN -1 ELSE 0 END)
-          ) FROM PeerRatings pr2 WHERE pr2.ratee_id=u.id),0) AS karma
+          ${KARMA_SQL} AS karma,
+          (
+            SELECT sport_type FROM (
+              SELECT sport_type FROM Games WHERE host_id = u.id
+              UNION ALL
+              SELECT g2.sport_type FROM Games g2
+              JOIN GameParticipants gp2 ON gp2.game_id = g2.id AND gp2.user_id = u.id
+            ) ts GROUP BY sport_type ORDER BY COUNT(*) DESC LIMIT 1
+          ) AS top_sport
         FROM Users u
         WHERE u.id != ?
           AND NOT EXISTS (
@@ -320,12 +304,15 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
           u.id, u.username, u.avatar,
           COUNT(DISTINCT sp_match.sport_type) AS shared_count,
           GROUP_CONCAT(DISTINCT sp_match.sport_type ORDER BY sp_match.sport_type SEPARATOR ',') AS shared_sports,
-          COALESCE((SELECT SUM(CASE WHEN r2.attended=1 THEN 1 ELSE -1 END) FROM Ratings r2 WHERE r2.ratee_id=u.id),0) +
-          COALESCE((SELECT SUM(
-            (CASE WHEN pr2.sportsmanship=1 THEN 1 WHEN pr2.sportsmanship=0 THEN -1 ELSE 0 END)+
-            (CASE WHEN pr2.punctuality=1   THEN 1 WHEN pr2.punctuality=0   THEN -1 ELSE 0 END)+
-            (CASE WHEN pr2.communication=1 THEN 1 WHEN pr2.communication=0 THEN -1 ELSE 0 END)
-          ) FROM PeerRatings pr2 WHERE pr2.ratee_id=u.id),0) AS karma
+          ${KARMA_SQL} AS karma,
+          (
+            SELECT sport_type FROM (
+              SELECT sport_type FROM Games WHERE host_id = u.id
+              UNION ALL
+              SELECT g2.sport_type FROM Games g2
+              JOIN GameParticipants gp2 ON gp2.game_id = g2.id AND gp2.user_id = u.id
+            ) ts GROUP BY sport_type ORDER BY COUNT(*) DESC LIMIT 1
+          ) AS top_sport
         FROM Users u
         ${sportJoinClause}
         WHERE u.id != ?
@@ -340,22 +327,12 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
       `, [param1, userId, userId, userId]);
     }
 
-    // Attach top_sport per player
-    const enriched = await Promise.all(rows.map(async (r) => {
-      const [[ts]] = await pool.execute(`
-        SELECT sport_type FROM (
-          SELECT sport_type FROM Games WHERE host_id = ?
-          UNION ALL
-          SELECT g.sport_type FROM Games g JOIN GameParticipants gp ON gp.game_id = g.id AND gp.user_id = ?
-        ) t GROUP BY sport_type ORDER BY COUNT(*) DESC LIMIT 1
-      `, [r.id, r.id]);
-      return {
-        ...r,
-        shared_sports: r.shared_sports ? r.shared_sports.split(',') : [],
-        karma: Number(r.karma),
-        shared_count: Number(r.shared_count),
-        top_sport: ts?.sport_type ?? null,
-      };
+    const enriched = rows.map(r => ({
+      ...r,
+      shared_sports: r.shared_sports ? r.shared_sports.split(',') : [],
+      karma: Number(r.karma),
+      shared_count: Number(r.shared_count),
+      top_sport: r.top_sport ?? null,
     }));
 
     res.json({ success: true, suggestions: enriched });

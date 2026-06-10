@@ -8,48 +8,20 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
-import { SPORT_FILTER_ITEMS } from '../../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/sports';
+import { Colors } from '../../constants/theme';
 import { getAvatarColor } from '../../utils/avatar';
+import AvatarCircle from '../../components/AvatarCircle';
+import type { MapItem, Participant } from '../../types';
 
 const { width } = Dimensions.get('window');
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-type MapItem = {
-  id?: number;
-  place_id: string;
-  name: string;
-  sport_type: string;
-  rating: number | string;
-  vicinity: string;
-  geometry: { location: { lat: number; lng: number } };
-  isLocalGame?: boolean;
-  venue_type?: 'court' | 'gym' | 'studio' | 'facility';
-  host_id?: number;
-  max_players?: number | null;
-  participant_count?: number;
-  scheduled_time?: string | null;
-  is_joined?: boolean;
-};
-
-type Participant = { id: number; username: string; avatar: string | null; role: string };
-
-
-const getSportStyle = (type: string): { icon: IconName; color: string } => {
-  switch (type) {
-    case 'basketball': return { icon: 'basketball',     color: '#FF8C00' };
-    case 'tennis':     return { icon: 'tennis',         color: '#CCFF00' };
-    case 'volleyball': return { icon: 'volleyball',     color: '#FFD700' };
-    case 'football':   return { icon: 'soccer',         color: '#FFFFFF' };
-    case 'yoga':       return { icon: 'yoga',           color: '#A78BFA' };
-    case 'gym':        return { icon: 'dumbbell',       color: '#FB923C' };
-    case 'studio':     return { icon: 'dance-ballroom', color: '#F472B6' };
-    case 'footvolley': return { icon: 'handball',       color: '#22D3EE' };
-    case 'swimming':   return { icon: 'swim',           color: '#0288D1' };
-    default:           return { icon: 'map-marker',     color: '#0FEA95' };
-  }
-};
-
+const getSportStyle = (type: string): { icon: IconName; color: string } => ({
+  icon: (SPORT_ICONS[type] ?? 'map-marker') as IconName,
+  color: SPORT_COLORS[type] ?? Colors.accent,
+});
 
 type ClusterItem = MapItem & {
   _isCluster: boolean;
@@ -85,16 +57,6 @@ function clusterGames(items: MapItem[], latDelta: number): ClusterItem[] {
   });
 }
 
-function AvatarMini({ name, avatar }: { name: string; avatar: string | null }) {
-  const color = getAvatarColor(name);
-  return (
-    <View style={[styles.avatarMini, { backgroundColor: color + '33', borderColor: color }]}>
-      {avatar
-        ? <Image source={{ uri: `data:image/jpeg;base64,${avatar}` }} style={styles.avatarMiniImg} />
-        : <Text style={[styles.avatarMiniLetter, { color }]}>{name.charAt(0).toUpperCase()}</Text>}
-    </View>
-  );
-}
 
 function BottomCard({ court, userId, token, onJoined }: {
   court: MapItem;
@@ -196,7 +158,7 @@ function BottomCard({ court, userId, token, onJoined }: {
                 style={[styles.avatarMiniWrap, { marginLeft: i > 0 ? -10 : 0, zIndex: 10 - i }]}
                 onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(p.id) } })}
               >
-                <AvatarMini name={p.username} avatar={p.avatar} />
+                <AvatarCircle username={p.username} avatar={p.avatar} size={30} />
               </TouchableOpacity>
             ))}
             {participants.length > 5 && (
@@ -707,12 +669,9 @@ const styles = StyleSheet.create({
   participantsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   participantAvatars: { flexDirection: 'row', alignItems: 'center' },
   avatarMiniWrap: {},
-  avatarMini: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#2C2C2E' },
-  avatarMiniImg: { width: '100%', height: '100%' },
-  avatarMiniLetter: { fontSize: 12, fontWeight: '900' },
-  avatarMiniMore: { backgroundColor: '#3A3A3C', borderColor: '#636366' },
-  avatarMiniMoreText: { color: '#AEAEB2', fontSize: 10, fontWeight: '800' },
-  participantLabel: { flex: 1, fontSize: 12, color: '#636366' },
+  avatarMiniMore: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface2, borderColor: Colors.textMuted },
+  avatarMiniMoreText: { color: Colors.textSub, fontSize: 10, fontWeight: '800' },
+  participantLabel: { flex: 1, fontSize: 12, color: Colors.textMuted },
 
   joinButton: { backgroundColor: '#0FEA95', paddingVertical: 15, borderRadius: 15, alignItems: 'center' },
   joinButtonText: { fontSize: 16, fontWeight: 'bold', color: '#1C1C1E' },

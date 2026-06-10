@@ -8,22 +8,7 @@ import { isPastGame } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { GamesSkeleton } from '../../components/SkeletonLoader';
-
-type Game = {
-  id: number;
-  sport_type: string;
-  level: number;
-  title: string | null;
-  scheduled_time: string | null;
-  location_desc: string | null;
-  equipment_notes: string | null;
-  max_players: number | null;
-  participant_count: number;
-  is_host: boolean;
-  status: string;
-  created_at: string;
-  photo: string | null;
-};
+import type { Game } from '../../types';
 
 function GameCard({
   game, onRatePlayers, onViewResults, onCloseGame, onEdit, onDelete, onLeave, onChat, onViewParticipants,

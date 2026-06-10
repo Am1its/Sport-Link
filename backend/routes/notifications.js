@@ -8,16 +8,21 @@ const router = express.Router();
 router.get('/', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   try {
-    const [rows] = await pool.execute(
-      `SELECT id, title, body, data, is_read, created_at
-       FROM Notifications
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT 50`,
-      [userId]
-    );
-    const unread_count = rows.filter(r => !r.is_read).length;
-    res.json({ success: true, notifications: rows, unread_count });
+    const [[{ unread_count }], [rows]] = await Promise.all([
+      pool.execute(
+        'SELECT COUNT(*) AS unread_count FROM Notifications WHERE user_id = ? AND is_read = FALSE',
+        [userId]
+      ),
+      pool.execute(
+        `SELECT id, title, body, data, is_read, created_at
+         FROM Notifications
+         WHERE user_id = ?
+         ORDER BY created_at DESC
+         LIMIT 50`,
+        [userId]
+      ),
+    ]);
+    res.json({ success: true, notifications: rows, unread_count: Number(unread_count) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });

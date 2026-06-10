@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
 const sendPushNotifications = require('../utils/sendPushNotification');
+const { KARMA_SQL } = require('../utils/karmaSQL');
 
 const router = express.Router();
 
@@ -13,16 +14,7 @@ router.get('/', authMiddleware, async (req, res) => {
       SELECT
         f.id AS friendship_id,
         u.id, u.username, u.avatar,
-        COALESCE((
-          SELECT SUM(CASE WHEN attended=1 THEN 1 ELSE -1 END) FROM Ratings WHERE ratee_id = u.id
-        ),0) +
-        COALESCE((
-          SELECT SUM(
-            CASE WHEN sportsmanship=1 THEN 1 WHEN sportsmanship=0 THEN -1 ELSE 0 END +
-            CASE WHEN punctuality=1   THEN 1 WHEN punctuality=0   THEN -1 ELSE 0 END +
-            CASE WHEN communication=1 THEN 1 WHEN communication=0 THEN -1 ELSE 0 END
-          ) FROM PeerRatings WHERE ratee_id = u.id
-        ),0) AS karma
+        ${KARMA_SQL} AS karma
       FROM Friends f
       JOIN Users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
       WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
