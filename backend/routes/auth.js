@@ -55,26 +55,18 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/google  — { code, code_verifier, redirect_uri }
+// POST /api/auth/google  — { access_token }
+// The PKCE code exchange is done on the client via expo-auth-session/exchangeCodeAsync;
+// the backend receives the resulting access_token and validates it with Google.
 router.post('/google', async (req, res) => {
-  const { code, code_verifier, redirect_uri } = req.body;
-  if (!code)
-    return res.status(400).json({ success: false, message: 'code is required' });
+  const { access_token } = req.body;
+  if (!access_token)
+    return res.status(400).json({ success: false, message: 'access_token is required' });
 
   try {
-    // Exchange auth code for tokens
-    const { data: tokens } = await axios.post('https://oauth2.googleapis.com/token', {
-      code,
-      client_id:     process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri,
-      grant_type:    'authorization_code',
-      ...(code_verifier ? { code_verifier } : {}),
-    });
-
     // Fetch profile using access token
     const { data: profile } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
+      headers: { Authorization: `Bearer ${access_token}` },
     });
 
     const { sub: googleId, email, name, picture } = profile;
@@ -118,7 +110,7 @@ router.post('/google', async (req, res) => {
     const user = { id: dbUser.id, username: dbUser.username, onboarding_complete: !!dbUser.onboarding_complete };
     res.json({ success: true, token: signToken(user), user });
   } catch (err) {
-    console.error('Google auth error:', err.message);
+    console.error('Google auth error:', err.message, JSON.stringify(err.response?.data));
     res.status(500).json({ success: false, message: 'Google sign-in failed' });
   }
 });

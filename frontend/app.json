@@ -15,7 +15,16 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.am1its.sportlink"
+      "bundleIdentifier": "com.am1its.sportlink",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.393613161940-tlkf5mb8gfi3fp9e93ni7eijn6t18qpd"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
