@@ -232,10 +232,10 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 26, fontWeight: '900', color: Colors.text },
   cardSub:   { fontSize: 14, color: Colors.textMuted, marginTop: -6 },
 
-  googleBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderRadius: Radius.lg, height: 52, gap: 10, paddingHorizontal: 16 },
-  googleBtnText: { fontSize: 15, fontWeight: '700', color: '#1C1C1E', flex: 1 },
+  googleBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.text, borderRadius: Radius.lg, height: 52, gap: 10, paddingHorizontal: 16 },
+  googleBtnText: { fontSize: 15, fontWeight: '700', color: Colors.bg, flex: 1 },
   soonBadge:     { backgroundColor: Colors.orange, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  soonText:      { fontSize: 9, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 },
+  soonText:      { fontSize: 9, fontWeight: '900', color: Colors.text, letterSpacing: 0.5 },
 
   divider:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
   dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },

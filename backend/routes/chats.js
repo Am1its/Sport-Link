@@ -1,20 +1,9 @@
 const express = require('express');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const { isUserInGame } = require('../utils/gameUtils');
 
 const router = express.Router();
-
-const isUserInGame = async (gameId, userId) => {
-  const [[row]] = await pool.execute(
-    `SELECT id FROM Games
-     WHERE id = ? AND status = 'active'
-       AND (host_id = ? OR EXISTS (
-         SELECT 1 FROM GameParticipants WHERE game_id = ? AND user_id = ?
-       ))`,
-    [gameId, userId, gameId, userId]
-  );
-  return !!row;
-};
 
 // GET /api/chats — all game chats the user is in
 // Uses a single derived-table JOIN for last message instead of 4 correlated subqueries

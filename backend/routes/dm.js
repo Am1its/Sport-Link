@@ -113,6 +113,8 @@ router.post('/:userId', async (req, res) => {
   const { content, type = 'text', event_id } = req.body;
   if (type === 'text' && !content?.trim())
     return res.status(400).json({ success: false, message: 'content required' });
+  if (type === 'text' && content && content.trim().length > 1000)
+    return res.status(400).json({ success: false, message: 'Message too long (max 1000 characters)' });
   if (type === 'event' && !event_id)
     return res.status(400).json({ success: false, message: 'event_id required' });
 

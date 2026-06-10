@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { getAvatarColor } from '../utils/avatar';
+import { Colors } from '../constants/theme';
 
 interface AvatarCircleProps {
   username: string;
@@ -37,5 +38,5 @@ export default function AvatarCircle({ username, avatar, size = 44, onPress }: A
 const styles = StyleSheet.create({
   img: { resizeMode: 'cover' },
   fallback: { justifyContent: 'center', alignItems: 'center' },
-  initial: { color: '#FFFFFF', fontWeight: '700' },
+  initial: { color: Colors.text, fontWeight: '700' },
 });

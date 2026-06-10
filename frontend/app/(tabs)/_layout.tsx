@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
+import { Colors } from '../../constants/theme';
 
 export default function TabLayout() {
   const { token } = useAuth();
@@ -36,12 +37,12 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#0FEA95',
-        tabBarInactiveTintColor: '#636366',
+        tabBarActiveTintColor: Colors.accent,
+        tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
-          backgroundColor: '#1C1C1E',
+          backgroundColor: Colors.bg,
           borderTopWidth: 1,
-          borderTopColor: '#2C2C2E',
+          borderTopColor: Colors.surface,
           elevation: 12,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -3 },
@@ -61,7 +62,7 @@ export default function TabLayout() {
           title: 'Chat',
           tabBarIcon: ({ color }) => <Ionicons name="chatbubbles" size={26} color={color} />,
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: '#FF453A', fontSize: 11 },
+          tabBarBadgeStyle: { backgroundColor: Colors.error, fontSize: 11 },
         }}
       />
       <Tabs.Screen name="profile"  options={{ title: 'Profile',  tabBarIcon: ({ color }) => <Ionicons name="person"      size={26} color={color} /> }} />

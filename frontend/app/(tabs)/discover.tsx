@@ -13,6 +13,7 @@ import { isPastGame } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { DiscoverSkeleton } from '../../components/SkeletonLoader';
+import type { Game } from '../../types';
 
 const RADIUS_OPTIONS = [
   { label: 'Any Distance', km: null },
@@ -22,21 +23,6 @@ const RADIUS_OPTIONS = [
   { label: '20 km', km: 20 },
 ];
 
-type Game = {
-  id: number;
-  place_id: string;
-  sport_type: string;
-  level: number;
-  title: string | null;
-  scheduled_time: string | null;
-  location_desc: string | null;
-  equipment_notes: string | null;
-  max_players: number | null;
-  participant_count: number;
-  host_id: number;
-  photo: string | null;
-  is_joined?: boolean;
-};
 
 function GameCard({
   game, userId, token, onJoined, onViewParticipants,

@@ -7,6 +7,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { Colors, Spacing, Radius, Type } from '../constants/theme';
 
 const SPORTS = [
   { key: 'basketball', label: 'Basketball' },
@@ -94,7 +95,7 @@ export default function SportPreferencesScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0FEA95" />
+        <ActivityIndicator size="large" color={Colors.accent} />
       </View>
     );
   }
@@ -103,7 +104,7 @@ export default function SportPreferencesScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={26} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Sport Preferences</Text>
         <View style={{ width: 40 }} />
@@ -114,13 +115,13 @@ export default function SportPreferencesScreen() {
 
         {SPORTS.map(sport => {
           const s = sports.find(x => x.sport_type === sport.key)!;
-          const color = SPORT_COLORS[sport.key] ?? '#636366';
+          const color = SPORT_COLORS[sport.key] ?? Colors.textMuted;
           const icon = SPORT_ICONS[sport.key] ?? 'help-circle';
           return (
             <View key={sport.key} style={[styles.card, !s.enabled && styles.cardDim]}>
               <View style={styles.cardTop}>
                 <View style={[styles.iconWrap, { backgroundColor: color + (s.enabled ? '30' : '15') }]}>
-                  <MaterialCommunityIcons name={icon as any} size={22} color={s.enabled ? color : '#48484A'} />
+                  <MaterialCommunityIcons name={icon as any} size={22} color={s.enabled ? color : Colors.textHint} />
                 </View>
                 <Text style={[styles.sportName, !s.enabled && styles.sportNameDim]}>{sport.label}</Text>
                 <View style={styles.cardTopRight}>
@@ -128,14 +129,14 @@ export default function SportPreferencesScreen() {
                     <Ionicons
                       name={s.is_favorite && s.enabled ? 'heart' : 'heart-outline'}
                       size={22}
-                      color={s.is_favorite && s.enabled ? '#FF453A' : '#48484A'}
+                      color={s.is_favorite && s.enabled ? Colors.error : Colors.textHint}
                     />
                   </TouchableOpacity>
                   <Switch
                     value={s.enabled}
                     onValueChange={() => toggleEnabled(sport.key)}
-                    trackColor={{ false: '#3A3A3C', true: color + '80' }}
-                    thumbColor={s.enabled ? color : '#636366'}
+                    trackColor={{ false: Colors.surface2, true: color + '80' }}
+                    thumbColor={s.enabled ? color : Colors.textMuted}
                     style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
                   />
                 </View>
@@ -163,7 +164,7 @@ export default function SportPreferencesScreen() {
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
           {saving
-            ? <ActivityIndicator color="#1C1C1E" size="small" />
+            ? <ActivityIndicator color={Colors.bg} size="small" />
             : <Text style={styles.saveBtnText}>Save Preferences</Text>}
         </TouchableOpacity>
       </ScrollView>
@@ -172,30 +173,30 @@ export default function SportPreferencesScreen() {
 }
 
 const styles = StyleSheet.create({
-  center:    { flex: 1, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center' },
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  center:    { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: Colors.bg },
 
-  header:  { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20 },
+  header:  { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.lg, paddingHorizontal: Spacing.xl },
   backBtn: { width: 40 },
-  title:   { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '900', color: '#FFFFFF' },
+  title:   { flex: 1, textAlign: 'center', ...Type.cardTitle, fontSize: 20 },
 
-  hint:   { fontSize: 13, color: '#636366', marginBottom: 20, textAlign: 'center' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 50 },
+  hint:   { ...Type.meta, fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.xl, textAlign: 'center' },
+  scroll: { paddingHorizontal: Spacing.xl, paddingBottom: 50 },
 
-  card:        { backgroundColor: '#2C2C2E', borderRadius: 16, padding: 14, marginBottom: 10 },
+  card:        { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, marginBottom: Spacing.sm },
   cardDim:     { opacity: 0.5 },
-  cardTop:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconWrap:    { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  sportName:   { flex: 1, fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  sportNameDim: { color: '#636366' },
+  cardTop:     { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  iconWrap:    { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
+  sportName:   { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.text },
+  sportNameDim: { color: Colors.textMuted },
   cardTopRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   heartBtn:    { padding: 4 },
 
-  skillRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#3A3A3C', gap: 12 },
-  dotsWrap: { flexDirection: 'row', gap: 8 },
-  dot:      { width: 14, height: 14, borderRadius: 7, backgroundColor: '#3A3A3C', borderWidth: 1.5, borderColor: '#3A3A3C' },
+  skillRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border, gap: Spacing.md },
+  dotsWrap: { flexDirection: 'row', gap: Spacing.sm },
+  dot:      { width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.surface2, borderWidth: 1.5, borderColor: Colors.surface2 },
   levelLabel: { fontSize: 12, fontWeight: '700', flex: 1, textAlign: 'right' },
 
-  saveBtn:     { marginTop: 24, backgroundColor: '#0FEA95', height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  saveBtnText: { color: '#1C1C1E', fontSize: 16, fontWeight: '900' },
+  saveBtn:     { marginTop: Spacing.xxl, backgroundColor: Colors.accent, height: 52, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
+  saveBtnText: { color: Colors.bg, ...Type.btnPrimary },
 });

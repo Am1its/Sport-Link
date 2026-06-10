@@ -317,6 +317,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
       if (isNaN(mp) || mp < 2)
         return res.status(400).json({ success: false, message: 'max_players must be at least 2' });
     }
+    if (title && title.length > 100)
+      return res.status(400).json({ success: false, message: 'title must be 100 characters or less' });
+    if (location_desc && location_desc.length > 200)
+      return res.status(400).json({ success: false, message: 'location_desc must be 200 characters or less' });
     if (scheduled_time) {
       const parsed = new Date(scheduled_time);
       if (!isNaN(parsed.getTime()) && parsed <= new Date())
@@ -375,6 +379,11 @@ router.post('/', authMiddleware, async (req, res) => {
     if (isNaN(mp) || mp < 2)
       return res.status(400).json({ success: false, message: 'max_players must be at least 2' });
   }
+
+  if (title && title.length > 100)
+    return res.status(400).json({ success: false, message: 'title must be 100 characters or less' });
+  if (location_desc && location_desc.length > 200)
+    return res.status(400).json({ success: false, message: 'location_desc must be 200 characters or less' });
 
   if (scheduled_time) {
     const parsed = new Date(scheduled_time);
