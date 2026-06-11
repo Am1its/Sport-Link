@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, ComponentProps, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated, FlatList, Image } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated, FlatList, Image, TextInput, Keyboard } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,11 +9,14 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { searchPlaces, GeoResult } from '../../utils/geocode';
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/sports';
 import { Colors } from '../../constants/theme';
 import { getAvatarColor } from '../../utils/avatar';
 import AvatarCircle from '../../components/AvatarCircle';
 import type { MapItem, Participant } from '../../types';
+
+const RECENT_SEARCHES_KEY = 'map_recent_searches';
 
 const { width } = Dimensions.get('window');
 
@@ -239,6 +243,12 @@ export default function HomeScreen() {
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
   const [myUsername, setMyUsername] = useState<string>('');
 
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [searchQuery, setSearchQuery]       = useState('');
+  const [searchResults, setSearchResults]   = useState<GeoResult[]>([]);
+  const [recentSearches, setRecentSearches] = useState<GeoResult[]>([]);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [mapRegion, setMapRegion] = useState<Region>({
     latitude: 32.0853,
     longitude: 34.7818,
@@ -250,6 +260,41 @@ export default function HomeScreen() {
     if (!scheduledTime) return false;
     const d = new Date(scheduledTime);
     return !isNaN(d.getTime()) && d < new Date();
+  };
+
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_SEARCHES_KEY)
+      .then(raw => { if (raw) setRecentSearches(JSON.parse(raw)); })
+      .catch(() => {});
+  }, []);
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (text.trim().length < 2) { setSearchResults([]); return; }
+    searchDebounce.current = setTimeout(async () => {
+      const results = await searchPlaces(text);
+      setSearchResults(results);
+    }, 400);
+  };
+
+  const handleSelectPlace = async (place: GeoResult) => {
+    Keyboard.dismiss();
+    setSearchExpanded(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    mapRef.current?.animateToRegion({
+      latitude: place.lat,
+      longitude: place.lng,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    }, 500);
+    // Save to recent searches (keep last 5, no duplicates)
+    setRecentSearches(prev => {
+      const next = [place, ...prev.filter(r => r.name !== place.name)].slice(0, 5);
+      AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -452,27 +497,78 @@ export default function HomeScreen() {
         ) : (
           <View>
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>SportLink</Text>
-              {visibleGameCount > 0 && activeFilter !== 'courts' && (
-                <View style={styles.gameCountBadge}>
-                  <Text style={styles.gameCountText}>{visibleGameCount} game{visibleGameCount !== 1 ? 's' : ''}</Text>
-                </View>
-              )}
-              <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile' as any)}>
-                {myAvatar ? (
-                  <Image
-                    source={{ uri: `data:image/jpeg;base64,${myAvatar}` }}
-                    style={styles.profileAvatar}
+              {searchExpanded ? (
+                <>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search location..."
+                    placeholderTextColor="#999"
+                    value={searchQuery}
+                    onChangeText={handleSearchChange}
+                    autoFocus
+                    returnKeyType="search"
                   />
-                ) : (
-                  <View style={[styles.profileAvatar, styles.profileAvatarFallback, { backgroundColor: getAvatarColor(myUsername || (user?.username ?? '')) }]}>
-                    <Text style={styles.profileAvatarLetter}>
-                      {(myUsername || user?.username || '?').charAt(0).toUpperCase()}
-                    </Text>
+                  <TouchableOpacity
+                    onPress={() => { setSearchExpanded(false); setSearchQuery(''); setSearchResults([]); Keyboard.dismiss(); }}
+                    style={{ paddingLeft: 8 }}
+                  >
+                    <Text style={{ color: '#1C1C1E', fontWeight: '700', fontSize: 14 }}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.headerTitle}>SportLink</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {visibleGameCount > 0 && activeFilter !== 'courts' && (
+                      <View style={styles.gameCountBadge}>
+                        <Text style={styles.gameCountText}>{visibleGameCount} game{visibleGameCount !== 1 ? 's' : ''}</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity onPress={() => setSearchExpanded(true)}>
+                      <Ionicons name="search-outline" size={22} color="#3A3A3C" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile' as any)}>
+                      {myAvatar ? (
+                        <Image
+                          source={{ uri: `data:image/jpeg;base64,${myAvatar}` }}
+                          style={styles.profileAvatar}
+                        />
+                      ) : (
+                        <View style={[styles.profileAvatar, styles.profileAvatarFallback, { backgroundColor: getAvatarColor(myUsername || (user?.username ?? '')) }]}>
+                          <Text style={styles.profileAvatarLetter}>
+                            {(myUsername || user?.username || '?').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
                   </View>
-                )}
-              </TouchableOpacity>
+                </>
+              )}
             </View>
+
+            {/* Search dropdown */}
+            {searchExpanded && (searchResults.length > 0 || (searchQuery.length < 2 && recentSearches.length > 0)) && (
+              <View style={styles.searchDropdown}>
+                {searchQuery.length < 2 && recentSearches.length > 0 && (
+                  <>
+                    <Text style={styles.searchDropdownLabel}>Recent</Text>
+                    {recentSearches.map(place => (
+                      <TouchableOpacity key={place.name} style={styles.searchDropdownItem} onPress={() => handleSelectPlace(place)}>
+                        <Ionicons name="time-outline" size={15} color="#8E8E93" />
+                        <Text style={styles.searchDropdownText} numberOfLines={1}>{place.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
+                {searchResults.map(place => (
+                  <TouchableOpacity key={place.name} style={styles.searchDropdownItem} onPress={() => handleSelectPlace(place)}>
+                    <Ionicons name="location-outline" size={15} color="#0FEA95" />
+                    <Text style={styles.searchDropdownText} numberOfLines={1}>{place.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
 
             {/* Main filter row */}
             <View style={styles.filtersWrapper}>
@@ -631,6 +727,11 @@ const styles = StyleSheet.create({
 
   headerContainer: { position: 'absolute', top: 0, width: '100%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.95)', marginHorizontal: 20, marginTop: 15, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  searchInput: { flex: 1, fontSize: 15, color: '#1C1C1E', paddingVertical: 4 },
+  searchDropdown: { marginHorizontal: 20, backgroundColor: 'rgba(255,255,255,0.98)', borderRadius: 16, paddingVertical: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 6 },
+  searchDropdownLabel: { fontSize: 11, fontWeight: '700', color: '#8E8E93', paddingHorizontal: 16, paddingVertical: 4, textTransform: 'uppercase' },
+  searchDropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  searchDropdownText: { flex: 1, fontSize: 14, color: '#1C1C1E', fontWeight: '500' },
   headerTitle: { fontSize: 22, fontWeight: '900', color: '#1C1C1E' },
   gameCountBadge: { backgroundColor: '#0FEA9522', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#0FEA9555' },
   gameCountText: { color: '#0FEA95', fontSize: 12, fontWeight: '800' },

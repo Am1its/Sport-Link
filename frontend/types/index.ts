@@ -29,6 +29,7 @@ export type Game = {
   boosted_at?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  neighborhood?: string | null;
 };
 
 export type MapItem = {

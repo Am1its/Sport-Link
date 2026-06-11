@@ -10,7 +10,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { API_BASE } from '../../constants/api';
-import { isPastGame } from '../../utils/time';
+import { isPastGame, getTodayRange, getThisWeekendRange, getThisWeekRange, DateRange } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { DiscoverSkeleton } from '../../components/SkeletonLoader';
@@ -26,13 +26,14 @@ const RADIUS_OPTIONS = [
 
 
 function GameCard({
-  game, userId, token, onJoined, onViewParticipants,
+  game, userId, token, onJoined, onViewParticipants, onNeighborhoodPress,
 }: {
   game: Game;
   userId?: number;
   token: string | null;
   onJoined: (id: number, newCount: number) => void;
   onViewParticipants: () => void;
+  onNeighborhoodPress?: (neighborhood: string) => void;
 }) {
   const handleShare = async () => {
     const label    = sportLabel(game.sport_type);
@@ -152,6 +153,18 @@ function GameCard({
               ) : null}
             </View>
 
+            {/* Neighborhood tag */}
+            {game.neighborhood ? (
+              <TouchableOpacity
+                style={styles.neighborhoodTag}
+                onPress={() => onNeighborhoodPress?.(game.neighborhood!)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="location-outline" size={10} color={Colors.textMuted} />
+                <Text style={styles.neighborhoodText}>{game.neighborhood}</Text>
+              </TouchableOpacity>
+            ) : null}
+
             {/* Title */}
             <Text style={styles.cardTitle} numberOfLines={1}>
               {game.title || `${sportLabel(game.sport_type)} Game`}
@@ -255,6 +268,8 @@ export default function DiscoverScreen() {
   const [search, setSearch]             = useState('');
   const [sportFilter, setSportFilter]   = useState<string>('all');
   const [radiusKm, setRadiusKm]         = useState<number | null>(null);
+  const [dateFilter, setDateFilter]     = useState<'any' | 'today' | 'weekend' | 'week'>('any');
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState<string | null>(null);
   const [showSportModal, setShowSportModal]   = useState(false);
   const [showRadiusModal, setShowRadiusModal] = useState(false);
   const userLocation = useRef<{ lat: number; lng: number } | null>(null);
@@ -286,6 +301,15 @@ export default function DiscoverScreen() {
       }
       if (q.length >= 2) parts.push(`q=${encodeURIComponent(q)}`);
 
+      if (dateFilter !== 'any') {
+        let range: DateRange;
+        if (dateFilter === 'today')   range = getTodayRange();
+        else if (dateFilter === 'weekend') range = getThisWeekendRange();
+        else range = getThisWeekRange();
+        parts.push(`date_from=${range.date_from}`, `date_to=${range.date_to}`);
+      }
+      if (neighborhoodFilter) parts.push(`neighborhood=${encodeURIComponent(neighborhoodFilter)}`);
+
       const url = `/api/games${parts.length ? `?${parts.join('&')}` : ''}`;
       const res  = await apiFetch(url, { token });
       const data = await res.json();
@@ -297,7 +321,7 @@ export default function DiscoverScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token, radiusKm]);
+  }, [token, radiusKm, dateFilter, neighborhoodFilter]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -316,6 +340,10 @@ export default function DiscoverScreen() {
 
   const handleJoined = (id: number, newCount: number) => {
     setGames(prev => prev.map(g => g.id === id ? { ...g, participant_count: newCount, is_joined: true } : g));
+  };
+
+  const handleNeighborhoodPress = (neighborhood: string) => {
+    setNeighborhoodFilter(prev => prev === neighborhood ? null : neighborhood);
   };
 
   const filtered = games.filter(g => {
@@ -347,6 +375,38 @@ export default function DiscoverScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Date filter chips */}
+      <View style={styles.dateChipsRow}>
+        {([
+          { key: 'any',     label: 'Any time' },
+          { key: 'today',   label: 'Today' },
+          { key: 'weekend', label: 'This Weekend' },
+          { key: 'week',    label: 'This Week' },
+        ] as const).map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.dateChip, dateFilter === key && styles.dateChipActive]}
+            onPress={() => setDateFilter(key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.dateChipText, dateFilter === key && styles.dateChipTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Neighborhood filter banner (when active) */}
+      {neighborhoodFilter && (
+        <TouchableOpacity
+          style={styles.neighborhoodBanner}
+          onPress={() => setNeighborhoodFilter(null)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="location" size={13} color={Colors.purple} />
+          <Text style={styles.neighborhoodBannerText}>{neighborhoodFilter}</Text>
+          <Ionicons name="close-circle" size={15} color={Colors.purple} />
+        </TouchableOpacity>
+      )}
 
       {/* Filter row */}
       <View style={styles.filterRow}>
@@ -428,6 +488,7 @@ export default function DiscoverScreen() {
               userId={user?.id}
               token={token}
               onJoined={handleJoined}
+              onNeighborhoodPress={handleNeighborhoodPress}
               onViewParticipants={() =>
                 router.push({
                   pathname: '/game-participants',
@@ -516,6 +577,19 @@ const styles = StyleSheet.create({
   // Search
   searchBox:   { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: 14, height: 48, marginBottom: 12, gap: Spacing.sm },
   searchInput: { flex: 1, color: Colors.text, fontSize: 15 },
+
+  // Date chips
+  dateChipsRow:      { flexDirection: 'row', gap: 6, marginBottom: Spacing.sm, flexWrap: 'wrap' },
+  dateChip:          { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  dateChipActive:    { backgroundColor: Colors.purple + '22', borderColor: Colors.purple + '66' },
+  dateChipText:      { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
+  dateChipTextActive:{ color: Colors.purple },
+
+  // Neighborhood
+  neighborhoodTag:    { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4, alignSelf: 'flex-start' },
+  neighborhoodText:   { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
+  neighborhoodBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.purple + '15', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.purple + '44', paddingHorizontal: 12, paddingVertical: 8, marginBottom: Spacing.sm },
+  neighborhoodBannerText: { flex: 1, fontSize: 13, fontWeight: '700', color: Colors.purple },
 
   // Filters
   filterRow:          { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
