@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView, Platform, Image, Alert, ActivityIndicator,
   Animated,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
@@ -122,6 +122,7 @@ function FocusInput({
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
   const { login } = useAuth();
 
   const [email, setEmail]       = useState('');
@@ -145,7 +146,7 @@ export default function LoginScreen() {
       const data = await res.json();
       if (!data.success) return Alert.alert('Sign in failed', data.message);
       await login(data.token, data.user);
-      router.replace('/(tabs)');
+      router.replace((redirect ?? '/(tabs)') as any);
     } catch {
       Alert.alert('Error', 'Could not connect to server.');
     } finally {

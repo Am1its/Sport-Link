@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { Colors } from '../../constants/theme';
@@ -11,7 +11,6 @@ import { API_BASE } from '../../constants/api';
 export default function TabLayout() {
   const { token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
-  const socketRef = useRef<Socket | null>(null);
 
   const checkUnread = useCallback(async () => {
     if (!token) return;
@@ -25,11 +24,12 @@ export default function TabLayout() {
       let count = 0;
 
       if (chatsData.success) {
-        for (const chat of chatsData.chats) {
-          if (!chat.last_message_at) continue;
-          const lastRead = await AsyncStorage.getItem(`chat_last_read_${chat.id}`);
-          if (!lastRead || new Date(lastRead) < new Date(chat.last_message_at)) count++;
-        }
+        const chatsWithMsg = chatsData.chats.filter((c: any) => c.last_message_at);
+        const keys = chatsWithMsg.map((c: any) => `chat_last_read_${c.id}`);
+        const readEntries = await AsyncStorage.multiGet(keys);
+        readEntries.forEach(([, lastRead], i) => {
+          if (!lastRead || new Date(lastRead) < new Date(chatsWithMsg[i].last_message_at)) count++;
+        });
       }
 
       if (dmData.success) {
@@ -53,12 +53,8 @@ export default function TabLayout() {
   useEffect(() => {
     if (!token) return;
     const socket = io(API_BASE, { auth: { token } });
-    socketRef.current = socket;
     socket.on('new_dm', () => checkUnread());
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
+    return () => { socket.disconnect(); };
   }, [token, checkUnread]);
 
   return (

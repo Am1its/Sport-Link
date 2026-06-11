@@ -9,7 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { getAvatarColor } from '../../utils/avatar';
-import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { ProfileStatsSkeleton } from '../../components/SkeletonLoader';
 
@@ -256,7 +256,7 @@ export default function ProfileScreen() {
                   <View>
                     <View style={styles.chipNameRow}>
                       <Text style={[styles.chipName, { color: c }]}>
-                        {pref.sport_type.charAt(0).toUpperCase() + pref.sport_type.slice(1)}
+                        {sportLabel(pref.sport_type)}
                       </Text>
                       {!!pref.is_favorite && <Ionicons name="heart" size={10} color={Colors.error} />}
                     </View>

@@ -7,7 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
-import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
@@ -220,7 +220,7 @@ export default function PlayerProfileScreen() {
                   <View>
                     <View style={styles.chipNameRow}>
                       <Text style={[styles.chipName, { color: c }]}>
-                        {pref.sport_type.charAt(0).toUpperCase() + pref.sport_type.slice(1)}
+                        {sportLabel(pref.sport_type)}
                       </Text>
                       {!!pref.is_favorite && <Ionicons name="heart" size={11} color={Colors.error} />}
                     </View>

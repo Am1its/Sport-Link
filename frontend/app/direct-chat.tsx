@@ -12,7 +12,7 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
-import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 
 type DmMessage = {
@@ -352,7 +352,7 @@ export default function DirectChatScreen() {
                       <MaterialCommunityIcons name={icon as any} size={22} color={color} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.pickerGameTitle}>{g.title || `${g.sport_type.charAt(0).toUpperCase() + g.sport_type.slice(1)} Game`}</Text>
+                      <Text style={styles.pickerGameTitle}>{g.title || `${sportLabel(g.sport_type)} Game`}</Text>
                       <Text style={styles.pickerGameInfo}>{formatGameTime(g.scheduled_time)}{g.location_desc ? `  ·  ${g.location_desc}` : ''}</Text>
                     </View>
                     <Ionicons name="share-outline" size={20} color={Colors.accent} />
@@ -377,7 +377,7 @@ function EventCard({ msg, isOwn, onJoin }: { msg: DmMessage; isOwn: boolean; onJ
                    msg.game_current_players >= msg.game_max_players;
   const isActive = msg.game_status === 'active';
   const gameTitle = msg.game_title ||
-    (msg.game_sport ? msg.game_sport.charAt(0).toUpperCase() + msg.game_sport.slice(1) + ' Game' : 'Game');
+    (msg.game_sport ? sportLabel(msg.game_sport) + ' Game' : 'Game');
 
   return (
     <View style={[styles.eventCard, { borderColor: color + '55' }]}>

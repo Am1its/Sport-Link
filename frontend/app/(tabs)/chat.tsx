@@ -7,7 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { formatChatTimestamp } from '../../utils/time';
-import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { getAvatarColor } from '../../utils/avatar';
 import { Colors, Spacing, Radius, Type } from '../../constants/theme';
 import { ChatSkeleton } from '../../components/SkeletonLoader';
@@ -70,7 +70,7 @@ export default function ChatScreen() {
   const renderGameChat = ({ item }: { item: GameChat }) => {
     const color    = SPORT_COLORS[item.sport_type] ?? Colors.accent;
     const icon     = SPORT_ICONS[item.sport_type]  ?? 'map-marker';
-    const gameName = `${item.sport_type.charAt(0).toUpperCase() + item.sport_type.slice(1)} Game`;
+    const gameName = `${sportLabel(item.sport_type)} Game`;
     return (
       <TouchableOpacity
         style={styles.row}

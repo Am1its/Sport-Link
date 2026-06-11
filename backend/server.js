@@ -20,8 +20,9 @@ const notificationsRoutes = require('./routes/notifications');
 const courtsRoutes        = require('./routes/courts');
 const dmRoutes            = require('./routes/dm');
 
-const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+const _corsEnv = process.env.CORS_ORIGIN?.trim();
+const ALLOWED_ORIGINS = _corsEnv
+  ? _corsEnv.split(',').map(o => o.trim()).filter(Boolean)
   : '*';
 
 const app = express();
@@ -132,8 +133,12 @@ async function sendGameReminders() {
     `);
 
     for (const game of games) {
-      // Mark first to prevent double-fire if the loop takes > 1 minute.
-      await pool.execute('UPDATE Games SET reminder_sent_at = NOW() WHERE id = ?', [game.id]);
+      // Atomic claim — prevents double-fire on rolling deploys / multiple processes.
+      const [claim] = await pool.execute(
+        'UPDATE Games SET reminder_sent_at = NOW() WHERE id = ? AND reminder_sent_at IS NULL',
+        [game.id]
+      );
+      if (claim.affectedRows === 0) continue;
 
       const [rows] = await pool.execute(`
         SELECT u.push_token
@@ -170,7 +175,7 @@ setInterval(sendGameReminders, 60_000);
 // Transitions active games to 'completed' AUTO_COMPLETE_HOURS after scheduled_time
 // (default 3h). Also nudges host + participants to submit ratings.
 async function autoCompleteGames() {
-  const hours = parseInt(process.env.AUTO_COMPLETE_HOURS ?? '3', 10);
+  const hours = parseInt(process.env.AUTO_COMPLETE_HOURS ?? '3', 10) || 3;
   try {
     const [games] = await pool.execute(`
       SELECT id, title, sport_type, host_id

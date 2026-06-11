@@ -8,7 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
-import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../../constants/theme';
 import type { Game } from '../../types';
 
@@ -43,7 +43,7 @@ export default function GameLandingScreen() {
   }, [id, token]);
 
   const handleJoin = async () => {
-    if (!token) return router.push('/login' as any);
+    if (!token) return router.push({ pathname: '/login', params: { redirect: `/game/${id}` } } as any);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setJoining(true);
     try {
@@ -64,10 +64,10 @@ export default function GameLandingScreen() {
 
   const handleShare = async () => {
     if (!game) return;
-    const sportLabel = game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1);
-    const title = game.title || `${sportLabel} Game`;
+    const label = sportLabel(game.sport_type);
+    const title = game.title || `${label} Game`;
     await Share.share({
-      message: `Join my ${sportLabel} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${id}`,
+      message: `Join my ${label} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${id}`,
     });
   };
 
@@ -93,8 +93,7 @@ export default function GameLandingScreen() {
 
   const color     = SPORT_COLORS[game.sport_type] ?? Colors.accent;
   const icon      = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
-  const sportLabel = game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1);
-  const title     = game.title || `${sportLabel} Game`;
+  const title     = game.title || `${sportLabel(game.sport_type)} Game`;
   const isOwn     = game.host_id === user?.id;
   const spotsLeft = game.max_players != null ? (game.max_players - 1) - game.participant_count : null;
   const isFull    = spotsLeft != null && spotsLeft <= 0 && !isJoined && !isOwn;
@@ -154,15 +153,7 @@ export default function GameLandingScreen() {
 
         {/* CTA */}
         <View style={styles.ctaWrap}>
-          {isOwn ? (
-            <TouchableOpacity
-              style={[styles.ctaBtn, styles.ctaBtnMuted]}
-              onPress={() => router.push({ pathname: '/game-chat', params: { id: String(game.id), name: title } })}
-            >
-              <Ionicons name="chatbubble-outline" size={18} color={Colors.accent} />
-              <Text style={[styles.ctaBtnText, { color: Colors.accent }]}>Open Chat</Text>
-            </TouchableOpacity>
-          ) : isJoined ? (
+          {(isOwn || isJoined) ? (
             <TouchableOpacity
               style={[styles.ctaBtn, styles.ctaBtnMuted]}
               onPress={() => router.push({ pathname: '/game-chat', params: { id: String(game.id), name: title } })}
