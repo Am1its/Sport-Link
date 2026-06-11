@@ -326,6 +326,16 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/blocked-users' as any)} activeOpacity={0.7}>
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.menuIconWrap, { backgroundColor: Colors.errorFaint }]}>
+              <Ionicons name="ban-outline" size={20} color={Colors.error} />
+            </View>
+            <Text style={styles.menuText}>Blocked Users</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIconWrap, { backgroundColor: Colors.errorFaint }]}>

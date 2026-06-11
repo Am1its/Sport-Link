@@ -69,8 +69,9 @@ router.get('/avatars', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/users/leaderboard — top 20 by karma
+// GET /api/users/leaderboard — top 20 by karma (excludes blocked users)
 router.get('/leaderboard', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
   try {
     const [rows] = await pool.execute(`
       SELECT
@@ -81,10 +82,91 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
         (SELECT COUNT(*) FROM GameParticipants WHERE user_id = u.id) AS games_joined,
         ${KARMA_SQL} AS karma
       FROM Users u
+      WHERE u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+        AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
       ORDER BY karma DESC
       LIMIT 20
-    `);
+    `, [userId, userId]);
     res.json({ success: true, leaderboard: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/users/blocked — list blocked users
+router.get('/blocked', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const [rows] = await pool.execute(
+      `SELECT u.id, u.username, u.avatar
+       FROM BlockedUsers b
+       JOIN Users u ON u.id = b.blocked_id
+       WHERE b.blocker_id = ?
+       ORDER BY b.created_at DESC`,
+      [userId]
+    );
+    res.json({ success: true, blocked: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/users/:id/block — block a user
+router.post('/:id/block', authMiddleware, async (req, res) => {
+  const blockerId = req.user.id;
+  const blockedId = parseInt(req.params.id);
+  if (isNaN(blockedId) || blockedId === blockerId)
+    return res.status(400).json({ success: false, message: 'Invalid user id' });
+  try {
+    await pool.execute(
+      'INSERT IGNORE INTO BlockedUsers (blocker_id, blocked_id) VALUES (?, ?)',
+      [blockerId, blockedId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/users/:id/block — unblock a user
+router.delete('/:id/block', authMiddleware, async (req, res) => {
+  const blockerId = req.user.id;
+  const blockedId = parseInt(req.params.id);
+  if (isNaN(blockedId))
+    return res.status(400).json({ success: false, message: 'Invalid user id' });
+  try {
+    await pool.execute(
+      'DELETE FROM BlockedUsers WHERE blocker_id = ? AND blocked_id = ?',
+      [blockerId, blockedId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/users/:id/report — report a user
+router.post('/:id/report', authMiddleware, async (req, res) => {
+  const reporterId = req.user.id;
+  const reportedId = parseInt(req.params.id);
+  const { reason, context } = req.body;
+  if (isNaN(reportedId) || reportedId === reporterId)
+    return res.status(400).json({ success: false, message: 'Invalid user id' });
+  const validReasons = ['spam', 'harassment', 'inappropriate', 'other'];
+  if (!validReasons.includes(reason))
+    return res.status(400).json({ success: false, message: 'Invalid reason' });
+  if (context && context.length > 500)
+    return res.status(400).json({ success: false, message: 'context max 500 chars' });
+  try {
+    await pool.execute(
+      'INSERT INTO Reports (reporter_id, reported_id, reason, context) VALUES (?, ?, ?, ?)',
+      [reporterId, reportedId, reason, context?.trim() ?? null]
+    );
+    res.json({ success: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -151,11 +233,14 @@ router.get('/search', authMiddleware, async (req, res) => {
   const q = (req.query.q || '').trim();
   if (q.length < 2) return res.json({ success: true, users: [] });
   try {
+    const userId = req.user.id;
     const [rows] = await pool.execute(
       `SELECT id, username, avatar FROM Users
        WHERE username LIKE ? AND id != ?
+         AND id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+         AND id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
        LIMIT 20`,
-      [`${q}%`, req.user.id]
+      [`${q}%`, userId, userId, userId]
     );
     res.json({ success: true, users: rows });
   } catch (err) {
@@ -277,10 +362,12 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
             SELECT 1 FROM Friends
             WHERE (requester_id=? AND addressee_id=u.id) OR (requester_id=u.id AND addressee_id=?)
           )
+          AND u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+          AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
           ${locationClause}
         ORDER BY shared_game_count DESC, karma DESC
         LIMIT 20
-      `, [userId, userId, userId, userId, userId]);
+      `, [userId, userId, userId, userId, userId, userId, userId]);
     } else {
       // Match by shared sport preferences (or specific sport filter)
       const sportJoinClause = sport
@@ -332,11 +419,13 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
             SELECT 1 FROM Friends
             WHERE (requester_id=? AND addressee_id=u.id) OR (requester_id=u.id AND addressee_id=?)
           )
+          AND u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+          AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
           ${locationClause}
         GROUP BY u.id, u.username, u.avatar
         ORDER BY shared_count DESC, shared_game_count DESC, karma DESC
         LIMIT 20
-      `, [param1, userId, userId, userId, userId, userId]);
+      `, [param1, userId, userId, userId, userId, userId, userId, userId]);
     }
 
     const enriched = rows.map(r => ({

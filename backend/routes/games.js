@@ -67,12 +67,14 @@ router.get('/', async (req, res) => {
     // 1. userId for is_joined EXISTS (if authed)
     // 2. lat, lng, lat for haversine (if radius)
     // 3. userId for SportPreferences JOIN (if authed)
-    // 4. search term (if q provided) — FULLTEXT or two LIKE params
-    // 5. radius_km for HAVING (if radius)
+    // 4. userId x2 for block filter WHERE subqueries (if authed)
+    // 5. search term (if q provided) — FULLTEXT or two LIKE params
+    // 6. radius_km for HAVING (if radius)
     const params = [];
     if (userId) params.push(userId);
     if (useRadius) params.push(parseFloat(lat), parseFloat(lng), parseFloat(lat));
     if (userId) params.push(userId);
+    if (userId) params.push(userId, userId);
     if (useSearch) {
       if (searchTerm.length >= 3) {
         // FULLTEXT boolean mode: prefix match on each word
@@ -101,6 +103,8 @@ router.get('/', async (req, res) => {
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') IS NULL
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > NOW()
         )
+        ${userId ? `AND g.host_id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+        AND g.host_id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)` : ''}
         ${searchClause}
       GROUP BY g.id
       ${useRadius ? 'HAVING distance_km <= ?' : ''}

@@ -53,8 +53,10 @@ router.get('/', async (req, res) => {
       ) conv
       JOIN DirectMessages d ON d.id = conv.last_id
       JOIN Users u ON u.id = conv.other_id
+      WHERE u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+        AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
       ORDER BY d.created_at DESC
-    `, [userId, userId, userId, userId]);
+    `, [userId, userId, userId, userId, userId, userId]);
 
     res.json({ success: true, conversations: convs });
   } catch (err) {

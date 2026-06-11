@@ -78,6 +78,7 @@ function RootLayout() {
         <Stack.Screen name="game/[id]" />
         <Stack.Screen name="activity" />
         <Stack.Screen name="invite/[id]" />
+        <Stack.Screen name="blocked-users" />
       </Stack>
     </AuthProvider>
   );
