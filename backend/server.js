@@ -161,3 +161,55 @@ async function sendGameReminders() {
 }
 
 setInterval(sendGameReminders, 60_000);
+
+// --- Auto-complete stale games ---
+// Transitions active games to 'completed' AUTO_COMPLETE_HOURS after scheduled_time
+// (default 3h). Also nudges host + participants to submit ratings.
+async function autoCompleteGames() {
+  const hours = parseInt(process.env.AUTO_COMPLETE_HOURS ?? '3', 10);
+  try {
+    const [games] = await pool.execute(`
+      SELECT id, title, sport_type, host_id
+      FROM Games
+      WHERE status = 'active'
+        AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i') <= DATE_SUB(NOW(), INTERVAL ? HOUR)
+    `, [hours]);
+
+    for (const game of games) {
+      const [result] = await pool.execute(
+        "UPDATE Games SET status = 'completed' WHERE id = ? AND status = 'active'",
+        [game.id]
+      );
+      if (result.affectedRows === 0) continue; // Already changed by host
+
+      const sportLabel = game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1);
+      const gameTitle  = game.title || `${sportLabel} Game`;
+      console.log(`✅ Auto-completed game ${game.id} (${gameTitle})`);
+
+      const [rows] = await pool.execute(`
+        SELECT u.push_token
+        FROM Users u
+        WHERE u.id = ? AND u.push_token IS NOT NULL
+        UNION
+        SELECT u.push_token
+        FROM GameParticipants gp
+        JOIN Users u ON u.id = gp.user_id
+        WHERE gp.game_id = ? AND u.push_token IS NOT NULL
+      `, [game.host_id, game.id]);
+
+      const tokens = rows.map(r => r.push_token).filter(Boolean);
+      if (tokens.length === 0) continue;
+
+      await sendPushNotifications(tokens.map(to => ({
+        to,
+        title: '🏅 Rate your teammates!',
+        body:  `${gameTitle} has ended. How did everyone do?`,
+        data:  { gameId: game.id },
+      })));
+    }
+  } catch (err) {
+    console.error('Auto-complete games error:', err.message);
+  }
+}
+
+setInterval(autoCompleteGames, 5 * 60_000);
