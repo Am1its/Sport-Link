@@ -39,6 +39,7 @@ type Review = {
 };
 
 type ClaimedBy = { id: number; username: string; avatar: string | null } | null;
+type Announcement = { id: number; message: string; created_at: string; username: string };
 
 function StarRow({ rating, size = 16, color = Colors.yellow, onPress }: {
   rating: number; size?: number; color?: string; onPress?: (n: number) => void;
@@ -198,6 +199,9 @@ export default function CourtDetailScreen() {
   const [claimedBy, setClaimedBy] = useState<ClaimedBy>(null);
   const [isManager, setIsManager] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annInput, setAnnInput] = useState('');
+  const [postingAnn, setPostingAnn] = useState(false);
 
   const sportColor = sport && SPORT_COLORS[sport] ? SPORT_COLORS[sport] : Colors.accent;
   const sportIcon  = sport && SPORT_ICONS[sport]  ? SPORT_ICONS[sport]  : 'trophy';
@@ -222,6 +226,7 @@ export default function CourtDetailScreen() {
         setAvgRating(data.avg_rating);
         setClaimedBy(data.claimed_by ?? null);
         setIsManager(data.is_manager ?? false);
+        setAnnouncements(data.announcements ?? []);
       }
     } catch (err: any) {
       if (err?.name === 'UnauthorizedError') return;
@@ -286,6 +291,31 @@ export default function CourtDetailScreen() {
         } catch {}
       }},
     ]);
+  };
+
+  const handlePostAnnouncement = async () => {
+    const msg = annInput.trim();
+    if (!msg || postingAnn) return;
+    setPostingAnn(true);
+    try {
+      const res = await apiFetch(`/api/courts/${placeId}/announcements`, {
+        method: 'POST', token,
+        body: JSON.stringify({ message: msg }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAnnouncements(prev => [data.announcement, ...prev]);
+        setAnnInput('');
+      } else Alert.alert('Error', data.message);
+    } catch { Alert.alert('Error', 'Could not post announcement.'); }
+    finally { setPostingAnn(false); }
+  };
+
+  const handleDeleteAnnouncement = async (annId: number) => {
+    try {
+      await apiFetch(`/api/courts/${placeId}/announcements/${annId}`, { method: 'DELETE', token });
+      setAnnouncements(prev => prev.filter(a => a.id !== annId));
+    } catch { Alert.alert('Error', 'Could not delete announcement.'); }
   };
 
   const displayName = placesData?.name ?? paramName ?? 'Court';
@@ -421,6 +451,59 @@ export default function CourtDetailScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Court Announcements */}
+          {(announcements.length > 0 || isManager) && (
+            <View style={styles.annSection}>
+              <View style={styles.annHeader}>
+                <Ionicons name="megaphone-outline" size={16} color={Colors.orange} />
+                <Text style={styles.annSectionTitle}>Announcements</Text>
+              </View>
+              {announcements.map(ann => (
+                <View key={ann.id} style={styles.annCard}>
+                  <View style={styles.annCardHeader}>
+                    <Ionicons name="alert-circle-outline" size={14} color={Colors.orange} />
+                    <Text style={styles.annUsername}>{ann.username}</Text>
+                    {isManager && (
+                      <TouchableOpacity
+                        onPress={() => Alert.alert('Delete Announcement', 'Remove this announcement?', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: () => handleDeleteAnnouncement(ann.id) },
+                        ])}
+                        style={{ marginLeft: 'auto' }}
+                      >
+                        <Ionicons name="close-circle-outline" size={16} color={Colors.error} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text style={styles.annMessage}>{ann.message}</Text>
+                </View>
+              ))}
+              {isManager && (
+                <View style={styles.annInputRow}>
+                  <TextInput
+                    style={styles.annInput}
+                    placeholder="Post an announcement..."
+                    placeholderTextColor={Colors.textHint}
+                    value={annInput}
+                    onChangeText={setAnnInput}
+                    multiline
+                    maxLength={500}
+                  />
+                  <TouchableOpacity
+                    style={[styles.annPostBtn, (!annInput.trim() || postingAnn) && { opacity: 0.4 }]}
+                    onPress={handlePostAnnouncement}
+                    disabled={!annInput.trim() || postingAnn}
+                  >
+                    {postingAnn
+                      ? <ActivityIndicator size="small" color={Colors.bg} />
+                      : <Text style={styles.annPostBtnText}>Post</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* SportLink rating aggregate */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Community Reviews</Text>
@@ -554,4 +637,17 @@ const styles = StyleSheet.create({
   unclaimText:   { fontSize: 11, color: Colors.error, fontWeight: '700' },
   claimCta:      { marginHorizontal: Spacing.xl, marginBottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: Colors.blueFaint, borderRadius: Radius.xl, padding: Spacing.md, borderWidth: 1, borderColor: Colors.blueBorder },
   claimCtaText:  { fontSize: 13, color: Colors.blue, fontWeight: '800' },
+
+  // Announcements
+  annSection:      { marginHorizontal: Spacing.xl, marginBottom: Spacing.xl },
+  annHeader:       { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
+  annSectionTitle: { fontSize: 15, fontWeight: '800', color: Colors.orange },
+  annCard:         { backgroundColor: Colors.orange + '14', borderRadius: Radius.lg, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.orange + '44' },
+  annCardHeader:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
+  annUsername:     { fontSize: 11, fontWeight: '800', color: Colors.orange },
+  annMessage:      { fontSize: 13, color: Colors.text, lineHeight: 19 },
+  annInputRow:     { marginTop: 6, gap: 8 },
+  annInput:        { backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, color: Colors.text, fontSize: 14, minHeight: 60, textAlignVertical: 'top', borderWidth: 1.5, borderColor: Colors.orange + '66' },
+  annPostBtn:      { backgroundColor: Colors.orange, borderRadius: Radius.pill, height: 42, alignItems: 'center', justifyContent: 'center' },
+  annPostBtnText:  { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
 });

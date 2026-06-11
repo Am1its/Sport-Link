@@ -186,12 +186,23 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
 
     const isManager = !!(claim && claim.user_id === req.user.id);
 
+    const [announcements] = await pool.execute(
+      `SELECT ca.id, ca.message, ca.created_at, u.username
+       FROM CourtAnnouncements ca
+       JOIN Users u ON u.id = ca.user_id
+       WHERE ca.place_id = ?
+       ORDER BY ca.created_at DESC
+       LIMIT 5`,
+      [placeId]
+    );
+
     res.json({
       success: true,
       places: placesData,
       review_count: Number(agg.review_count),
       avg_rating: agg.avg_rating ? Number(agg.avg_rating) : null,
       reviews,
+      announcements,
       claimed_by: claim ? { id: claim.user_id, username: claim.username, avatar: claim.avatar } : null,
       is_manager: isManager,
     });
@@ -345,6 +356,56 @@ router.delete('/:placeId/claim', authMiddleware, async (req, res) => {
     );
     if (result.affectedRows === 0)
       return res.status(404).json({ success: false, message: 'No claim found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/courts/:placeId/announcements — manager posts a notice
+router.post('/:placeId/announcements', authMiddleware, async (req, res) => {
+  const { placeId } = req.params;
+  const userId = req.user.id;
+  const { message } = req.body;
+  if (!message?.trim()) return res.status(400).json({ success: false, message: 'message required' });
+  if (message.trim().length > 500) return res.status(400).json({ success: false, message: 'message max 500 chars' });
+
+  const isManager = await requireCourtManager(placeId, userId);
+  if (!isManager) return res.status(403).json({ success: false, message: 'Not the court manager' });
+
+  try {
+    const [result] = await pool.execute(
+      'INSERT INTO CourtAnnouncements (place_id, user_id, message) VALUES (?, ?, ?)',
+      [placeId, userId, message.trim()]
+    );
+    const [[ann]] = await pool.execute(
+      `SELECT ca.id, ca.message, ca.created_at, u.username
+       FROM CourtAnnouncements ca JOIN Users u ON u.id = ca.user_id
+       WHERE ca.id = ?`, [result.insertId]
+    );
+    res.status(201).json({ success: true, announcement: ann });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/courts/:placeId/announcements/:annId — manager removes a notice
+router.delete('/:placeId/announcements/:annId', authMiddleware, async (req, res) => {
+  const { placeId, annId } = req.params;
+  const userId = req.user.id;
+
+  const isManager = await requireCourtManager(placeId, userId);
+  if (!isManager) return res.status(403).json({ success: false, message: 'Not the court manager' });
+
+  try {
+    const [result] = await pool.execute(
+      'DELETE FROM CourtAnnouncements WHERE id = ? AND place_id = ?',
+      [annId, placeId]
+    );
+    if (result.affectedRows === 0)
+      return res.status(404).json({ success: false, message: 'Announcement not found' });
     res.json({ success: true });
   } catch (err) {
     console.error(err);
