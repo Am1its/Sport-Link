@@ -43,12 +43,15 @@ const toMapGame = (row) => ({
   is_joined: row.is_joined != null ? Boolean(row.is_joined) : false,
 });
 
-// GET /api/games — public; optional ?lat=&lng=&radius_km= for distance filter
+// GET /api/games — public; optional ?lat=&lng=&radius_km=&q= for distance + text filter
 // Authenticated: sorted by sport preference match + skill proximity.
 // Unauthenticated: sorted by created_at DESC.
+// ?q= uses FULLTEXT (words ≥ 3 chars) or LIKE fallback for shorter terms.
 router.get('/', async (req, res) => {
-  const { lat, lng, radius_km } = req.query;
+  const { lat, lng, radius_km, q } = req.query;
   const useRadius = lat && lng && radius_km;
+  const searchTerm = typeof q === 'string' ? q.trim() : '';
+  const useSearch  = searchTerm.length >= 2;
 
   const userId = optionalUserId(req);
 
@@ -63,12 +66,26 @@ router.get('/', async (req, res) => {
     // 1. userId for is_joined EXISTS (if authed)
     // 2. lat, lng, lat for haversine (if radius)
     // 3. userId for SportPreferences JOIN (if authed)
-    // 4. radius_km for HAVING (if radius)
+    // 4. search term (if q provided) — FULLTEXT or two LIKE params
+    // 5. radius_km for HAVING (if radius)
     const params = [];
     if (userId) params.push(userId);
     if (useRadius) params.push(parseFloat(lat), parseFloat(lng), parseFloat(lat));
     if (userId) params.push(userId);
+    if (useSearch) {
+      if (searchTerm.length >= 3) {
+        // FULLTEXT boolean mode: prefix match on each word
+        const booleanQuery = searchTerm.split(/\s+/).filter(Boolean).map(w => `+${w}*`).join(' ');
+        params.push(booleanQuery);
+      } else {
+        params.push(`%${searchTerm}%`, `%${searchTerm}%`);
+      }
+    }
     if (useRadius) params.push(parseFloat(radius_km));
+
+    const searchClause = !useSearch ? '' : searchTerm.length >= 3
+      ? 'AND MATCH(g.title, g.location_desc) AGAINST (? IN BOOLEAN MODE)'
+      : 'AND (g.title LIKE ? OR g.location_desc LIKE ?)';
 
     const [rows] = await pool.execute(`
       SELECT g.*, COUNT(gp.user_id) AS participant_count
@@ -83,6 +100,7 @@ router.get('/', async (req, res) => {
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') IS NULL
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > NOW()
         )
+        ${searchClause}
       GROUP BY g.id
       ${useRadius ? 'HAVING distance_km <= ?' : ''}
       ORDER BY
