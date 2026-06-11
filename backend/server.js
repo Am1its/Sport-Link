@@ -58,6 +58,141 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'SportLink API is running!' });
 });
 
+// --- Game share landing page (Open Graph social preview + deep link) ---
+const SPORT_LABELS = {
+  basketball: 'Basketball', football: 'Football', tennis: 'Tennis',
+  volleyball: 'Volleyball', yoga: 'Yoga', gym: 'Gym',
+  studio: 'Studio', footvolley: 'Footvolley', swimming: 'Swimming',
+};
+const SPORT_EMOJI = {
+  basketball: '🏀', football: '⚽', tennis: '🎾',
+  volleyball: '🏐', yoga: '🧘', gym: '💪',
+  studio: '💃', footvolley: '🏐', swimming: '🏊',
+};
+
+app.get('/game/:id', async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  if (isNaN(gameId)) return res.status(404).send('Not found');
+
+  try {
+    const [[game]] = await pool.execute(
+      `SELECT g.id, g.sport_type, g.title, g.location_desc, g.scheduled_time,
+              g.level, g.max_players, u.username AS host_username,
+              COUNT(gp.user_id) AS participant_count
+       FROM Games g
+       JOIN Users u ON u.id = g.host_id
+       LEFT JOIN GameParticipants gp ON gp.game_id = g.id
+       WHERE g.id = ? AND g.status = 'active'
+       GROUP BY g.id`,
+      [gameId]
+    );
+
+    const BASE_URL = process.env.PUBLIC_URL || `https://sport-link-production.up.railway.app`;
+    const deepLink = `sportlink://game/${gameId}`;
+    const pageUrl  = `${BASE_URL}/game/${gameId}`;
+
+    if (!game) {
+      return res.status(404).send(buildLandingHtml({
+        title: 'Game not found — SportLink',
+        description: 'This game may have been cancelled or completed.',
+        deepLink, pageUrl, game: null,
+      }));
+    }
+
+    const sport  = SPORT_LABELS[game.sport_type] ?? game.sport_type;
+    const emoji  = SPORT_EMOJI[game.sport_type]  ?? '🏅';
+    const title  = game.title || `${sport} Game`;
+    const ogTitle = `${emoji} ${title} — SportLink`;
+    const parts  = [];
+    if (game.scheduled_time) parts.push(`🕒 ${game.scheduled_time}`);
+    if (game.location_desc)  parts.push(`📍 ${game.location_desc}`);
+    parts.push(`Hosted by ${game.host_username}`);
+    const description = parts.join('  ·  ');
+
+    res.send(buildLandingHtml({ title: ogTitle, description, deepLink, pageUrl, game, sport, emoji }));
+  } catch (err) {
+    console.error('Landing page error:', err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+function buildLandingHtml({ title, description, deepLink, pageUrl, game, sport, emoji }) {
+  const bgColor   = '#1C1C1E';
+  const accent    = '#0FEA95';
+  const surface   = '#2C2C2E';
+  const textColor = '#FFFFFF';
+  const subColor  = '#AEAEB2';
+
+  const gameBlock = game ? `
+    <div class="game-card">
+      <div class="sport-badge">${emoji} ${sport ?? ''}</div>
+      <h1 class="game-title">${game.title || (sport + ' Game')}</h1>
+      ${game.scheduled_time ? `<div class="meta"><span class="meta-icon">🕒</span> ${game.scheduled_time}</div>` : ''}
+      ${game.location_desc  ? `<div class="meta"><span class="meta-icon">📍</span> ${game.location_desc}</div>` : ''}
+      <div class="meta"><span class="meta-icon">👤</span> Hosted by <strong>${game.host_username}</strong></div>
+      ${game.max_players
+        ? `<div class="meta"><span class="meta-icon">👥</span> ${game.participant_count + 1} / ${game.max_players} players</div>`
+        : ''}
+      <div class="meta"><span class="meta-icon">⚡</span> Level ${game.level} / 5</div>
+    </div>` : `<p style="color:${subColor};text-align:center;margin:2rem 0">Game not found or no longer active.</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${title}</title>
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="${title}" />
+  <meta property="og:description" content="${description}" />
+  <meta property="og:url"         content="${pageUrl}" />
+  <meta property="og:type"        content="website" />
+  <meta property="og:site_name"   content="SportLink" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary" />
+  <meta name="twitter:title"       content="${title}" />
+  <meta name="twitter:description" content="${description}" />
+
+  <!-- iOS deep link -->
+  <meta name="apple-itunes-app" content="app-id=PLACEHOLDER, app-argument=${deepLink}" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: ${bgColor}; color: ${textColor}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+    .logo { font-size: 28px; font-weight: 900; letter-spacing: -1px; margin-bottom: 32px; }
+    .logo span { color: ${accent}; }
+    .game-card { background: ${surface}; border-radius: 20px; padding: 24px; width: 100%; max-width: 400px; margin-bottom: 28px; }
+    .sport-badge { display: inline-block; font-size: 13px; font-weight: 700; color: ${accent}; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .game-title { font-size: 22px; font-weight: 900; color: ${textColor}; margin-bottom: 16px; line-height: 1.3; }
+    .meta { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; color: ${subColor}; margin-bottom: 8px; }
+    .meta-icon { flex-shrink: 0; }
+    .meta strong { color: ${textColor}; }
+    .open-btn { display: block; width: 100%; max-width: 400px; background: ${accent}; color: #000; font-size: 16px; font-weight: 800; text-align: center; padding: 16px; border-radius: 100px; text-decoration: none; margin-bottom: 14px; }
+    .open-btn:hover { opacity: 0.9; }
+    .sub { font-size: 13px; color: ${subColor}; text-align: center; }
+  </style>
+
+  <script>
+    // Auto-open deep link when page loads on mobile
+    window.addEventListener('load', function() {
+      const ua = navigator.userAgent;
+      if (/iPhone|iPad|iPod|Android/.test(ua)) {
+        window.location.href = '${deepLink}';
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="logo">Sport<span>Link</span></div>
+  ${gameBlock}
+  <a class="open-btn" href="${deepLink}">Open in SportLink</a>
+  <p class="sub">Don't have SportLink yet? Download it from the App Store.</p>
+</body>
+</html>`;
+}
+
 app.use('/api/auth',          authRoutes);
 app.use('/api/games',         gamesRoutes);
 app.use('/api/chats',         chatsRoutes);

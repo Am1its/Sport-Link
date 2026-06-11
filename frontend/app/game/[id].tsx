@@ -8,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { API_BASE } from '../../constants/api';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../../constants/theme';
 import type { Game } from '../../types';
@@ -64,10 +65,13 @@ export default function GameLandingScreen() {
 
   const handleShare = async () => {
     if (!game) return;
-    const label = sportLabel(game.sport_type);
-    const title = game.title || `${label} Game`;
+    const label    = sportLabel(game.sport_type);
+    const title    = game.title || `${label} Game`;
+    const shareUrl = `${API_BASE}/game/${id}`;
     await Share.share({
-      message: `Join my ${label} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${id}`,
+      title,
+      message: `Join my ${label} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\n${shareUrl}`,
+      url: shareUrl,
     });
   };
 
