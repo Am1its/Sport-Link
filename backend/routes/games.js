@@ -35,7 +35,8 @@ const toMapGame = (row) => ({
 });
 
 // GET /api/games — public; optional ?lat=&lng=&radius_km= for distance filter
-// If a valid JWT is present, is_joined is included per game.
+// Authenticated: sorted by sport preference match + skill proximity.
+// Unauthenticated: sorted by created_at DESC.
 router.get('/', async (req, res) => {
   const { lat, lng, radius_km } = req.query;
   const useRadius = lat && lng && radius_km;
@@ -49,17 +50,22 @@ router.get('/', async (req, res) => {
   } catch { /* invalid/expired token — treat as unauthenticated */ }
 
   try {
-    // Haversine SELECT expression — params: lat, lng, lat
     const haversineExpr = `(6371 * ACOS(
       COS(RADIANS(?)) * COS(RADIANS(g.latitude)) *
       COS(RADIANS(g.longitude) - RADIANS(?)) +
       SIN(RADIANS(?)) * SIN(RADIANS(g.latitude))
     ))`;
 
-    // Build params: [userId?] + [lat, lng, lat, radius_km (if radius)]
+    // Param order follows the position of ? in the SQL string:
+    // 1. userId for is_joined EXISTS (if authed)
+    // 2. lat, lng, lat for haversine (if radius)
+    // 3. userId for SportPreferences JOIN (if authed)
+    // 4. radius_km for HAVING (if radius)
     const params = [];
     if (userId) params.push(userId);
-    if (useRadius) params.push(parseFloat(lat), parseFloat(lng), parseFloat(lat), parseFloat(radius_km));
+    if (useRadius) params.push(parseFloat(lat), parseFloat(lng), parseFloat(lat));
+    if (userId) params.push(userId);
+    if (useRadius) params.push(parseFloat(radius_km));
 
     const [rows] = await pool.execute(`
       SELECT g.*, COUNT(gp.user_id) AS participant_count
@@ -67,6 +73,7 @@ router.get('/', async (req, res) => {
         ${useRadius ? `, ${haversineExpr} AS distance_km` : ''}
       FROM Games g
       LEFT JOIN GameParticipants gp ON gp.game_id = g.id
+      ${userId ? 'LEFT JOIN SportPreferences sp ON sp.user_id = ? AND sp.sport_type = g.sport_type' : ''}
       WHERE g.status = 'active'
         AND (
           g.scheduled_time IS NULL
@@ -75,7 +82,13 @@ router.get('/', async (req, res) => {
         )
       GROUP BY g.id
       ${useRadius ? 'HAVING distance_km <= ?' : ''}
-      ORDER BY g.created_at DESC
+      ORDER BY
+        ${userId ? `
+          CASE WHEN MAX(sp.sport_type) IS NOT NULL THEN 1 ELSE 0 END DESC,
+          MAX(COALESCE(sp.is_favorite, 0)) DESC,
+          ABS(g.level - COALESCE(MAX(sp.skill_level), 3)) ASC,
+          STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') ASC
+        ` : 'g.created_at DESC'}
     `, params);
 
     res.json({ success: true, games: rows.map(toMapGame) });
