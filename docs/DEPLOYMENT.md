@@ -66,7 +66,13 @@ SHOW COLUMNS FROM CourtReviews LIKE 'owner_response';
 
 ### Database Backups
 
-Enable in Railway dashboard → MySQL service → Settings → Automated Backups. Recommended: daily backups, 7-day retention (available on Starter plan+).
+Railway automated backups require the Pro plan ($20/month). **Deferred until post-launch** when real user data exists and the Pro plan is justified.
+
+Manual backup on demand (run from your machine with Railway's external MySQL connection string):
+```bash
+mysqldump -h <host> -P <port> -u <user> -p<password> sportlink > backup_$(date +%Y%m%d).sql
+```
+Connection string available in Railway → MySQL service → Connect tab.
 
 ---
 
@@ -177,9 +183,9 @@ The `sportlink://` URL scheme is registered in `app.json → scheme`. Supported 
 
 ## Checklist Before App Store Submission
 
-- [ ] Run migration 019 on Railway MySQL
-- [ ] Set `EXPO_PUBLIC_SENTRY_DSN` in Railway env vars
-- [ ] Enable Railway automated backups
+- [x] Run migration 019 on Railway MySQL
+- [x] Set `EXPO_PUBLIC_SENTRY_DSN` in Railway env vars
+- [ ] Database backups — deferred until Pro plan (post-launch)
 - [ ] Create Apple Developer account ($99/yr)
 - [ ] Create app record in App Store Connect (get `ascAppId`)
 - [ ] Fill `appleTeamId` in `eas.json`
