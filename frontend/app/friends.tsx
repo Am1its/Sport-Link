@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  TextInput, ActivityIndicator, Alert, RefreshControl,
+  TextInput, ActivityIndicator, Alert, RefreshControl, Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { API_BASE } from '../constants/api';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null; karma: number };
 type Request = { friendship_id: number; id: number; username: string; avatar: string | null };
@@ -18,7 +19,7 @@ type Tab = 'friends' | 'requests' | 'search';
 
 export default function FriendsScreen() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<Tab>('friends');
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -123,7 +124,15 @@ export default function FriendsScreen() {
           <Ionicons name="chevron-back" size={26} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Friends</Text>
-        <View style={{ width: 36 }} />
+        <TouchableOpacity
+          style={styles.inviteBtn}
+          onPress={() => {
+            const url = `${API_BASE}/invite/${user?.id}`;
+            Share.share({ title: 'Join me on SportLink!', message: `Join me on SportLink! ${url}`, url });
+          }}
+        >
+          <Ionicons name="share-outline" size={20} color={Colors.accent} />
+        </TouchableOpacity>
       </View>
 
       {/* Tabs */}
@@ -291,7 +300,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.lg },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
+  backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
+  inviteBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.accentFaint, borderWidth: 1, borderColor: Colors.accentBorder, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 22, fontWeight: '900', color: Colors.text },
 
   tabRow: { flexDirection: 'row', paddingHorizontal: Spacing.xl, gap: Spacing.sm, marginBottom: Spacing.lg },

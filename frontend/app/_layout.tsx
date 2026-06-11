@@ -67,6 +67,7 @@ export default function RootLayout() {
         <Stack.Screen name="direct-chat" />
         <Stack.Screen name="game/[id]" />
         <Stack.Screen name="activity" />
+        <Stack.Screen name="invite/[id]" />
       </Stack>
     </AuthProvider>
   );

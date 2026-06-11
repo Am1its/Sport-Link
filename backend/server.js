@@ -193,6 +193,99 @@ function buildLandingHtml({ title, description, deepLink, pageUrl, game, sport, 
 </html>`;
 }
 
+// --- Invite / referral landing page ---
+app.get('/invite/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId);
+  if (isNaN(userId)) return res.status(404).send('Not found');
+
+  try {
+    const [[user]] = await pool.execute(
+      `SELECT u.username, u.bio, u.avatar,
+              (SELECT sport_type FROM GameParticipants gp
+               JOIN Games g ON g.id = gp.game_id
+               WHERE gp.user_id = u.id
+               GROUP BY g.sport_type ORDER BY COUNT(*) DESC LIMIT 1) AS top_sport
+       FROM Users u WHERE u.id = ?`,
+      [userId]
+    );
+
+    const BASE_URL = process.env.PUBLIC_URL || 'https://sport-link-production.up.railway.app';
+    const deepLink = `sportlink://invite/${userId}`;
+    const pageUrl  = `${BASE_URL}/invite/${userId}`;
+
+    if (!user) return res.status(404).send('User not found');
+
+    const sportEmoji = SPORT_EMOJI[user.top_sport] ?? '🏅';
+    const ogTitle = `${user.username} invited you to SportLink ${sportEmoji}`;
+    const ogDesc  = user.bio
+      ? `"${user.bio}" — Join SportLink and play ${SPORT_LABELS[user.top_sport] ?? 'sports'} together!`
+      : `Join SportLink and play ${SPORT_LABELS[user.top_sport] ?? 'sports'} together!`;
+
+    const avatarHtml = user.avatar
+      ? `<img class="avatar" src="data:image/jpeg;base64,${user.avatar}" alt="${user.username}" />`
+      : `<div class="avatar avatar-fallback">${user.username.charAt(0).toUpperCase()}</div>`;
+
+    const bgColor  = '#1C1C1E';
+    const accent   = '#0FEA95';
+    const surface  = '#2C2C2E';
+    const textClr  = '#FFFFFF';
+    const subColor = '#AEAEB2';
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${ogTitle}</title>
+  <meta property="og:title"       content="${ogTitle}" />
+  <meta property="og:description" content="${ogDesc}" />
+  <meta property="og:url"         content="${pageUrl}" />
+  <meta property="og:type"        content="website" />
+  <meta property="og:site_name"   content="SportLink" />
+  <meta name="twitter:card"        content="summary" />
+  <meta name="twitter:title"       content="${ogTitle}" />
+  <meta name="twitter:description" content="${ogDesc}" />
+  <meta name="apple-itunes-app"   content="app-id=PLACEHOLDER, app-argument=${deepLink}" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: ${bgColor}; color: ${textClr}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+    .logo { font-size: 28px; font-weight: 900; letter-spacing: -1px; margin-bottom: 32px; }
+    .logo span { color: ${accent}; }
+    .card { background: ${surface}; border-radius: 20px; padding: 28px 24px; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .avatar { width: 80px; height: 80px; border-radius: 40px; object-fit: cover; border: 3px solid ${accent}; }
+    .avatar-fallback { width: 80px; height: 80px; border-radius: 40px; border: 3px solid ${accent}; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 900; background: ${accent}22; color: ${accent}; }
+    .username { font-size: 22px; font-weight: 900; color: ${textClr}; }
+    .bio { font-size: 14px; color: ${subColor}; text-align: center; line-height: 1.5; }
+    .headline { font-size: 15px; color: ${subColor}; text-align: center; }
+    .open-btn { display: block; width: 100%; max-width: 400px; background: ${accent}; color: #000; font-size: 16px; font-weight: 800; text-align: center; padding: 16px; border-radius: 100px; text-decoration: none; margin-bottom: 14px; }
+    .sub { font-size: 13px; color: ${subColor}; text-align: center; }
+  </style>
+  <script>
+    window.addEventListener('load', function() {
+      if (/iPhone|iPad|iPod|Android/.test(navigator.userAgent)) {
+        window.location.href = '${deepLink}';
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="logo">Sport<span>Link</span></div>
+  <div class="card">
+    ${avatarHtml}
+    <div class="username">${user.username}</div>
+    ${user.bio ? `<div class="bio">"${user.bio}"</div>` : ''}
+    <div class="headline">${sportEmoji} invited you to play ${SPORT_LABELS[user.top_sport] ?? 'sports'} on SportLink!</div>
+  </div>
+  <a class="open-btn" href="${deepLink}">Open in SportLink</a>
+  <p class="sub">Don't have SportLink? Download from the App Store.</p>
+</body>
+</html>`);
+  } catch (err) {
+    console.error('Invite landing error:', err.message);
+    res.status(500).send('Server error');
+  }
+});
+
 app.use('/api/auth',          authRoutes);
 app.use('/api/games',         gamesRoutes);
 app.use('/api/chats',         chatsRoutes);

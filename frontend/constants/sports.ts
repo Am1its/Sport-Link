@@ -22,7 +22,7 @@ export const SPORT_ICONS: Record<string, string> = {
   swimming:   'swim',
 };
 
-const SPORT_LABELS: Record<string, string> = {
+export const SPORT_LABELS: Record<string, string> = {
   basketball: 'Basketball',
   football:   'Football',
   tennis:     'Tennis',
