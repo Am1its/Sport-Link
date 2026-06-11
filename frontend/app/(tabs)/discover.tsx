@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList, Modal,
   TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl, Image, Share,
@@ -34,10 +34,10 @@ function GameCard({
   onViewParticipants: () => void;
 }) {
   const handleShare = async () => {
-    const sportLabel = sportLabel(game.sport_type);
-    const title = game.title || `${sportLabel} Game`;
+    const label = sportLabel(game.sport_type);
+    const title = game.title || `${label} Game`;
     await Share.share({
-      message: `Join my ${sportLabel} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${game.id}`,
+      message: `Join my ${label} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${game.id}`,
     });
   };
   const [joining, setJoining] = useState(false);
@@ -232,12 +232,16 @@ export default function DiscoverScreen() {
   const [showSportModal, setShowSportModal]   = useState(false);
   const [showRadiusModal, setShowRadiusModal] = useState(false);
   const userLocation = useRef<{ lat: number; lng: number } | null>(null);
+  const searchRef    = useRef('');
+  searchRef.current  = search;
 
   const fetchGames = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      let url = '/api/games';
+      const q = searchRef.current.trim();
+      const parts: string[] = [];
+
       if (radiusKm !== null) {
         if (!userLocation.current) {
           const { status } = await Location.requestForegroundPermissionsAsync();
@@ -247,9 +251,16 @@ export default function DiscoverScreen() {
           }
         }
         if (userLocation.current) {
-          url += `?lat=${userLocation.current.lat}&lng=${userLocation.current.lng}&radius_km=${radiusKm}`;
+          parts.push(
+            `lat=${userLocation.current.lat}`,
+            `lng=${userLocation.current.lng}`,
+            `radius_km=${radiusKm}`,
+          );
         }
       }
+      if (q.length >= 2) parts.push(`q=${encodeURIComponent(q)}`);
+
+      const url = `/api/games${parts.length ? `?${parts.join('&')}` : ''}`;
       const res  = await apiFetch(url, { token });
       const data = await res.json();
       if (data.success) setGames(data.games);
@@ -262,6 +273,12 @@ export default function DiscoverScreen() {
     }
   }, [token, radiusKm]);
 
+  // Debounce search: re-fetch 400ms after the user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => fetchGames(), 400);
+    return () => clearTimeout(timer);
+  }, [search, fetchGames]);
+
   useFocusEffect(
     useCallback(() => { fetchGames(); }, [fetchGames])
   );
@@ -272,18 +289,10 @@ export default function DiscoverScreen() {
 
   const filtered = games.filter(g => {
     if (isPastGame(g.scheduled_time)) return false;
-    const matchSport  = sportFilter === 'all' || g.sport_type === sportFilter;
-    const q           = search.toLowerCase().trim();
-    const matchSearch = !q ||
-      g.sport_type.includes(q) ||
-      (g.location_desc ?? '').toLowerCase().includes(q) ||
-      (g.title ?? '').toLowerCase().includes(q);
-    return matchSport && matchSearch;
+    return sportFilter === 'all' || g.sport_type === sportFilter;
   });
 
-  const sportLabel = sportFilter === 'all'
-    ? 'All Sports'
-    : sportFilter.charAt(0).toUpperCase() + sportFilter.slice(1);
+  const sportFilterLabel = sportFilter === 'all' ? 'All Sports' : sportLabel(sportFilter);
 
   const radiusLabel = radiusKm === null ? 'Any Distance' : `${radiusKm} km`;
 
@@ -324,7 +333,7 @@ export default function DiscoverScreen() {
             style={[styles.selectorText, sportFilter !== 'all' && { color: Colors.accent }]}
             numberOfLines={1}
           >
-            {sportLabel}
+            {sportFilterLabel}
           </Text>
           <Ionicons
             name="chevron-down"
