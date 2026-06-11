@@ -273,9 +273,10 @@ export default function ProfileScreen() {
       <View style={styles.menuContainer}>
         <Text style={styles.menuSection}>Community</Text>
         {[
-          { icon: 'trophy-outline', iconColor: Colors.yellow,  bg: Colors.yellow + '20', label: 'Leaderboard',       route: '/leaderboard' },
-          { icon: 'people-outline', iconColor: Colors.blue,    bg: Colors.blueFaint,     label: 'Friends',           route: '/friends' },
-          { icon: 'magnet-outline', iconColor: Colors.accent,  bg: Colors.accentFaint,   label: 'Discover Players',  route: '/player-matching' },
+          { icon: 'trophy-outline',    iconColor: Colors.yellow,  bg: Colors.yellow + '20', label: 'Leaderboard',       route: '/leaderboard' },
+          { icon: 'people-outline',    iconColor: Colors.blue,    bg: Colors.blueFaint,     label: 'Friends',           route: '/friends' },
+          { icon: 'pulse-outline',     iconColor: Colors.orange,  bg: Colors.orange + '20', label: 'Friend Activity',   route: '/activity' },
+          { icon: 'magnet-outline',    iconColor: Colors.accent,  bg: Colors.accentFaint,   label: 'Discover Players',  route: '/player-matching' },
         ].map(item => (
           <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => router.push(item.route as any)} activeOpacity={0.7}>
             <View style={styles.menuItemLeft}>
