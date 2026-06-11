@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { StatusBar } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Sentry from '@sentry/react-native';
@@ -62,6 +63,7 @@ function AppServices() {
 function RootLayout() {
   return (
     <AuthProvider>
+      <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" translucent={false} />
       <AppServices />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />

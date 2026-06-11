@@ -9,8 +9,9 @@ import { apiFetch } from '../utils/api';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
-const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+const IOS_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID     ?? '';
+const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
+const WEB_CLIENT_ID     = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID         ?? '';
 
 const reverseClientId = IOS_CLIENT_ID.replace('.apps.googleusercontent.com', '');
 const REDIRECT_URI = makeRedirectUri({
@@ -27,6 +28,7 @@ export function useGoogleAuth() {
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId: IOS_CLIENT_ID,
+    androidClientId: ANDROID_CLIENT_ID || undefined,
     webClientId: WEB_CLIENT_ID,
     scopes: ['openid', 'email', 'profile'],
     redirectUri: REDIRECT_URI,
