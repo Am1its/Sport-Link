@@ -54,6 +54,14 @@ function GameCard({
                 {game.is_host ? 'HOST' : 'JOINED'}
               </Text>
             </View>
+            {game.recurrence && game.recurrence !== 'none' && (
+              <View style={styles.badgeRecurring}>
+                <Ionicons name="repeat-outline" size={10} color={Colors.blue} />
+                <Text style={styles.badgeRecurringText}>
+                  {game.recurrence === 'weekly' ? 'WEEKLY' : 'BI-WEEKLY'}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Title */}
@@ -374,6 +382,8 @@ const styles = StyleSheet.create({
   badgeHost:   { backgroundColor: Colors.accentFaint },
   badgeJoined: { backgroundColor: Colors.orange + '22' },
   badgeText:   { fontSize: 10, fontWeight: '800' },
+  badgeRecurring:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.blueFaint, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  badgeRecurringText: { fontSize: 9, fontWeight: '800', color: Colors.blue },
 
   cardTitle:    { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 2 },
   locationText: { fontSize: 13, color: Colors.textSub, marginBottom: 6 },

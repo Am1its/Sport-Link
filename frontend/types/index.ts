@@ -21,6 +21,7 @@ export type Game = {
   status?: string;
   created_at?: string;
   photo: string | null;
+  recurrence?: 'none' | 'weekly' | 'biweekly';
 };
 
 export type MapItem = {

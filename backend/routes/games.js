@@ -41,6 +41,7 @@ const toMapGame = (row) => ({
   photo: row.photo ?? null,
   created_at: row.created_at,
   is_joined: row.is_joined != null ? Boolean(row.is_joined) : false,
+  recurrence: row.recurrence ?? 'none',
 });
 
 // GET /api/games — public; optional ?lat=&lng=&radius_km=&q= for distance + text filter
@@ -431,9 +432,12 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 // POST /api/games — requires auth
 router.post('/', authMiddleware, async (req, res) => {
-  const { sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, invited_friends, photo } = req.body;
+  const { sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, invited_friends, photo, recurrence } = req.body;
   if (!sport_type || !level || latitude == null || longitude == null)
     return res.status(400).json({ success: false, message: 'sport_type, level, latitude, longitude are required' });
+
+  const validRecurrences = ['none', 'weekly', 'biweekly'];
+  const recurrenceVal = validRecurrences.includes(recurrence) ? recurrence : 'none';
 
   const levelNum = parseInt(level);
   if (isNaN(levelNum) || levelNum < 1 || levelNum > 5)
@@ -458,9 +462,9 @@ router.post('/', authMiddleware, async (req, res) => {
 
   try {
     const [result] = await pool.execute(
-      `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, photo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, sport_type, level, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null, photo || null]
+      `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, photo, recurrence)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, sport_type, level, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null, photo || null, recurrenceVal]
     );
     const gameId = result.insertId;
 

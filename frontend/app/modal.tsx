@@ -56,6 +56,8 @@ export default function GameFormModal() {
   const [photo, setPhoto]             = useState<string | null>((params.existingPhoto as string) || null);
   const [loading, setLoading]         = useState(false);
 
+  const [recurrence, setRecurrence] = useState<'none' | 'weekly' | 'biweekly'>('none');
+
   const [friends, setFriends]                 = useState<Friend[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<number>>(new Set());
 
@@ -128,8 +130,9 @@ export default function GameFormModal() {
         photo:           photo         || null,
       };
       if (!isEdit) {
-        body.latitude  = parseFloat(params.lat as string);
-        body.longitude = parseFloat(params.lng as string);
+        body.latitude   = parseFloat(params.lat as string);
+        body.longitude  = parseFloat(params.lng as string);
+        body.recurrence = recurrence;
         if (selectedFriendIds.size > 0) body.invited_friends = Array.from(selectedFriendIds);
       }
 
@@ -390,6 +393,37 @@ export default function GameFormModal() {
           </>
         )}
 
+        {/* ── Recurrence (new games only) ── */}
+        {!isEdit && (
+          <>
+            <SectionLabel>Repeat</SectionLabel>
+            <View style={styles.recurrenceRow}>
+              {(['none', 'weekly', 'biweekly'] as const).map(opt => {
+                const labels = { none: 'One-time', weekly: 'Weekly', biweekly: 'Bi-weekly' };
+                const active = recurrence === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.recurrenceChip, active && { backgroundColor: sportColor + '22', borderColor: sportColor, borderWidth: 2 }]}
+                    onPress={() => setRecurrence(opt)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.recurrenceText, active && { color: sportColor, fontWeight: '800' }]}>{labels[opt]}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {recurrence !== 'none' && (
+              <View style={styles.recurrenceNote}>
+                <Ionicons name="repeat-outline" size={14} color={Colors.accent} />
+                <Text style={styles.recurrenceNoteText}>
+                  A new game will be scheduled automatically after each session.
+                </Text>
+              </View>
+            )}
+          </>
+        )}
+
         {/* ── Submit ── */}
         <TouchableOpacity
           style={[styles.submitBtn, loading && { opacity: 0.75 }, { shadowColor: sportColor }]}
@@ -472,6 +506,12 @@ const styles = StyleSheet.create({
   friendName:   { color: Colors.textSub, fontSize: 13, fontWeight: '700', flexShrink: 1 },
   inviteNote:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.xl },
   inviteNoteText: { color: Colors.accent, fontSize: 13, fontWeight: '600' },
+
+  recurrenceRow:  { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
+  recurrenceChip: { flex: 1, paddingVertical: 10, borderRadius: Radius.md, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center' },
+  recurrenceText: { fontSize: 13, fontWeight: '600', color: Colors.textSub },
+  recurrenceNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: Spacing.xl },
+  recurrenceNoteText: { flex: 1, color: Colors.accent, fontSize: 13, fontWeight: '600', lineHeight: 18 },
 
   // Submit
   submitBtn: {
