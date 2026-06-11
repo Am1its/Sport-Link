@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList, Modal,
-  TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl, Image,
+  TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl, Image, Share,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -33,6 +33,13 @@ function GameCard({
   onJoined: (id: number, newCount: number) => void;
   onViewParticipants: () => void;
 }) {
+  const handleShare = async () => {
+    const sportLabel = game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1);
+    const title = game.title || `${sportLabel} Game`;
+    await Share.share({
+      message: `Join my ${sportLabel} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${game.id}`,
+    });
+  };
   const [joining, setJoining] = useState(false);
   const [isJoined, setIsJoined] = useState(!!game.is_joined);
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -174,35 +181,40 @@ function GameCard({
         ) : null}
       </View>
 
-      {/* Join button */}
+      {/* Join + Share row */}
       <View style={styles.joinBtnWrap}>
-        {isOwn ? (
-          <View style={[styles.joinBtn, styles.joinBtnMuted]}>
-            <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
-            <Text style={[styles.joinBtnText, { color: Colors.accent }]}>Your Game</Text>
-          </View>
-        ) : isJoined ? (
-          <View style={[styles.joinBtn, styles.joinBtnMuted]}>
-            <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
-            <Text style={[styles.joinBtnText, { color: Colors.accent }]}>Joined</Text>
-          </View>
-        ) : isFull ? (
-          <View style={[styles.joinBtn, styles.joinBtnMuted]}>
-            <Ionicons name="close-circle" size={16} color={Colors.error} />
-            <Text style={[styles.joinBtnText, { color: Colors.error }]}>Full</Text>
-          </View>
-        ) : (
-          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-            <TouchableOpacity style={styles.joinBtn} onPress={handleJoin} disabled={joining} activeOpacity={0.85}>
-              {joining
-                ? <ActivityIndicator color={Colors.bg} size="small" />
-                : <>
-                    <Text style={styles.joinBtnText}>Join Game</Text>
-                    <Ionicons name="arrow-forward" size={16} color={Colors.bg} />
-                  </>}
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+        <View style={styles.joinRow}>
+          {isOwn ? (
+            <View style={[styles.joinBtn, styles.joinBtnMuted]}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
+              <Text style={[styles.joinBtnText, { color: Colors.accent }]}>Your Game</Text>
+            </View>
+          ) : isJoined ? (
+            <View style={[styles.joinBtn, styles.joinBtnMuted]}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
+              <Text style={[styles.joinBtnText, { color: Colors.accent }]}>Joined</Text>
+            </View>
+          ) : isFull ? (
+            <View style={[styles.joinBtn, styles.joinBtnMuted]}>
+              <Ionicons name="close-circle" size={16} color={Colors.error} />
+              <Text style={[styles.joinBtnText, { color: Colors.error }]}>Full</Text>
+            </View>
+          ) : (
+            <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, { flex: 1 }]}>
+              <TouchableOpacity style={styles.joinBtn} onPress={handleJoin} disabled={joining} activeOpacity={0.85}>
+                {joining
+                  ? <ActivityIndicator color={Colors.bg} size="small" />
+                  : <>
+                      <Text style={styles.joinBtnText}>Join Game</Text>
+                      <Ionicons name="arrow-forward" size={16} color={Colors.bg} />
+                    </>}
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.7}>
+            <Ionicons name="share-outline" size={18} color={Colors.textSub} />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -519,9 +531,11 @@ const styles = StyleSheet.create({
 
   // Join button
   joinBtnWrap: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border },
-  joinBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 44, borderRadius: Radius.pill },
+  joinRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  joinBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 44, borderRadius: Radius.pill },
   joinBtnMuted:{ backgroundColor: Colors.surface2 },
   joinBtnText: { color: Colors.bg, ...Type.btnPrimary },
+  shareBtn:    { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
 
   // Empty state
   emptyIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md },

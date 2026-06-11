@@ -129,6 +129,41 @@ router.get('/mine', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/games/:id — single game detail (auth-optional: includes is_joined if authed)
+router.get('/:id', async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  if (isNaN(gameId)) return res.status(400).json({ success: false, message: 'Invalid game id' });
+
+  let userId = null;
+  try {
+    const raw = req.headers['authorization']?.split(' ')[1];
+    if (raw) userId = jwt.verify(raw, process.env.JWT_SECRET)?.id ?? null;
+  } catch { /* unauthenticated */ }
+
+  try {
+    const params = [];
+    if (userId) params.push(userId);
+    params.push(gameId);
+
+    const [[row]] = await pool.execute(`
+      SELECT g.*, COUNT(gp.user_id) AS participant_count,
+        u.username AS host_username
+        ${userId ? ', CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS is_joined' : ''}
+      FROM Games g
+      LEFT JOIN GameParticipants gp ON gp.game_id = g.id
+      JOIN Users u ON u.id = g.host_id
+      WHERE g.id = ?
+      GROUP BY g.id
+    `, params);
+
+    if (!row) return res.status(404).json({ success: false, message: 'Game not found' });
+    res.json({ success: true, game: { ...toMapGame(row), host_username: row.host_username, status: row.status } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // POST /api/games/:id/complete — host closes the game
 router.post('/:id/complete', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.id);
