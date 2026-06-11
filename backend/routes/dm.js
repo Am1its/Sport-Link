@@ -72,10 +72,14 @@ router.get('/:userId', async (req, res) => {
   if (isNaN(other)) return res.status(400).json({ success: false, message: 'Invalid userId' });
 
   try {
-    await pool.execute(
+    const [markResult] = await pool.execute(
       'UPDATE DirectMessages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ? AND is_read = 0',
       [me, other]
     );
+    if (markResult.affectedRows > 0) {
+      const io = req.app.get('io');
+      if (io) io.to(`user_${other}`).emit('dm_read', { readBy: me });
+    }
 
     const [messages] = await pool.execute(`
       SELECT
@@ -156,6 +160,9 @@ router.put('/:userId/read', async (req, res) => {
       'UPDATE DirectMessages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ? AND is_read = 0',
       [me, other]
     );
+    // Notify the sender their messages were read
+    const io = req.app.get('io');
+    if (io) io.to(`user_${other}`).emit('dm_read', { readBy: me });
     res.json({ success: true });
   } catch (err) {
     console.error('DM read error:', err);

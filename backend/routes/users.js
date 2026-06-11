@@ -20,6 +20,8 @@ const fetchUser = async (userId) => {
        u.username,
        u.bio,
        u.avatar,
+       u.current_streak,
+       u.longest_streak,
        (SELECT COUNT(*) FROM Games            WHERE host_id  = u.id) AS games_hosted,
        (SELECT COUNT(*) FROM GameParticipants WHERE user_id  = u.id) AS games_joined,
        ${KARMA_SQL} AS karma,
@@ -38,15 +40,24 @@ const fetchUser = async (userId) => {
   return user;
 };
 
+const fetchBadges = async (userId) => {
+  const [rows] = await pool.execute(
+    'SELECT badge_key, earned_at FROM Badges WHERE user_id = ? ORDER BY earned_at ASC',
+    [userId]
+  );
+  return rows;
+};
+
 // GET /api/users/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const [user, sport_preferences] = await Promise.all([
+    const [user, sport_preferences, badges] = await Promise.all([
       fetchUser(req.user.id),
       fetchSportPreferences(req.user.id),
+      fetchBadges(req.user.id),
     ]);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    res.json({ success: true, user: { ...user, sport_preferences } });
+    res.json({ success: true, user: { ...user, sport_preferences, badges } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -450,12 +461,13 @@ router.get('/:id', authMiddleware, async (req, res) => {
   const viewerId = req.user.id;
   if (isNaN(targetId)) return res.status(400).json({ success: false, message: 'Invalid user id' });
   try {
-    const [user, sport_preferences] = await Promise.all([
+    const [user, sport_preferences, badges] = await Promise.all([
       fetchUser(targetId),
       fetchSportPreferences(targetId),
+      fetchBadges(targetId),
     ]);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const { avatar, username, bio, karma, games_hosted, games_joined, top_sport } = user;
+    const { avatar, username, bio, karma, games_hosted, games_joined, top_sport, current_streak, longest_streak } = user;
 
     // Determine friendship status between viewer and target
     let friendship_status = 'none';
@@ -477,7 +489,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       }
     }
 
-    res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined, top_sport: top_sport ?? null, sport_preferences, friendship_status, friendship_id } });
+    res.json({ success: true, user: { id: targetId, username, bio, avatar, karma, games_hosted, games_joined, top_sport: top_sport ?? null, current_streak, longest_streak, sport_preferences, badges, friendship_status, friendship_id } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });

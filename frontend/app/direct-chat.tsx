@@ -69,10 +69,13 @@ export default function DirectChatScreen() {
   const [showPicker, setShowPicker]   = useState(false);
   const [myGames, setMyGames]         = useState<MyGame[]>([]);
   const [loadingGames, setLoadingGames] = useState(false);
+  const [isTyping, setIsTyping]       = useState(false);
 
-  const scrollRef  = useRef<ScrollView>(null);
-  const socketRef  = useRef<Socket | null>(null);
-  const seenIds    = useRef<Set<number>>(new Set());
+  const scrollRef        = useRef<ScrollView>(null);
+  const socketRef        = useRef<Socket | null>(null);
+  const seenIds          = useRef<Set<number>>(new Set());
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingEmit   = useRef<number>(0);
 
   const otherId = parseInt(userId, 10);
 
@@ -119,18 +122,34 @@ export default function DirectChatScreen() {
       if (msg.sender_id !== otherId && msg.receiver_id !== otherId) return;
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
       fetchAvatars([msg.sender_id]);
-      // Mark as read since we're in the chat
       apiFetch(`/api/dm/${userId}/read`, { method: 'PUT', token }).catch(() => {});
+      setIsTyping(false);
     });
 
-    return () => { socket.disconnect(); socketRef.current = null; };
+    socket.on('dm_typing', ({ from }: { from: number }) => {
+      if (from !== otherId) return;
+      setIsTyping(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
+    });
+
+    socket.on('dm_read', ({ readBy }: { readBy: number }) => {
+      if (readBy !== otherId) return;
+      setMessages(prev => prev.map(m => m.sender_id === user?.id ? { ...m, is_read: true } : m));
+    });
+
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      socket.disconnect();
+      socketRef.current = null;
+    };
   }, [userId]);
 
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 || isTyping) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  }, [messages.length]);
+  }, [messages.length, isTyping]);
 
   const sendText = async () => {
     const content = input.trim();
@@ -231,7 +250,14 @@ export default function DirectChatScreen() {
         <View key={msg.id} style={styles.bubbleRowOwn}>
           <View style={styles.bubbleOwnContent}>
             {bubbleContent}
-            <Text style={[styles.timestamp, { textAlign: 'right' }]}>{formatTime(msg.created_at)}</Text>
+            <View style={styles.readReceiptRow}>
+              <Text style={[styles.timestamp, { textAlign: 'right' }]}>{formatTime(msg.created_at)}</Text>
+              <Ionicons
+                name={msg.is_read ? 'checkmark-done' : 'checkmark'}
+                size={12}
+                color={msg.is_read ? Colors.accent : Colors.textMuted}
+              />
+            </View>
           </View>
           {avatar}
         </View>
@@ -295,6 +321,24 @@ export default function DirectChatScreen() {
             </View>
           )}
           {messages.map(renderMessage)}
+          {isTyping && (
+            <View style={styles.bubbleRowOther}>
+              <View style={[styles.avatarSmall, { backgroundColor: getAvatarColor(username) + '22', borderColor: getAvatarColor(username) }]}>
+                {avatarCache[otherId] ? (
+                  <Image source={{ uri: `data:image/jpeg;base64,${avatarCache[otherId]}` }} style={styles.avatarSmallImage} />
+                ) : (
+                  <Text style={[styles.avatarSmallLetter, { color: getAvatarColor(username) }]}>
+                    {username.charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.bubbleOtherContent}>
+                <View style={[styles.bubble, styles.bubbleOther, styles.typingBubble]}>
+                  <Text style={styles.typingDots}>• • •</Text>
+                </View>
+              </View>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -308,7 +352,14 @@ export default function DirectChatScreen() {
           placeholder="Message..."
           placeholderTextColor={Colors.textMuted}
           value={input}
-          onChangeText={setInput}
+          onChangeText={(text) => {
+            setInput(text);
+            const now = Date.now();
+            if (text.length > 0 && now - lastTypingEmit.current > 2000 && socketRef.current?.connected) {
+              socketRef.current.emit('dm_typing', { to: otherId });
+              lastTypingEmit.current = now;
+            }
+          }}
           multiline
           maxLength={1000}
           returnKeyType="send"
@@ -445,7 +496,10 @@ const styles = StyleSheet.create({
   bubbleOther:  { backgroundColor: Colors.surface, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: Colors.border },
   bubbleText:   { color: Colors.text, fontSize: 15, lineHeight: 21 },
   bubbleTextOwn: { color: Colors.bg },
-  timestamp:    { color: Colors.textMuted, fontSize: 11, marginTop: 3, marginHorizontal: 4 },
+  timestamp:       { color: Colors.textMuted, fontSize: 11, marginTop: 3, marginHorizontal: 4 },
+  readReceiptRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
+  typingBubble:    { paddingHorizontal: 16, paddingVertical: 12 },
+  typingDots:      { color: Colors.textMuted, fontSize: 18, letterSpacing: 2 },
 
   // Event card
   eventCard:       { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, borderWidth: 1.5, gap: 6, minWidth: 200, ...Shadow.card },
