@@ -35,6 +35,16 @@ All notable changes to SportLink are documented here, ordered from most recent t
 - **Claim CTA** (when unclaimed): blue-faint card with "Manage This Court" button.
 - `ReviewCard` updated — if `isManager`, shows "Reply as Manager" button on each review. Inline text input with Save/Cancel. Existing responses show with edit/delete icons. `owner_response` displayed in accent-faint bubble with shield-checkmark label.
 
+### Code Quality
+- **Code review #2** — 7 findings fixed and merged (branch `fix/code-review-findings-2`):
+  1. **XSS** — `escapeHtml()` applied to all user-controlled strings in landing/invite pages (`backend/server.js`).
+  2. **Notification routing** — cold-start and foreground listeners now navigate to `/game/[id]`; guarded on `user?.onboarding_complete`.
+  3. **Invite URL crash** — `friends.tsx` guards `user?.id` before building share URL.
+  4. **Debounce leak** — `discover.tsx` cancels pending search timer in `useFocusEffect` cleanup to prevent stale fetch on tab blur.
+  5. **Redundant DB query** — `autoCompleteGames` now selects `parent_game_id` in the outer query; eliminates inner re-query.
+  6. **Manager auth DRY** — `requireCourtManager(placeId, userId)` helper in `courts.js`; two handlers use it instead of inline SQL.
+  7. **AvatarCircle** — claim banner in `court-detail.tsx` uses shared `<AvatarCircle>` instead of inline avatar block.
+
 ---
 
 ## [Sprint 12] — June 2026 — Engagement Loop, Growth Features, Improvements
