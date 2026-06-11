@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Image,
+  FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, SafeAreaView, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,6 +15,7 @@ import { API_BASE } from '../constants/api';
 import { Colors, Radius } from '../constants/theme';
 
 const MAX_MESSAGE_LENGTH = 1000;
+const PAGE_SIZE = 30;
 
 type Message = {
   id: number;
@@ -29,15 +30,17 @@ export default function GameChatScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
   const { token, user } = useAuth();
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [input, setInput] = useState('');
+  // Messages stored newest-first for the inverted FlatList
+  const [messages, setMessages]       = useState<Message[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore]         = useState(false);
+  const [input, setInput]             = useState('');
   const [inputFocused, setInputFocused] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [sending, setSending]         = useState(false);
   const [avatarCache, setAvatarCache] = useState<Record<number, string | null>>({});
   const seenUserIds = useRef<Set<number>>(new Set());
-  const scrollRef = useRef<ScrollView>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef   = useRef<Socket | null>(null);
 
   const fetchAvatars = async (userIds: number[]) => {
     const newIds = userIds.filter(uid => !seenUserIds.current.has(uid));
@@ -56,10 +59,12 @@ export default function GameChatScreen() {
 
   const fetchMessages = async () => {
     try {
-      const res = await apiFetch(`/api/chats/${id}/messages`, { token });
+      const res  = await apiFetch(`/api/chats/${id}/messages?limit=${PAGE_SIZE}`, { token });
       const data = await res.json();
       if (data.success) {
-        setMessages(data.messages);
+        // Server returns ASC; reverse to newest-first for inverted FlatList
+        setMessages([...data.messages].reverse());
+        setHasMore(data.messages.length === PAGE_SIZE);
         const otherIds = [...new Set<number>(
           data.messages
             .filter((m: Message) => m.user_id !== user?.id)
@@ -74,19 +79,40 @@ export default function GameChatScreen() {
     }
   };
 
+  const loadMore = async () => {
+    if (loadingMore || !hasMore || messages.length === 0) return;
+    // oldest message is at the END of the newest-first array
+    const oldestId = messages[messages.length - 1].id;
+    setLoadingMore(true);
+    try {
+      const res  = await apiFetch(`/api/chats/${id}/messages?before=${oldestId}&limit=${PAGE_SIZE}`, { token });
+      const data = await res.json();
+      if (data.success) {
+        // Server returns ASC; reverse to newest-first, then append (visually older = higher in list)
+        const older = [...data.messages].reverse();
+        setMessages(prev => [...prev, ...older]);
+        setHasMore(data.messages.length === PAGE_SIZE);
+        const otherIds = [...new Set<number>(
+          data.messages.filter((m: Message) => m.user_id !== user?.id).map((m: Message) => m.user_id)
+        )];
+        fetchAvatars(otherIds);
+      }
+    } catch {}
+    finally { setLoadingMore(false); }
+  };
+
   useEffect(() => {
     if (user?.id) fetchAvatars([user.id]);
     fetchMessages();
     AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
 
-    // Connect socket.io for real-time messages
     const socket = io(API_BASE, { auth: { token } });
     socketRef.current = socket;
     socket.emit('join_game', id);
     socket.on('new_message', (msg: Message) => {
       setMessages(prev => {
         if (prev.some(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
+        return [msg, ...prev]; // newest first
       });
       AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
       fetchAvatars([msg.user_id]);
@@ -98,12 +124,6 @@ export default function GameChatScreen() {
     };
   }, [id]);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [messages.length]);
-
   const sendMessage = () => {
     if (!input.trim() || sending) return;
     const content = input.trim();
@@ -111,14 +131,63 @@ export default function GameChatScreen() {
     if (socketRef.current?.connected) {
       socketRef.current.emit('send_message', { gameId: id, content });
     } else {
-      // Fallback to REST if socket not connected
       setSending(true);
       apiFetch(`/api/chats/${id}/messages`, { method: 'POST', token, body: JSON.stringify({ content }) })
         .then(r => r.json())
-        .then(data => { if (data.success) setMessages(prev => [...prev, data.message]); })
+        .then(data => { if (data.success) setMessages(prev => [data.message, ...prev]); })
         .catch(err => { if (!(err instanceof UnauthorizedError)) console.error('Send message error:', err); })
         .finally(() => setSending(false));
     }
+  };
+
+  const renderMessage = ({ item: msg }: { item: Message }) => {
+    const isOwn = msg.user_id === user?.id;
+    const color = getAvatarColor(msg.username);
+    const avatarBase64 = avatarCache[msg.user_id] ?? null;
+
+    const avatarCircle = (
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(msg.user_id) } })}
+        activeOpacity={0.75}
+      >
+        <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
+          {avatarBase64 ? (
+            <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
+          ) : (
+            <Text style={[styles.avatarSmallLetter, { color }]}>
+              {msg.username.charAt(0).toUpperCase()}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+
+    if (isOwn) {
+      return (
+        <View style={styles.bubbleRowOwn}>
+          <View style={styles.bubbleOwnContent}>
+            <View style={[styles.bubble, styles.bubbleOwn]}>
+              <Text style={[styles.bubbleText, styles.bubbleTextOwn]}>{msg.content}</Text>
+            </View>
+            <Text style={[styles.timestamp, { textAlign: 'right' }]}>{formatTime(msg.created_at)}</Text>
+          </View>
+          {avatarCircle}
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.bubbleRowOther}>
+        {avatarCircle}
+        <View style={styles.bubbleOtherContent}>
+          <Text style={styles.senderName}>{msg.username}</Text>
+          <View style={[styles.bubble, styles.bubbleOther]}>
+            <Text style={styles.bubbleText}>{msg.content}</Text>
+          </View>
+          <Text style={styles.timestamp}>{formatTime(msg.created_at)}</Text>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -140,72 +209,28 @@ export default function GameChatScreen() {
           <ActivityIndicator color={Colors.accent} size="large" />
         </View>
       ) : (
-        <ScrollView
-          ref={scrollRef}
-          style={styles.messageList}
+        <FlatList
+          data={messages}
+          inverted
+          keyExtractor={item => String(item.id)}
+          renderItem={renderMessage}
           contentContainerStyle={styles.messageContent}
           showsVerticalScrollIndicator={false}
-        >
-          {messages.length === 0 && (
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          // In an inverted list, ListFooterComponent renders at the visual TOP (older messages)
+          ListFooterComponent={loadingMore
+            ? <ActivityIndicator color={Colors.accent} style={{ paddingVertical: 12 }} />
+            : null}
+          ListHeaderComponent={messages.length === 0 ? (
             <View style={styles.emptyChat}>
               <View style={styles.emptyChatIconWrap}>
                 <Ionicons name="chatbubbles-outline" size={38} color={Colors.surface2} />
               </View>
               <Text style={styles.emptyChatText}>No messages yet. Say hi! 👋</Text>
             </View>
-          )}
-          {messages.map((msg) => {
-            const isOwn = msg.user_id === user?.id;
-            const color = getAvatarColor(msg.username);
-            const avatarBase64 = avatarCache[msg.user_id] ?? null;
-
-            const avatarCircle = (
-              <TouchableOpacity
-                onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(msg.user_id) } })}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
-                  {avatarBase64 ? (
-                    <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
-                  ) : (
-                    <Text style={[styles.avatarSmallLetter, { color }]}>
-                      {msg.username.charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-
-            if (isOwn) {
-              return (
-                <View key={msg.id} style={styles.bubbleRowOwn}>
-                  <View style={styles.bubbleOwnContent}>
-                    <View style={[styles.bubble, styles.bubbleOwn]}>
-                      <Text style={[styles.bubbleText, styles.bubbleTextOwn]}>{msg.content}</Text>
-                    </View>
-                    <Text style={[styles.timestamp, { textAlign: 'right' }]}>
-                      {formatTime(msg.created_at)}
-                    </Text>
-                  </View>
-                  {avatarCircle}
-                </View>
-              );
-            }
-
-            return (
-              <View key={msg.id} style={styles.bubbleRowOther}>
-                {avatarCircle}
-                <View style={styles.bubbleOtherContent}>
-                  <Text style={styles.senderName}>{msg.username}</Text>
-                  <View style={[styles.bubble, styles.bubbleOther]}>
-                    <Text style={styles.bubbleText}>{msg.content}</Text>
-                  </View>
-                  <Text style={styles.timestamp}>{formatTime(msg.created_at)}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
+          ) : null}
+        />
       )}
 
       <View style={styles.inputRow}>
@@ -249,8 +274,7 @@ const styles = StyleSheet.create({
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  messageList: { flex: 1 },
-  messageContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  messageContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 12, flexGrow: 1, justifyContent: 'flex-end' },
 
   emptyChat: { flex: 1, alignItems: 'center', paddingTop: 80 },
   emptyChatIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
