@@ -1,9 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import * as Sentry from '@sentry/react-native';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { registerPushToken } from '../utils/registerPushToken';
 import { setUnauthorizedHandler } from '../utils/api';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  debug: false,
+  tracesSampleRate: 0.2,
+});
 
 function navigateFromNotification(data: Record<string, any>, router: ReturnType<typeof useRouter>) {
   if (!data) return;
@@ -49,7 +56,7 @@ function AppServices() {
   return null;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <AuthProvider>
       <AppServices />
@@ -72,3 +79,5 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);

@@ -160,7 +160,8 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
     );
 
     const [reviews] = await pool.execute(
-      `SELECT cr.id, cr.user_id, u.username, u.avatar, cr.rating, cr.comment, cr.created_at
+      `SELECT cr.id, cr.user_id, u.username, u.avatar, cr.rating, cr.comment,
+              cr.owner_response, cr.owner_response_at, cr.created_at
        FROM CourtReviews cr
        JOIN Users u ON u.id = cr.user_id
        WHERE cr.place_id = ?
@@ -169,12 +170,22 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
       [placeId]
     );
 
+    const [[claim]] = await pool.execute(
+      `SELECT cc.user_id, u.username, u.avatar FROM CourtClaims cc
+       JOIN Users u ON u.id = cc.user_id WHERE cc.place_id = ?`,
+      [placeId]
+    );
+
+    const isManager = claim ? claim.user_id === req.user.id : false;
+
     res.json({
       success: true,
       places: placesData,
       review_count: Number(agg.review_count),
       avg_rating: agg.avg_rating ? Number(agg.avg_rating) : null,
       reviews,
+      claimed_by: claim ? { id: claim.user_id, username: claim.username, avatar: claim.avatar } : null,
+      is_manager: isManager,
     });
   } catch (err) {
     console.error(err);
@@ -187,7 +198,8 @@ router.get('/:placeId/reviews', authMiddleware, async (req, res) => {
   const { placeId } = req.params;
   try {
     const [reviews] = await pool.execute(
-      `SELECT cr.id, cr.user_id, u.username, u.avatar, cr.rating, cr.comment, cr.created_at
+      `SELECT cr.id, cr.user_id, u.username, u.avatar, cr.rating, cr.comment,
+              cr.owner_response, cr.owner_response_at, cr.created_at
        FROM CourtReviews cr
        JOIN Users u ON u.id = cr.user_id
        WHERE cr.place_id = ?
@@ -239,6 +251,98 @@ router.delete('/:placeId/reviews/:reviewId', authMiddleware, async (req, res) =>
     if (!review) return res.status(404).json({ success: false, message: 'Review not found' });
 
     await pool.execute('DELETE FROM CourtReviews WHERE id = ?', [reviewId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/courts/:placeId/reviews/:reviewId/response — manager responds to a review
+router.put('/:placeId/reviews/:reviewId/response', authMiddleware, async (req, res) => {
+  const { placeId } = req.params;
+  const reviewId = parseInt(req.params.reviewId);
+  const { response } = req.body;
+  const userId = req.user.id;
+
+  if (!response || !response.trim())
+    return res.status(400).json({ success: false, message: 'response is required' });
+  if (response.length > 500)
+    return res.status(400).json({ success: false, message: 'response max 500 chars' });
+
+  try {
+    const [[claim]] = await pool.execute(
+      'SELECT user_id FROM CourtClaims WHERE place_id = ? AND user_id = ?',
+      [placeId, userId]
+    );
+    if (!claim) return res.status(403).json({ success: false, message: 'Not the court manager' });
+
+    await pool.execute(
+      'UPDATE CourtReviews SET owner_response = ?, owner_response_at = NOW() WHERE id = ? AND place_id = ?',
+      [response.trim(), reviewId, placeId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/courts/:placeId/reviews/:reviewId/response — manager removes their response
+router.delete('/:placeId/reviews/:reviewId/response', authMiddleware, async (req, res) => {
+  const { placeId } = req.params;
+  const reviewId = parseInt(req.params.reviewId);
+  const userId = req.user.id;
+
+  try {
+    const [[claim]] = await pool.execute(
+      'SELECT user_id FROM CourtClaims WHERE place_id = ? AND user_id = ?',
+      [placeId, userId]
+    );
+    if (!claim) return res.status(403).json({ success: false, message: 'Not the court manager' });
+
+    await pool.execute(
+      'UPDATE CourtReviews SET owner_response = NULL, owner_response_at = NULL WHERE id = ? AND place_id = ?',
+      [reviewId, placeId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/courts/:placeId/claim — claim a court as manager
+router.post('/:placeId/claim', authMiddleware, async (req, res) => {
+  const { placeId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    await pool.execute(
+      'INSERT INTO CourtClaims (place_id, user_id) VALUES (?, ?)',
+      [placeId, userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY')
+      return res.status(409).json({ success: false, message: 'Court already claimed' });
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/courts/:placeId/claim — release claim (manager only)
+router.delete('/:placeId/claim', authMiddleware, async (req, res) => {
+  const { placeId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const [result] = await pool.execute(
+      'DELETE FROM CourtClaims WHERE place_id = ? AND user_id = ?',
+      [placeId, userId]
+    );
+    if (result.affectedRows === 0)
+      return res.status(404).json({ success: false, message: 'No claim found' });
     res.json({ success: true });
   } catch (err) {
     console.error(err);

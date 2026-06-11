@@ -32,8 +32,12 @@ type Review = {
   avatar: string | null;
   rating: number;
   comment: string | null;
+  owner_response: string | null;
+  owner_response_at: string | null;
   created_at: string;
 };
+
+type ClaimedBy = { id: number; username: string; avatar: string | null } | null;
 
 function StarRow({ rating, size = 16, color = Colors.yellow, onPress }: {
   rating: number; size?: number; color?: string; onPress?: (n: number) => void;
@@ -53,10 +57,39 @@ function StarRow({ rating, size = 16, color = Colors.yellow, onPress }: {
   );
 }
 
-function ReviewCard({ review, userId, onDelete }: { review: Review; userId: number; onDelete: (id: number) => void }) {
+function ReviewCard({ review, userId, isManager, placeId, token, onDelete, onRefresh }: {
+  review: Review; userId: number; isManager: boolean;
+  placeId: string; token: string | null;
+  onDelete: (id: number) => void; onRefresh: () => void;
+}) {
   const color = getAvatarColor(review.username);
   const isOwn = review.user_id === userId;
   const date = new Date(review.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const [replyMode, setReplyMode] = useState(false);
+  const [replyText, setReplyText] = useState(review.owner_response ?? '');
+  const [savingReply, setSavingReply] = useState(false);
+
+  const handleSaveReply = async () => {
+    if (!replyText.trim()) return;
+    setSavingReply(true);
+    try {
+      await apiFetch(`/api/courts/${placeId}/reviews/${review.id}/response`, {
+        method: 'PUT', token,
+        body: JSON.stringify({ response: replyText.trim() }),
+      });
+      setReplyMode(false);
+      onRefresh();
+    } catch {}
+    setSavingReply(false);
+  };
+
+  const handleDeleteReply = async () => {
+    try {
+      await apiFetch(`/api/courts/${placeId}/reviews/${review.id}/response`, { method: 'DELETE', token });
+      setReplyText('');
+      onRefresh();
+    } catch {}
+  };
 
   return (
     <View style={styles.reviewCard}>
@@ -86,6 +119,60 @@ function ReviewCard({ review, userId, onDelete }: { review: Review; userId: numb
         )}
       </View>
       {review.comment ? <Text style={styles.reviewComment}>{review.comment}</Text> : null}
+
+      {/* Owner response */}
+      {review.owner_response && !replyMode && (
+        <View style={styles.ownerResponse}>
+          <View style={styles.ownerResponseHeader}>
+            <Ionicons name="shield-checkmark" size={13} color={Colors.accent} />
+            <Text style={styles.ownerResponseLabel}>Manager Response</Text>
+            {isManager && (
+              <View style={{ flexDirection: 'row', gap: 8, marginLeft: 'auto' }}>
+                <TouchableOpacity onPress={() => { setReplyText(review.owner_response ?? ''); setReplyMode(true); }}>
+                  <Ionicons name="pencil-outline" size={13} color={Colors.textMuted} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleDeleteReply}>
+                  <Ionicons name="trash-outline" size={13} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+          <Text style={styles.ownerResponseText}>{review.owner_response}</Text>
+        </View>
+      )}
+
+      {/* Reply input for manager */}
+      {isManager && !review.owner_response && !replyMode && (
+        <TouchableOpacity style={styles.replyBtn} onPress={() => setReplyMode(true)}>
+          <Ionicons name="chatbubble-outline" size={13} color={Colors.accent} />
+          <Text style={styles.replyBtnText}>Reply as Manager</Text>
+        </TouchableOpacity>
+      )}
+      {replyMode && (
+        <View style={styles.replyInputRow}>
+          <TextInput
+            style={styles.replyInput}
+            placeholder="Write a response…"
+            placeholderTextColor={Colors.textHint}
+            value={replyText}
+            onChangeText={setReplyText}
+            multiline
+            maxLength={500}
+            autoFocus
+          />
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <TouchableOpacity style={styles.replyCancel} onPress={() => setReplyMode(false)}>
+              <Text style={styles.replyCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.replySave} onPress={handleSaveReply} disabled={savingReply}>
+              {savingReply
+                ? <ActivityIndicator size="small" color={Colors.bg} />
+                : <Text style={styles.replySaveText}>Save</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -107,6 +194,9 @@ export default function CourtDetailScreen() {
   const [myComment, setMyComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [hoursExpanded, setHoursExpanded] = useState(false);
+  const [claimedBy, setClaimedBy] = useState<ClaimedBy>(null);
+  const [isManager, setIsManager] = useState(false);
+  const [claiming, setClaiming] = useState(false);
 
   const sportColor = sport && SPORT_COLORS[sport] ? SPORT_COLORS[sport] : Colors.accent;
   const sportIcon  = sport && SPORT_ICONS[sport]  ? SPORT_ICONS[sport]  : 'trophy';
@@ -129,6 +219,8 @@ export default function CourtDetailScreen() {
         setReviews(data.reviews);
         setReviewCount(data.review_count);
         setAvgRating(data.avg_rating);
+        setClaimedBy(data.claimed_by ?? null);
+        setIsManager(data.is_manager ?? false);
       }
     } catch (err: any) {
       if (err?.name === 'UnauthorizedError') return;
@@ -167,6 +259,32 @@ export default function CourtDetailScreen() {
     } catch (err: any) {
       if (err?.name !== 'UnauthorizedError') Alert.alert('Error', 'Could not delete review.');
     }
+  };
+
+  const handleClaim = async () => {
+    setClaiming(true);
+    try {
+      const res = await apiFetch(`/api/courts/${placeId}/claim`, { method: 'POST', token });
+      const data = await res.json();
+      if (data.success) await load();
+      else Alert.alert('Cannot claim', data.message);
+    } catch (err: any) {
+      if (err?.name !== 'UnauthorizedError') Alert.alert('Error', 'Could not claim court.');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handleUnclaim = () => {
+    Alert.alert('Release Court', 'Remove yourself as manager?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Release', style: 'destructive', onPress: async () => {
+        try {
+          await apiFetch(`/api/courts/${placeId}/claim`, { method: 'DELETE', token });
+          await load();
+        } catch {}
+      }},
+    ]);
   };
 
   const displayName = placesData?.name ?? paramName ?? 'Court';
@@ -278,6 +396,38 @@ export default function CourtDetailScreen() {
             )}
           </View>
 
+          {/* Court manager / claim banner */}
+          {claimedBy ? (
+            <View style={styles.claimBanner}>
+              <View style={[styles.claimAvatar, { backgroundColor: getAvatarColor(claimedBy.username) + '22', borderColor: getAvatarColor(claimedBy.username) }]}>
+                {claimedBy.avatar ? (
+                  <Image source={{ uri: `data:image/jpeg;base64,${claimedBy.avatar}` }} style={styles.claimAvatarImg} />
+                ) : (
+                  <Text style={[styles.claimAvatarLetter, { color: getAvatarColor(claimedBy.username) }]}>
+                    {claimedBy.username.charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.claimLabel}>Managed by</Text>
+                <Text style={styles.claimUsername}>{claimedBy.username}</Text>
+              </View>
+              <Ionicons name="shield-checkmark" size={20} color={Colors.accent} />
+              {isManager && (
+                <TouchableOpacity onPress={handleUnclaim} style={styles.unclaimBtn}>
+                  <Text style={styles.unclaimText}>Release</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.claimCta} onPress={handleClaim} disabled={claiming}>
+              <Ionicons name="shield-outline" size={18} color={Colors.blue} />
+              <Text style={styles.claimCtaText}>
+                {claiming ? 'Claiming…' : 'Manage This Court'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {/* SportLink rating aggregate */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Community Reviews</Text>
@@ -324,7 +474,11 @@ export default function CourtDetailScreen() {
                 key={r.id}
                 review={r}
                 userId={user?.id ?? -1}
+                isManager={isManager}
+                placeId={placeId}
+                token={token}
                 onDelete={handleDeleteReview}
+                onRefresh={load}
               />
             ))
           )}
@@ -386,4 +540,28 @@ const styles = StyleSheet.create({
   reviewDate:     { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
   reviewComment:  { fontSize: 13, color: Colors.textSub, lineHeight: 19 },
   deleteBtn:      { padding: 4 },
+
+  ownerResponse:       { marginTop: 10, backgroundColor: Colors.accentFaint, borderRadius: Radius.md, padding: 10, borderWidth: 1, borderColor: Colors.accentBorder },
+  ownerResponseHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
+  ownerResponseLabel:  { fontSize: 11, fontWeight: '800', color: Colors.accent },
+  ownerResponseText:   { fontSize: 13, color: Colors.textSub, lineHeight: 18 },
+  replyBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  replyBtnText:   { fontSize: 12, color: Colors.accent, fontWeight: '700' },
+  replyInputRow:  { marginTop: 10 },
+  replyInput:     { backgroundColor: Colors.surface2, borderRadius: Radius.md, padding: 10, color: Colors.text, fontSize: 13, minHeight: 60, textAlignVertical: 'top', borderWidth: 1, borderColor: Colors.accentBorder },
+  replyCancel:    { flex: 1, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.border, height: 36, alignItems: 'center', justifyContent: 'center' },
+  replyCancelText: { fontSize: 13, color: Colors.textMuted, fontWeight: '700' },
+  replySave:      { flex: 1, borderRadius: Radius.pill, backgroundColor: Colors.accent, height: 36, alignItems: 'center', justifyContent: 'center' },
+  replySaveText:  { fontSize: 13, color: Colors.bg, fontWeight: '900' },
+
+  claimBanner: { marginHorizontal: Spacing.xl, marginBottom: Spacing.xl, backgroundColor: Colors.accentFaint, borderRadius: Radius.xl, padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: Colors.accentBorder },
+  claimAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  claimAvatarImg:    { width: '100%', height: '100%' },
+  claimAvatarLetter: { fontSize: 15, fontWeight: '900' },
+  claimLabel:    { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
+  claimUsername: { fontSize: 13, fontWeight: '800', color: Colors.text },
+  unclaimBtn:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.error },
+  unclaimText:   { fontSize: 11, color: Colors.error, fontWeight: '700' },
+  claimCta:      { marginHorizontal: Spacing.xl, marginBottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: Colors.blueFaint, borderRadius: Radius.xl, padding: Spacing.md, borderWidth: 1, borderColor: Colors.blueBorder },
+  claimCtaText:  { fontSize: 13, color: Colors.blue, fontWeight: '800' },
 });
