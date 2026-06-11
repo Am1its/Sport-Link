@@ -39,9 +39,13 @@ const toMapGame = (row) => ({
   location_desc: row.location_desc,
   equipment_notes: row.equipment_notes ?? null,
   photo: row.photo ?? null,
+  post_game_photo: row.post_game_photo ?? null,
+  boosted_at: row.boosted_at ?? null,
   created_at: row.created_at,
   is_joined: row.is_joined != null ? Boolean(row.is_joined) : false,
   recurrence: row.recurrence ?? 'none',
+  latitude: row.latitude != null ? parseFloat(row.latitude) : null,
+  longitude: row.longitude != null ? parseFloat(row.longitude) : null,
 });
 
 // GET /api/games — public; optional ?lat=&lng=&radius_km=&q= for distance + text filter
@@ -91,7 +95,7 @@ router.get('/', async (req, res) => {
       : 'AND (g.title LIKE ? OR g.location_desc LIKE ?)';
 
     const [rows] = await pool.execute(`
-      SELECT g.*, COUNT(gp.user_id) AS participant_count
+      SELECT g.*, COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count
         ${userId ? ', CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS is_joined' : ''}
         ${useRadius ? `, ${haversineExpr} AS distance_km` : ''}
       FROM Games g
@@ -130,8 +134,11 @@ router.get('/mine', authMiddleware, async (req, res) => {
   try {
     const [rows] = await pool.execute(`
       SELECT g.*,
-        COUNT(gp.user_id)          AS participant_count,
-        (g.host_id = ?)            AS is_host
+        COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count,
+        (g.host_id = ?)            AS is_host,
+        (SELECT status FROM GameParticipants WHERE game_id = g.id AND user_id = ?)            AS participant_status,
+        (SELECT waitlist_position FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS waitlist_position,
+        CAST(COALESCE((SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ? AND checked_in_at IS NOT NULL), 0) AS UNSIGNED) AS checked_in
       FROM Games g
       LEFT JOIN GameParticipants gp ON gp.game_id = g.id
       WHERE g.status IN ('active', 'completed')
@@ -141,12 +148,15 @@ router.get('/mine', authMiddleware, async (req, res) => {
         )
       GROUP BY g.id
       ORDER BY g.created_at DESC
-    `, [userId, userId, userId]);
+    `, [userId, userId, userId, userId, userId, userId]);
 
     const games = rows.map((row) => ({
       ...toMapGame(row),
       is_host: !!row.is_host,
       status: row.status,
+      participant_status: row.participant_status ?? null,
+      waitlist_position: row.waitlist_position ?? null,
+      checked_in: !!row.checked_in,
     }));
     res.json({ success: true, games });
   } catch (err) {
@@ -236,27 +246,42 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'You already joined this game' });
     }
 
+    let waitlisted = false;
+    let waitlistPosition = null;
+
     if (game.max_players) {
       const [[{ count }]] = await conn.execute(
-        'SELECT COUNT(*) AS count FROM GameParticipants WHERE game_id = ?', [gameId]
+        "SELECT COUNT(*) AS count FROM GameParticipants WHERE game_id = ? AND status = 'joined'", [gameId]
       );
       // Host occupies one slot; participants fill the remaining max_players - 1 spots
       if (count >= game.max_players - 1) {
-        await conn.rollback();
-        return res.status(400).json({ success: false, message: 'This game is full' });
+        // Game is full — add to waitlist
+        const [[{ maxPos }]] = await conn.execute(
+          'SELECT COALESCE(MAX(waitlist_position), 0) AS maxPos FROM GameParticipants WHERE game_id = ?', [gameId]
+        );
+        waitlistPosition = maxPos + 1;
+        waitlisted = true;
       }
     }
 
-    await conn.execute('INSERT INTO GameParticipants (game_id, user_id) VALUES (?, ?)', [gameId, userId]);
+    if (waitlisted) {
+      await conn.execute(
+        "INSERT INTO GameParticipants (game_id, user_id, status, waitlist_position) VALUES (?, ?, 'waitlist', ?)",
+        [gameId, userId, waitlistPosition]
+      );
+    } else {
+      await conn.execute('INSERT INTO GameParticipants (game_id, user_id) VALUES (?, ?)', [gameId, userId]);
+    }
+
     const [[{ count: newCount }]] = await conn.execute(
-      'SELECT COUNT(*) AS count FROM GameParticipants WHERE game_id = ?', [gameId]
+      "SELECT COUNT(*) AS count FROM GameParticipants WHERE game_id = ? AND status = 'joined'", [gameId]
     );
     await conn.commit();
 
     // Notify the host (outside transaction)
     const [[joiner]]  = await pool.execute('SELECT username FROM Users WHERE id = ?', [userId]);
     const [[hostRow]] = await pool.execute('SELECT push_token FROM Users WHERE id = ?', [game.host_id]);
-    if (hostRow?.push_token) {
+    if (!waitlisted && hostRow?.push_token) {
       sendPushNotifications([{
         to: hostRow.push_token,
         title: '🏅 New player joined!',
@@ -265,7 +290,7 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       }]);
     }
 
-    res.json({ success: true, participant_count: newCount });
+    res.json({ success: true, participant_count: newCount, waitlisted, waitlist_position: waitlistPosition });
   } catch (err) {
     await conn.rollback();
     console.error(err);
@@ -283,12 +308,23 @@ router.get('/:id/participants', authMiddleware, async (req, res) => {
     if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
 
     const [rows] = await pool.execute(`
-      SELECT u.id, u.username, u.avatar, 'host' AS role
+      SELECT u.id, u.username, u.avatar,
+             'host'  AS role,
+             1       AS is_host,
+             NULL    AS status,
+             NULL    AS waitlist_position,
+             0       AS checked_in
       FROM Users u WHERE u.id = ?
       UNION ALL
-      SELECT u.id, u.username, u.avatar, 'player' AS role
+      SELECT u.id, u.username, u.avatar,
+             'player' AS role,
+             0        AS is_host,
+             gp.status,
+             gp.waitlist_position,
+             (gp.checked_in_at IS NOT NULL) AS checked_in
       FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id
       WHERE gp.game_id = ?
+      ORDER BY is_host DESC, role ASC
     `, [game.host_id, gameId]);
 
     res.json({ success: true, participants: rows });
@@ -350,12 +386,186 @@ router.delete('/:id/leave', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'The host cannot leave — delete the game instead' });
 
     const [[participation]] = await pool.execute(
-      'SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]
+      'SELECT id, status FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]
     );
     if (!participation)
       return res.status(400).json({ success: false, message: 'You are not in this game' });
 
     await pool.execute('DELETE FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]);
+
+    // If the leaver was a joined (not waitlisted) player, promote the first waitlisted player
+    if (participation.status === 'joined') {
+      const [[next]] = await pool.execute(
+        "SELECT gp.id, gp.user_id, u.push_token FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.status = 'waitlist' ORDER BY gp.waitlist_position ASC LIMIT 1",
+        [gameId]
+      );
+      if (next) {
+        await pool.execute(
+          "UPDATE GameParticipants SET status = 'joined', waitlist_position = NULL WHERE id = ?",
+          [next.id]
+        );
+        if (next.push_token) {
+          const [[g]] = await pool.execute('SELECT title, sport_type FROM Games WHERE id = ?', [gameId]);
+          sendPushNotifications([{
+            to: next.push_token,
+            title: '🎉 You\'re in!',
+            body: `A spot opened in ${g?.title || g?.sport_type || 'a game'}. You're now joined!`,
+            data: { gameId },
+          }]);
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/games/:id/checkin — participant or host marks themselves as checked in
+router.post('/:id/checkin', authMiddleware, async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  const userId = req.user.id;
+  try {
+    const [[game]] = await pool.execute(
+      "SELECT host_id, scheduled_time FROM Games WHERE id = ? AND status = 'active'", [gameId]
+    );
+    if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
+
+    // Verify caller is host or participant
+    const isHost = game.host_id === userId;
+    if (!isHost) {
+      const [[part]] = await pool.execute(
+        "SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ? AND status = 'joined'", [gameId, userId]
+      );
+      if (!part) return res.status(403).json({ success: false, message: 'Not a participant' });
+    }
+
+    // Enforce 30-min window around scheduled_time
+    if (game.scheduled_time) {
+      const scheduled = new Date(game.scheduled_time.replace(' ', 'T') + ':00');
+      const now = new Date();
+      const diff = (now - scheduled) / 60000; // minutes
+      if (diff < -30 || diff > 30) {
+        return res.status(400).json({ success: false, message: 'Check-in only available within 30 minutes of game time' });
+      }
+    }
+
+    if (!isHost) {
+      await pool.execute(
+        'UPDATE GameParticipants SET checked_in_at = NOW() WHERE game_id = ? AND user_id = ?',
+        [gameId, userId]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/games/:id/boost — host only, one-time push to nearby sport players
+router.post('/:id/boost', authMiddleware, async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  const userId = req.user.id;
+  try {
+    const [[game]] = await pool.execute(
+      "SELECT * FROM Games WHERE id = ? AND status = 'active'", [gameId]
+    );
+    if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
+    if (game.host_id !== userId)
+      return res.status(403).json({ success: false, message: 'Only the host can boost this game' });
+    if (game.boosted_at)
+      return res.status(409).json({ success: false, message: 'Already boosted' });
+
+    // Check there is at least 1 open spot
+    const [[{ count }]] = await pool.execute(
+      "SELECT COUNT(*) AS count FROM GameParticipants WHERE game_id = ? AND status = 'joined'", [gameId]
+    );
+    if (game.max_players && count >= game.max_players - 1)
+      return res.status(400).json({ success: false, message: 'Game is full' });
+
+    await pool.execute('UPDATE Games SET boosted_at = NOW() WHERE id = ?', [gameId]);
+
+    // Find nearby players who play this sport (within 20 km using game coords)
+    if (game.latitude && game.longitude) {
+      const [targets] = await pool.execute(`
+        SELECT DISTINCT u.push_token
+        FROM SportPreferences sp
+        JOIN Users u ON u.id = sp.user_id
+        WHERE sp.sport_type = ?
+          AND u.push_token IS NOT NULL
+          AND u.id != ?
+          AND u.id NOT IN (SELECT user_id FROM GameParticipants WHERE game_id = ?)
+          AND (
+            6371 * ACOS(GREATEST(-1, LEAST(1,
+              COS(RADIANS(?)) * COS(RADIANS(
+                COALESCE(
+                  (SELECT latitude FROM Games WHERE host_id = u.id ORDER BY created_at DESC LIMIT 1),
+                  ?
+                )
+              )) *
+              COS(RADIANS(
+                COALESCE(
+                  (SELECT longitude FROM Games WHERE host_id = u.id ORDER BY created_at DESC LIMIT 1),
+                  ?
+                )
+              ) - RADIANS(?)) +
+              SIN(RADIANS(?)) * SIN(RADIANS(
+                COALESCE(
+                  (SELECT latitude FROM Games WHERE host_id = u.id ORDER BY created_at DESC LIMIT 1),
+                  ?
+                )
+              ))
+            ))) <= 20
+          )
+        LIMIT 50
+      `, [game.sport_type, userId, gameId,
+          game.latitude, game.latitude, game.longitude, game.longitude,
+          game.latitude, game.latitude]);
+
+      if (targets.length > 0) {
+        const label = game.title || game.location_desc || game.sport_type;
+        sendPushNotifications(targets.map(t => ({
+          to: t.push_token,
+          title: `🔥 ${game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1)} game near you!`,
+          body: `A game needs one more player: ${label}`,
+          data: { gameId },
+        })));
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/games/:id/post-photo — participant or host adds a post-game photo
+router.put('/:id/post-photo', authMiddleware, async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  const userId = req.user.id;
+  const { photo } = req.body;
+  if (!photo) return res.status(400).json({ success: false, message: 'photo is required' });
+  try {
+    const [[game]] = await pool.execute(
+      "SELECT host_id, status FROM Games WHERE id = ?", [gameId]
+    );
+    if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
+    if (game.status !== 'completed')
+      return res.status(400).json({ success: false, message: 'Game must be completed first' });
+
+    const isHost = game.host_id === userId;
+    if (!isHost) {
+      const [[part]] = await pool.execute(
+        'SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]
+      );
+      if (!part) return res.status(403).json({ success: false, message: 'Not a participant' });
+    }
+
+    await pool.execute('UPDATE Games SET post_game_photo = ? WHERE id = ?', [photo, gameId]);
     res.json({ success: true });
   } catch (err) {
     console.error(err);

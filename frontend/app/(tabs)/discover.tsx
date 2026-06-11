@@ -46,6 +46,7 @@ function GameCard({
   };
   const [joining, setJoining] = useState(false);
   const [isJoined, setIsJoined] = useState(!!game.is_joined);
+  const [isWaitlisted, setIsWaitlisted] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const color  = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon   = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
@@ -66,24 +67,29 @@ function GameCard({
   const handleJoin = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.spring(scaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
-    onJoined(game.id, game.participant_count + 1);
+    if (!isFull) onJoined(game.id, game.participant_count + 1);
     setJoining(true);
     try {
       const res  = await apiFetch(`/api/games/${game.id}/join`, { method: 'POST', token });
       const data = await res.json();
       if (!data.success) {
-        onJoined(game.id, game.participant_count);
+        if (!isFull) onJoined(game.id, game.participant_count);
         springBack();
         return Alert.alert('Error', data.message);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsJoined(true);
-      onJoined(game.id, data.participant_count);
+      if (data.waitlisted) {
+        setIsWaitlisted(true);
+        Alert.alert("You're on the waitlist!", `You're #${data.waitlist_position} in line. You'll be notified if a spot opens.`);
+      } else {
+        onJoined(game.id, data.participant_count);
+        Alert.alert("You're in!", 'Game added to My Schedule.');
+      }
       springBack();
-      Alert.alert("You're in!", 'Game added to My Schedule.');
     } catch (err) {
       if (err instanceof UnauthorizedError) return;
-      onJoined(game.id, game.participant_count);
+      if (!isFull) onJoined(game.id, game.participant_count);
       springBack();
       Alert.alert('Error', 'Could not connect to server');
     } finally {
@@ -125,6 +131,11 @@ function GameCard({
                 <View style={styles.myBadge}>
                   <Ionicons name="star" size={9} color={Colors.accent} />
                   <Text style={styles.myBadgeText}>Your Game</Text>
+                </View>
+              ) : isWaitlisted ? (
+                <View style={styles.waitlistChip}>
+                  <Ionicons name="time-outline" size={10} color={Colors.warning} />
+                  <Text style={styles.waitlistChipText}>Waitlist</Text>
                 </View>
               ) : isJoined ? (
                 <View style={styles.joinedChip}>
@@ -193,16 +204,27 @@ function GameCard({
               <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
               <Text style={[styles.joinBtnText, { color: Colors.accent }]}>Your Game</Text>
             </View>
+          ) : isWaitlisted ? (
+            <View style={[styles.joinBtn, styles.joinBtnMuted]}>
+              <Ionicons name="time-outline" size={16} color={Colors.warning} />
+              <Text style={[styles.joinBtnText, { color: Colors.warning }]}>On Waitlist</Text>
+            </View>
           ) : isJoined ? (
             <View style={[styles.joinBtn, styles.joinBtnMuted]}>
               <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
               <Text style={[styles.joinBtnText, { color: Colors.accent }]}>Joined</Text>
             </View>
           ) : isFull ? (
-            <View style={[styles.joinBtn, styles.joinBtnMuted]}>
-              <Ionicons name="close-circle" size={16} color={Colors.error} />
-              <Text style={[styles.joinBtnText, { color: Colors.error }]}>Full</Text>
-            </View>
+            <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, { flex: 1 }]}>
+              <TouchableOpacity style={[styles.joinBtn, styles.joinBtnWaitlist]} onPress={handleJoin} disabled={joining} activeOpacity={0.85}>
+                {joining
+                  ? <ActivityIndicator color={Colors.warning} size="small" />
+                  : <>
+                      <Ionicons name="time-outline" size={16} color={Colors.warning} />
+                      <Text style={[styles.joinBtnText, { color: Colors.warning }]}>Join Waitlist</Text>
+                    </>}
+              </TouchableOpacity>
+            </Animated.View>
           ) : (
             <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, { flex: 1 }]}>
               <TouchableOpacity style={styles.joinBtn} onPress={handleJoin} disabled={joining} activeOpacity={0.85}>
@@ -530,6 +552,8 @@ const styles = StyleSheet.create({
   sportLabel:  { ...Type.cardSport },
   joinedChip:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.accentFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.accentBorder, paddingHorizontal: 6, paddingVertical: 2 },
   joinedChipText: { color: Colors.accent, fontSize: 10, fontWeight: '800' },
+  waitlistChip:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.warningFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.warningBorder, paddingHorizontal: 6, paddingVertical: 2 },
+  waitlistChipText: { color: Colors.warning, fontSize: 10, fontWeight: '800' },
   myBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.accentFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.accentBorder, paddingHorizontal: 6, paddingVertical: 2 },
   myBadgeText:    { color: Colors.accent, fontSize: 10, fontWeight: '800' },
   urgencyBadge:   { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.warningFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.warningBorder, paddingHorizontal: 6, paddingVertical: 2 },
@@ -550,8 +574,9 @@ const styles = StyleSheet.create({
   // Join button
   joinBtnWrap: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border },
   joinRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  joinBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 44, borderRadius: Radius.pill },
-  joinBtnMuted:{ backgroundColor: Colors.surface2 },
+  joinBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 44, borderRadius: Radius.pill },
+  joinBtnMuted:    { backgroundColor: Colors.surface2 },
+  joinBtnWaitlist: { backgroundColor: Colors.warning + '22', borderWidth: 1, borderColor: Colors.warningBorder },
   joinBtnText: { color: Colors.bg, ...Type.btnPrimary },
   shareBtn:    { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
 
