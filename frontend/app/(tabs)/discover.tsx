@@ -9,6 +9,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { API_BASE } from '../../constants/api';
 import { isPastGame } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
@@ -34,10 +35,13 @@ function GameCard({
   onViewParticipants: () => void;
 }) {
   const handleShare = async () => {
-    const label = sportLabel(game.sport_type);
-    const title = game.title || `${label} Game`;
+    const label    = sportLabel(game.sport_type);
+    const title    = game.title || `${label} Game`;
+    const shareUrl = `${API_BASE}/game/${game.id}`;
     await Share.share({
-      message: `Join my ${label} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${game.id}`,
+      title,
+      message: `Join my ${label} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\n${shareUrl}`,
+      url: shareUrl,
     });
   };
   const [joining, setJoining] = useState(false);
