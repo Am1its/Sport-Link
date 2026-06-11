@@ -42,7 +42,9 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/chats/:gameId/messages
+// GET /api/chats/:gameId/messages?before=<msgId>&limit=<n>
+// Returns up to `limit` (default 30, max 50) messages in ASC order.
+// When `before` is provided, returns only messages with id < before (older messages).
 router.get('/:gameId/messages', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.gameId);
   const userId = req.user.id;
@@ -50,15 +52,26 @@ router.get('/:gameId/messages', authMiddleware, async (req, res) => {
   if (!(await isUserInGame(gameId, userId)))
     return res.status(403).json({ success: false, message: 'You are not part of this game' });
 
+  const limit  = Math.min(parseInt(req.query.limit ?? '30', 10) || 30, 50);
+  const before = req.query.before ? parseInt(req.query.before, 10) : null;
+
   try {
+    const params = [gameId];
+    const beforeClause = before && !isNaN(before) ? 'AND m.id < ?' : '';
+    if (before && !isNaN(before)) params.push(before);
+    params.push(limit);
+
     const [messages] = await pool.execute(
       `SELECT m.id, m.user_id, u.username, m.content, m.created_at
        FROM Messages m
        JOIN Users u ON u.id = m.user_id
-       WHERE m.game_id = ? ORDER BY m.created_at ASC LIMIT 100`,
-      [gameId]
+       WHERE m.game_id = ? ${beforeClause}
+       ORDER BY m.id DESC
+       LIMIT ?`,
+      params
     );
-    res.json({ success: true, messages });
+    // Return in chronological ASC order so the client can reverse for its display needs
+    res.json({ success: true, messages: messages.reverse() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
