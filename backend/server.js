@@ -20,6 +20,7 @@ const notificationsRoutes = require('./routes/notifications');
 const courtsRoutes        = require('./routes/courts');
 const dmRoutes            = require('./routes/dm');
 const activityRoutes      = require('./routes/activity');
+const geocodeRoutes       = require('./routes/geocode');
 
 const _corsEnv = process.env.CORS_ORIGIN?.trim();
 const ALLOWED_ORIGINS = _corsEnv
@@ -440,6 +441,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/courts',        courtsRoutes);
 app.use('/api/dm',            dmRoutes);
 app.use('/api/activity',      activityRoutes);
+app.use('/api/geocode',       geocodeRoutes);
 
 httpServer.listen(PORT, () => {
   console.log(`🚀 SportLink Backend running on http://localhost:${PORT}`);

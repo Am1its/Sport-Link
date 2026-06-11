@@ -44,6 +44,7 @@ const toMapGame = (row) => ({
   created_at: row.created_at,
   is_joined: row.is_joined != null ? Boolean(row.is_joined) : false,
   recurrence: row.recurrence ?? 'none',
+  neighborhood: row.neighborhood ?? null,
   latitude: row.latitude != null ? parseFloat(row.latitude) : null,
   longitude: row.longitude != null ? parseFloat(row.longitude) : null,
 });
@@ -53,10 +54,12 @@ const toMapGame = (row) => ({
 // Unauthenticated: sorted by created_at DESC.
 // ?q= uses FULLTEXT (words ≥ 3 chars) or LIKE fallback for shorter terms.
 router.get('/', async (req, res) => {
-  const { lat, lng, radius_km, q } = req.query;
-  const useRadius = lat && lng && radius_km;
-  const searchTerm = typeof q === 'string' ? q.trim() : '';
-  const useSearch  = searchTerm.length >= 2;
+  const { lat, lng, radius_km, q, date_from, date_to, neighborhood } = req.query;
+  const useRadius       = lat && lng && radius_km;
+  const searchTerm      = typeof q === 'string' ? q.trim() : '';
+  const useSearch       = searchTerm.length >= 2;
+  const useDateFilter   = date_from && date_to;
+  const useNeighborhood = typeof neighborhood === 'string' && neighborhood.trim().length > 0;
 
   const userId = optionalUserId(req);
 
@@ -72,8 +75,10 @@ router.get('/', async (req, res) => {
     // 2. lat, lng, lat for haversine (if radius)
     // 3. userId for SportPreferences JOIN (if authed)
     // 4. userId x2 for block filter WHERE subqueries (if authed)
-    // 5. search term (if q provided) — FULLTEXT or two LIKE params
-    // 6. radius_km for HAVING (if radius)
+    // 5. search term (if q) — FULLTEXT or two LIKE params
+    // 6. date_from, date_to (if date filter)
+    // 7. neighborhood (if neighborhood filter)
+    // 8. radius_km for HAVING (if radius)
     const params = [];
     if (userId) params.push(userId);
     if (useRadius) params.push(parseFloat(lat), parseFloat(lng), parseFloat(lat));
@@ -81,18 +86,25 @@ router.get('/', async (req, res) => {
     if (userId) params.push(userId, userId);
     if (useSearch) {
       if (searchTerm.length >= 3) {
-        // FULLTEXT boolean mode: prefix match on each word
         const booleanQuery = searchTerm.split(/\s+/).filter(Boolean).map(w => `+${w}*`).join(' ');
         params.push(booleanQuery);
       } else {
         params.push(`%${searchTerm}%`, `%${searchTerm}%`);
       }
     }
+    if (useDateFilter) params.push(date_from, date_to);
+    if (useNeighborhood) params.push(neighborhood.trim());
     if (useRadius) params.push(parseFloat(radius_km));
 
     const searchClause = !useSearch ? '' : searchTerm.length >= 3
       ? 'AND MATCH(g.title, g.location_desc) AGAINST (? IN BOOLEAN MODE)'
       : 'AND (g.title LIKE ? OR g.location_desc LIKE ?)';
+
+    const dateClause = useDateFilter
+      ? "AND DATE(STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i')) BETWEEN ? AND ?"
+      : '';
+
+    const neighborhoodClause = useNeighborhood ? 'AND g.neighborhood = ?' : '';
 
     const [rows] = await pool.execute(`
       SELECT g.*, COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count
@@ -110,6 +122,8 @@ router.get('/', async (req, res) => {
         ${userId ? `AND g.host_id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
         AND g.host_id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)` : ''}
         ${searchClause}
+        ${dateClause}
+        ${neighborhoodClause}
       GROUP BY g.id
       ${useRadius ? 'HAVING distance_km <= ?' : ''}
       ORDER BY
@@ -577,7 +591,7 @@ router.put('/:id/post-photo', authMiddleware, async (req, res) => {
 router.put('/:id', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.id);
   const userId = req.user.id;
-  const { sport_type, level, location_desc, scheduled_time, equipment_notes, max_players, title, photo } = req.body;
+  const { sport_type, level, location_desc, scheduled_time, equipment_notes, max_players, title, photo, neighborhood } = req.body;
 
   try {
     const [[game]] = await pool.execute(
@@ -616,7 +630,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
          equipment_notes = ?,
          max_players     = ?,
          title           = ?,
-         photo           = ?
+         photo           = ?,
+         neighborhood    = ?
        WHERE id = ?`,
       [
         sport_type || game.sport_type,
@@ -627,6 +642,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
         max_players     !== undefined && max_players !== '' ? parseInt(max_players) : (max_players === '' ? null : game.max_players),
         title           !== undefined ? (title || null) : game.title,
         photo           !== undefined ? (photo || null) : game.photo,
+        neighborhood    !== undefined ? (neighborhood || null) : game.neighborhood,
         gameId,
       ]
     );
@@ -646,7 +662,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 // POST /api/games — requires auth
 router.post('/', authMiddleware, async (req, res) => {
-  const { sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, invited_friends, photo, recurrence } = req.body;
+  const { sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, invited_friends, photo, recurrence, neighborhood } = req.body;
   if (!sport_type || !level || latitude == null || longitude == null)
     return res.status(400).json({ success: false, message: 'sport_type, level, latitude, longitude are required' });
 
@@ -676,9 +692,9 @@ router.post('/', authMiddleware, async (req, res) => {
 
   try {
     const [result] = await pool.execute(
-      `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, photo, recurrence)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, sport_type, level, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null, photo || null, recurrenceVal]
+      `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, photo, recurrence, neighborhood)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, sport_type, level, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null, photo || null, recurrenceVal, neighborhood || null]
     );
     const gameId = result.insertId;
 

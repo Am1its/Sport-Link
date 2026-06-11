@@ -9,6 +9,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
+import { reverseGeocode } from '../utils/geocode';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../constants/theme';
@@ -54,6 +55,7 @@ export default function GameFormModal() {
   const [maxPlayers, setMaxPlayers]   = useState((params.existingMaxPlayers as string) || '');
   const [title, setTitle]             = useState((params.existingTitle as string) || '');
   const [photo, setPhoto]             = useState<string | null>((params.existingPhoto as string) || null);
+  const [neighborhood, setNeighborhood] = useState('');
   const [loading, setLoading]         = useState(false);
 
   const [recurrence, setRecurrence] = useState<'none' | 'weekly' | 'biweekly'>('none');
@@ -68,6 +70,15 @@ export default function GameFormModal() {
       .then(d => { if (d.success) setFriends(d.friends); })
       .catch(() => {});
   }, [isEdit]);
+
+  useEffect(() => {
+    if (isEdit) return;
+    const lat = parseFloat(params.lat as string);
+    const lng = parseFloat(params.lng as string);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      reverseGeocode(lat, lng).then(hood => { if (hood) setNeighborhood(hood); });
+    }
+  }, []);
 
   const pickPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -128,6 +139,7 @@ export default function GameFormModal() {
         equipment_notes: equipment     || null,
         max_players:     maxPlayers    ? parseInt(maxPlayers) : null,
         photo:           photo         || null,
+        neighborhood:    neighborhood.trim() || null,
       };
       if (!isEdit) {
         body.latitude   = parseFloat(params.lat as string);
@@ -258,6 +270,25 @@ export default function GameFormModal() {
             value={locationDesc}
             onChangeText={setLocationDesc}
           />
+        </View>
+
+        {/* ── Neighborhood ── */}
+        <SectionLabel>Neighborhood (optional)</SectionLabel>
+        <View style={styles.inputRow}>
+          <Ionicons name="map-outline" size={18} color={Colors.textMuted} />
+          <TextInput
+            style={styles.inputField}
+            placeholder="e.g. Florentin, Dizengoff"
+            placeholderTextColor={Colors.textHint}
+            value={neighborhood}
+            onChangeText={setNeighborhood}
+            maxLength={100}
+          />
+          {neighborhood.length > 0 && (
+            <TouchableOpacity onPress={() => setNeighborhood('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color={Colors.textHint} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Date & Time ── */}
