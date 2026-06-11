@@ -15,7 +15,7 @@ Sentry.init({
 function navigateFromNotification(data: Record<string, any>, router: ReturnType<typeof useRouter>) {
   if (!data) return;
   if (data.gameId) {
-    router.push({ pathname: '/game-chat', params: { id: String(data.gameId), name: 'Game' } });
+    router.push({ pathname: '/game/[id]', params: { id: String(data.gameId) } } as any);
   } else if (data.screen === 'friends') {
     router.push('/friends' as any);
   } else if (data.screen === 'games') {
@@ -24,7 +24,7 @@ function navigateFromNotification(data: Record<string, any>, router: ReturnType<
 }
 
 function AppServices() {
-  const { token, logout } = useAuth();
+  const { token, logout, user } = useAuth();
   const router = useRouter();
   const coldStartHandled = useRef(false);
 
@@ -36,22 +36,25 @@ function AppServices() {
     if (token) registerPushToken(token);
   }, [token]);
 
-  // Handle tap when app is open or backgrounded
+  // Handle tap when app is open or backgrounded — skip if onboarding not done
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      if (!user?.onboarding_complete) return;
       navigateFromNotification(response.notification.request.content.data as Record<string, any>, router);
     });
     return () => sub.remove();
-  }, [router]);
+  }, [router, user]);
 
-  // Handle tap that cold-started the app — runs once after auth resolves
+  // Handle tap that cold-started the app — wait for user to load before navigating
   useEffect(() => {
-    if (!token || coldStartHandled.current) return;
+    if (!token || !user || coldStartHandled.current) return;
     coldStartHandled.current = true;
     Notifications.getLastNotificationResponseAsync().then(response => {
-      if (response) navigateFromNotification(response.notification.request.content.data as Record<string, any>, router);
+      if (response && user.onboarding_complete) {
+        navigateFromNotification(response.notification.request.content.data as Record<string, any>, router);
+      }
     });
-  }, [token, router]);
+  }, [token, router, user]);
 
   return null;
 }

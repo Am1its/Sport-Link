@@ -5,6 +5,14 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+async function requireCourtManager(placeId, userId) {
+  const [[claim]] = await pool.execute(
+    'SELECT user_id FROM CourtClaims WHERE place_id = ? AND user_id = ?',
+    [placeId, userId]
+  );
+  return !!claim;
+}
+
 const detectSportType = (name = '') => {
   const n = name.toLowerCase();
   if (n.match(/basket|כדורסל/))                  return 'basketball';
@@ -176,7 +184,7 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
       [placeId]
     );
 
-    const isManager = claim ? claim.user_id === req.user.id : false;
+    const isManager = !!(claim && claim.user_id === req.user.id);
 
     res.json({
       success: true,
@@ -271,11 +279,8 @@ router.put('/:placeId/reviews/:reviewId/response', authMiddleware, async (req, r
     return res.status(400).json({ success: false, message: 'response max 500 chars' });
 
   try {
-    const [[claim]] = await pool.execute(
-      'SELECT user_id FROM CourtClaims WHERE place_id = ? AND user_id = ?',
-      [placeId, userId]
-    );
-    if (!claim) return res.status(403).json({ success: false, message: 'Not the court manager' });
+    if (!(await requireCourtManager(placeId, userId)))
+      return res.status(403).json({ success: false, message: 'Not the court manager' });
 
     await pool.execute(
       'UPDATE CourtReviews SET owner_response = ?, owner_response_at = NOW() WHERE id = ? AND place_id = ?',
@@ -295,11 +300,8 @@ router.delete('/:placeId/reviews/:reviewId/response', authMiddleware, async (req
   const userId = req.user.id;
 
   try {
-    const [[claim]] = await pool.execute(
-      'SELECT user_id FROM CourtClaims WHERE place_id = ? AND user_id = ?',
-      [placeId, userId]
-    );
-    if (!claim) return res.status(403).json({ success: false, message: 'Not the court manager' });
+    if (!(await requireCourtManager(placeId, userId)))
+      return res.status(403).json({ success: false, message: 'Not the court manager' });
 
     await pool.execute(
       'UPDATE CourtReviews SET owner_response = NULL, owner_response_at = NULL WHERE id = ? AND place_id = ?',

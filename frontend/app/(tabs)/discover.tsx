@@ -277,14 +277,19 @@ export default function DiscoverScreen() {
     }
   }, [token, radiusKm]);
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Debounce search: re-fetch 400ms after the user stops typing
   useEffect(() => {
-    const timer = setTimeout(() => fetchGames(), 400);
-    return () => clearTimeout(timer);
+    debounceRef.current = setTimeout(() => fetchGames(), 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search, fetchGames]);
 
   useFocusEffect(
-    useCallback(() => { fetchGames(); }, [fetchGames])
+    useCallback(() => {
+      fetchGames();
+      return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    }, [fetchGames])
   );
 
   const handleJoined = (id: number, newCount: number) => {
