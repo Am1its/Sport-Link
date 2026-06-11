@@ -2,7 +2,7 @@
 
 > **Note:** This technical design is derived from the User Personas and Stories defined in [Product Definitions](PRODUCT_DEFINITIONS.md). The architecture is optimized for location-based discovery (Persona: "Newcomer") and real-time event management (Persona: "Organizer").
 >
-> **Status:** Reflects the live prototype as of Sprint 11.
+> **Status:** Reflects the live production system as of Sprint 13 (June 2026).
 
 ---
 

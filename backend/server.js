@@ -286,6 +286,133 @@ app.get('/invite/:userId', async (req, res) => {
   }
 });
 
+// --- Privacy Policy ---
+app.get('/privacy', (req, res) => {
+  const updated = 'June 11, 2026';
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — SportLink</title>
+  <style>
+    body { max-width: 720px; margin: 0 auto; padding: 40px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1C1C1E; color: #FFFFFF; line-height: 1.7; }
+    h1 { font-size: 28px; font-weight: 900; color: #0FEA95; margin-bottom: 4px; }
+    h2 { font-size: 18px; font-weight: 800; color: #FFFFFF; margin: 32px 0 10px; }
+    p, li { font-size: 15px; color: #AEAEB2; }
+    ul { padding-left: 20px; }
+    a { color: #0FEA95; }
+    .updated { font-size: 13px; color: #636366; margin-bottom: 32px; }
+  </style>
+</head>
+<body>
+  <h1>SportLink Privacy Policy</h1>
+  <p class="updated">Last updated: ${updated}</p>
+
+  <h2>1. Information We Collect</h2>
+  <p>We collect the following information when you use SportLink:</p>
+  <ul>
+    <li><strong>Account information:</strong> username, email address, and optionally a bio and profile photo.</li>
+    <li><strong>Location data:</strong> your device location (when you grant permission) to show nearby courts and games. We do not store your location history.</li>
+    <li><strong>Game activity:</strong> games you create, join, and messages you send in game chats.</li>
+    <li><strong>Device information:</strong> Expo push token for sending notifications about your games.</li>
+    <li><strong>Google Sign-In:</strong> if you use Google Sign-In, we receive your name, email, and Google profile photo.</li>
+  </ul>
+
+  <h2>2. How We Use Your Information</h2>
+  <ul>
+    <li>To provide core app features: finding games, joining courts, real-time chat, and ratings.</li>
+    <li>To send push notifications about game activity, friend requests, and post-game ratings.</li>
+    <li>To calculate and display your karma score based on game participation and peer ratings.</li>
+    <li>To improve the app and fix bugs using aggregated, anonymized usage data via Sentry error monitoring.</li>
+  </ul>
+
+  <h2>3. Data Sharing</h2>
+  <p>We do not sell your personal data. We share data only with:</p>
+  <ul>
+    <li><strong>Other SportLink users:</strong> your username, avatar, bio, sport preferences, and karma are visible to other users on your public profile.</li>
+    <li><strong>Google:</strong> if you use Google Sign-In (governed by Google's Privacy Policy).</li>
+    <li><strong>Expo (push notifications):</strong> your push token is sent to Expo's push notification service to deliver notifications.</li>
+    <li><strong>Sentry:</strong> error reports and crash logs are sent to Sentry for debugging (no personal data is intentionally included).</li>
+    <li><strong>Railway:</strong> our hosting provider stores your data on their servers in the EU/US.</li>
+  </ul>
+
+  <h2>4. Data Retention</h2>
+  <p>Your data is retained as long as your account is active. You may contact us to delete your account and all associated data.</p>
+
+  <h2>5. Your Rights</h2>
+  <p>You have the right to access, correct, or delete your personal data. Contact us at <a href="mailto:oran2107@gmail.com">oran2107@gmail.com</a>.</p>
+
+  <h2>6. Children</h2>
+  <p>SportLink is not intended for users under 13. We do not knowingly collect data from children under 13.</p>
+
+  <h2>7. Changes to This Policy</h2>
+  <p>We may update this policy. Continued use of the app after changes constitutes acceptance of the updated policy.</p>
+
+  <h2>8. Contact</h2>
+  <p>Questions? Email us at <a href="mailto:oran2107@gmail.com">oran2107@gmail.com</a>.</p>
+</body>
+</html>`);
+});
+
+// --- Terms of Service ---
+app.get('/terms', (req, res) => {
+  const updated = 'June 11, 2026';
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — SportLink</title>
+  <style>
+    body { max-width: 720px; margin: 0 auto; padding: 40px 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1C1C1E; color: #FFFFFF; line-height: 1.7; }
+    h1 { font-size: 28px; font-weight: 900; color: #0FEA95; margin-bottom: 4px; }
+    h2 { font-size: 18px; font-weight: 800; color: #FFFFFF; margin: 32px 0 10px; }
+    p, li { font-size: 15px; color: #AEAEB2; }
+    ul { padding-left: 20px; }
+    a { color: #0FEA95; }
+    .updated { font-size: 13px; color: #636366; margin-bottom: 32px; }
+  </style>
+</head>
+<body>
+  <h1>SportLink Terms of Service</h1>
+  <p class="updated">Last updated: ${updated}</p>
+
+  <h2>1. Acceptance</h2>
+  <p>By using SportLink you agree to these Terms. If you do not agree, do not use the app.</p>
+
+  <h2>2. Use of the Service</h2>
+  <ul>
+    <li>You must be at least 13 years old to use SportLink.</li>
+    <li>You are responsible for all activity under your account.</li>
+    <li>You may not use SportLink for any unlawful purpose or to harass other users.</li>
+    <li>You may not impersonate other people or post false information.</li>
+  </ul>
+
+  <h2>3. User Content</h2>
+  <p>You retain ownership of content you post (profile photos, game details, chat messages). By posting, you grant SportLink a non-exclusive, royalty-free license to display that content within the app. You are solely responsible for your content.</p>
+
+  <h2>4. Community Standards</h2>
+  <p>SportLink is a sports community. Treat other users with respect. We may suspend or terminate accounts that violate these standards, including harassment, hate speech, or spamming.</p>
+
+  <h2>5. Ratings and Karma</h2>
+  <p>The karma system reflects community feedback. We do not guarantee the accuracy of karma scores and are not liable for any reputational effect.</p>
+
+  <h2>6. Disclaimer</h2>
+  <p>SportLink is provided "as is" without warranties of any kind. We are not responsible for in-person meetings arranged through the app. Participate in games at your own risk.</p>
+
+  <h2>7. Limitation of Liability</h2>
+  <p>To the fullest extent permitted by law, SportLink is not liable for any indirect, incidental, or consequential damages arising from your use of the app.</p>
+
+  <h2>8. Changes</h2>
+  <p>We may modify these Terms at any time. Continued use after changes constitutes acceptance.</p>
+
+  <h2>9. Contact</h2>
+  <p>Questions? Email <a href="mailto:oran2107@gmail.com">oran2107@gmail.com</a>.</p>
+</body>
+</html>`);
+});
+
 app.use('/api/auth',          authRoutes);
 app.use('/api/games',         gamesRoutes);
 app.use('/api/chats',         chatsRoutes);

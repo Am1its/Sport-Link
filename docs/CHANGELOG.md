@@ -4,6 +4,103 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 13] — June 2026 — App Store Prep, Sentry, Court Ownership
+
+### App Store Readiness
+- **Icon & splash:** Generated `assets/icon.png` (1024×1024 PNG) and `assets/splash.png` (2048×2048) from Logo4 with dark `#1C1C1E` background. Both referenced in `app.json`.
+- **`app.json`** updated: `userInterfaceStyle: dark`, iOS `buildNumber: "1"`, Android `versionCode: 1`, proper `NSLocationWhenInUseUsageDescription` / `NSCameraUsageDescription` / `NSPhotoLibraryUsageDescription` / `NSUserNotificationsUsageDescription` info.plist keys, iOS `privacyManifests` for `NSUserDefaults` access (CA92.1), `expo-notifications` plugin with green icon tint, `supportsTablet: false`.
+- **`eas.json`** created: three build profiles — `development` (simulator), `preview` (internal distribution), `production` (auto-increment). Submit config with Apple ID pre-filled.
+- **Privacy Policy** served at `GET /privacy` on Railway — covers data collected, usage, sharing (Google, Expo, Sentry, Railway), retention, user rights, children, contact.
+- **Terms of Service** served at `GET /terms` on Railway — covers acceptance, permitted use, user content license, community standards, karma disclaimer, limitation of liability.
+
+### Sentry Error Monitoring
+- **`@sentry/react-native`** installed in frontend.
+- `Sentry.init({ dsn: process.env.EXPO_PUBLIC_SENTRY_DSN, debug: false, tracesSampleRate: 0.2 })` called at module load in `frontend/app/_layout.tsx`.
+- `RootLayout` wrapped in `Sentry.wrap()` to capture unhandled JS errors and promise rejections.
+- DSN stored in `EXPO_PUBLIC_SENTRY_DSN` env var (`.env` + Railway env vars).
+
+### Court Claim / Ownership (#17)
+**Backend:**
+- **Migration 019** — `CourtClaims` table: `id`, `place_id` (UNIQUE), `user_id` FK → Users, `claimed_at`. `CourtReviews` gains `owner_response VARCHAR(500) NULL` and `owner_response_at DATETIME NULL`.
+- `POST /api/courts/:placeId/claim` — any authenticated user claims an unclaimed court (first-come, 409 if already claimed).
+- `DELETE /api/courts/:placeId/claim` — manager releases claim.
+- `PUT /api/courts/:placeId/reviews/:reviewId/response` — manager adds/updates response to a review (guards via CourtClaims lookup).
+- `DELETE /api/courts/:placeId/reviews/:reviewId/response` — manager removes their response.
+- `GET /api/courts/:placeId` — now returns `claimed_by: { id, username, avatar } | null` and `is_manager: boolean`.
+- All review queries now include `owner_response` and `owner_response_at` fields.
+
+**Frontend (`frontend/app/court-detail.tsx`):**
+- `ClaimedBy` type added; `claimedBy`, `isManager`, `claiming` state.
+- **Manager banner** (when claimed): accent-faint background, shield-checkmark icon, manager avatar + username, Release button for the manager.
+- **Claim CTA** (when unclaimed): blue-faint card with "Manage This Court" button.
+- `ReviewCard` updated — if `isManager`, shows "Reply as Manager" button on each review. Inline text input with Save/Cancel. Existing responses show with edit/delete icons. `owner_response` displayed in accent-faint bubble with shield-checkmark label.
+
+---
+
+## [Sprint 12] — June 2026 — Engagement Loop, Growth Features, Improvements
+
+### Google Sign-In (Production)
+- PKCE flow via `expo-auth-session`. `POST /api/auth/google` validates access token against Google userinfo endpoint. New Google users route to `/onboarding`.
+
+### Notification Tap → Navigate (#8)
+- `Notifications.addNotificationResponseReceivedListener` in `_layout.tsx` navigates to `game-chat` (if `data.gameId`), `/friends`, or `/(tabs)/games`.
+- Cold-start handler via `getLastNotificationResponseAsync()` with `coldStartHandled` ref guard.
+
+### Real-Time Notification Badge via Socket.io (#9)
+- `(tabs)/_layout.tsx`: socket connects on auth, listens for `new_dm` event → calls `checkUnread`.
+- `AsyncStorage.multiGet` replaces sequential key reads for chat unread detection.
+
+### Post-Game Push Nudge (#10)
+- Cron sends push 30 min after `scheduled_time` to host + participants nudging them to rate.
+
+### Auto-Complete Games (#11)
+- `autoCompleteGames` cron transitions `active` games to `completed` 2 hours after `scheduled_time`.
+- Recurring games: if `recurrence != 'none'` and `parent_game_id IS NULL`, spawns a new game `+7` or `+14` days out.
+
+### Smart Game Recommendations (#12)
+- `GET /api/games` joins `SportPreferences` for caller; returns `sport_match_score` (0–3). Discover sorts by `sport_match_score DESC, scheduled_time ASC`.
+
+### Full-Text Game Search (#19)
+- **Migration 017** — `ALTER TABLE Games ADD FULLTEXT INDEX ft_games_search (title, location_desc)`.
+- `GET /api/games?q=` — `MATCH/AGAINST` in BOOLEAN MODE (prefix `+word*`) for ≥3 char queries; LIKE fallback for 2-char terms.
+- Discover debounces 400ms, sends `?q=` to server, sport filter stays client-side.
+
+### Chat Pagination (#18)
+- `GET /api/chats/:gameId/messages?before=<id>&limit=30` — `ORDER BY id DESC`, reversed before response.
+- `game-chat.tsx` switched to inverted `FlatList`; new messages prepend; `loadMore` appends older at array tail; `ListFooterComponent` shows loading indicator at visual top.
+
+### Activity Feed (#15)
+- `GET /api/activity` — UNION of friends' join events + game creation events; last 50; auth required.
+- `frontend/app/activity.tsx` — FlatList with actor avatar (tappable → player-profile), 3px sport-color accent bar, "X joined / created Y" headline, sport badge, `timeAgo` helper.
+- Accessible from Profile → Friend Activity.
+
+### Social Sharing + Game Landing Pages (#13)
+- `GET /game/:id` on Railway — server-renders HTML with OG meta tags, auto-redirects mobile to `sportlink://game/:id`, shows game info card.
+- `GET /invite/:userId` — invite landing page with avatar, username, bio, sport; auto-redirects to `sportlink://invite/:userId`.
+- `Share.share` on game cards and invite button uses full Railway URLs.
+
+### Invite by Link / Referral (#14)
+- `frontend/app/invite/[id].tsx` — deep link handler for `sportlink://invite/:userId`. Shows public profile, Add Friend CTA (or "Already Friends" / "Sign in" states).
+- Share button in `friends.tsx` header invites via `${API_BASE}/invite/${user.id}`.
+
+### Recurring Games (#16)
+- **Migration 018** — `ALTER TABLE Games ADD COLUMN recurrence ENUM('none','weekly','biweekly') NOT NULL DEFAULT 'none'`, `ADD COLUMN parent_game_id INT NULL`, FK `→ Games(id) ON DELETE SET NULL`.
+- `modal.tsx` — Repeat chip selector (One-time / Weekly / Bi-weekly) shown for new games.
+- `games.tsx` — recurring badge (repeat icon + WEEKLY / BI-WEEKLY label) on game cards.
+- Backend cron spawns child game on completion of root recurring games.
+
+### Player Matching Improvement (#20)
+- `GET /api/users/suggestions` — both branches now compute `shared_game_count` (completed games where both users participated).
+- Sort order updated: `shared_count DESC, shared_game_count DESC, karma DESC`.
+- Player cards show "✓ X games together" green badge when `shared_game_count > 0`.
+
+### Code Quality
+- All 10 findings from June 2026 code review fixed and merged (branch `fix/code-review-findings`).
+- `frontend/constants/sports.ts` — `SPORT_LABELS` exported; `sportLabel(type)` helper function.
+- `frontend/types/index.ts` — `Game.recurrence`, `Game.photo` types added.
+
+---
+
 ## [Sprint 11] — May 2026 — Full UI/UX Overhaul & Design System
 
 ### Design Token System
