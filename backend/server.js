@@ -113,31 +113,24 @@ io.on('connection', (socket) => {
 });
 
 // --- Game-start reminder notifications ---
-// Maps gameId → timestamp when reminder was sent. Pruned after 2 hours.
-const remindersSent = new Map();
-
 async function sendGameReminders() {
   try {
-    // Prune stale entries (games that started more than 2 hours ago)
-    const TWO_HOURS = 2 * 60 * 60 * 1000;
-    for (const [id, ts] of remindersSent) {
-      if (Date.now() - ts > TWO_HOURS) remindersSent.delete(id);
-    }
-
-    // Find active games starting in the next 25–35 minutes.
+    // Only games whose reminder has never been sent (reminder_sent_at IS NULL).
+    // Survives server restarts — no more in-memory dedup.
     const [games] = await pool.execute(`
       SELECT id, title, sport_type, host_id
       FROM Games
       WHERE status = 'active'
+        AND reminder_sent_at IS NULL
         AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i')
             BETWEEN DATE_ADD(NOW(), INTERVAL 25 MINUTE)
               AND   DATE_ADD(NOW(), INTERVAL 35 MINUTE)
     `);
 
     for (const game of games) {
-      if (remindersSent.has(game.id)) continue;
+      // Mark first to prevent double-fire if the loop takes > 1 minute.
+      await pool.execute('UPDATE Games SET reminder_sent_at = NOW() WHERE id = ?', [game.id]);
 
-      // Collect push tokens for host + all participants in one query.
       const [rows] = await pool.execute(`
         SELECT u.push_token
         FROM Users u
@@ -150,7 +143,6 @@ async function sendGameReminders() {
       `, [game.host_id, game.id]);
 
       const tokens = rows.map(r => r.push_token).filter(Boolean);
-      remindersSent.set(game.id, Date.now());
       if (tokens.length === 0) continue;
 
       const sportLabel = game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1);
