@@ -18,8 +18,10 @@ router.get('/', authMiddleware, async (req, res) => {
       FROM Friends f
       JOIN Users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
       WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
+        AND u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+        AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
       ORDER BY u.username ASC
-    `, [userId, userId, userId]);
+    `, [userId, userId, userId, userId, userId]);
     res.json({ success: true, friends: rows });
   } catch (err) {
     console.error(err);
@@ -36,8 +38,10 @@ router.get('/requests', authMiddleware, async (req, res) => {
       FROM Friends f
       JOIN Users u ON u.id = f.requester_id
       WHERE f.addressee_id = ? AND f.status = 'pending'
+        AND u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+        AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
       ORDER BY f.created_at DESC
-    `, [userId]);
+    `, [userId, userId, userId]);
     res.json({ success: true, requests: rows });
   } catch (err) {
     console.error(err);

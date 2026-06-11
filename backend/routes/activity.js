@@ -34,6 +34,8 @@ router.get('/', authMiddleware, async (req, res) => {
           (f.addressee_id = ? AND f.requester_id = gp.user_id)
         ) AND f.status = 'accepted'
         WHERE gp.user_id != ?
+          AND u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+          AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
       )
       UNION ALL
       (
@@ -57,10 +59,12 @@ router.get('/', authMiddleware, async (req, res) => {
           (f.addressee_id = ? AND f.requester_id = g.host_id)
         ) AND f.status = 'accepted'
         WHERE g.status = 'active' AND g.host_id != ?
+          AND u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
+          AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
       )
       ORDER BY happened_at DESC
       LIMIT 50
-    `, [userId, userId, userId, userId, userId, userId]);
+    `, [userId, userId, userId, userId, userId, userId, userId, userId, userId, userId]);
 
     res.json({ success: true, activities: rows });
   } catch (err) {

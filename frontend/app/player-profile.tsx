@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Alert, Modal,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -34,9 +34,11 @@ export default function PlayerProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const { token, user: me } = useAuth();
 
-  const [profile, setProfile]       = useState<PublicUser | null>(null);
-  const [loading, setLoading]       = useState(true);
+  const [profile, setProfile]           = useState<PublicUser | null>(null);
+  const [loading, setLoading]           = useState(true);
   const [friendLoading, setFriendLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -104,6 +106,41 @@ export default function PlayerProfileScreen() {
     }
   };
 
+  const handleMoreOptions = () => {
+    if (!profile) return;
+    Alert.alert(profile.username, undefined, [
+      {
+        text: 'Block User', style: 'destructive', onPress: () => {
+          Alert.alert('Block User', `Block ${profile.username}? They won't be able to see your profile or interact with you.`, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Block', style: 'destructive', onPress: async () => {
+                try {
+                  await apiFetch(`/api/users/${profile.id}/block`, { method: 'POST', token });
+                  router.back();
+                } catch { Alert.alert('Error', 'Could not block user'); }
+              },
+            },
+          ]);
+        },
+      },
+      { text: 'Report User', onPress: () => { setReportReason(null); setShowReportModal(true); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const submitReport = async () => {
+    if (!reportReason || !profile) return;
+    try {
+      await apiFetch(`/api/users/${profile.id}/report`, {
+        method: 'POST', token,
+        body: JSON.stringify({ reason: reportReason }),
+      });
+      setShowReportModal(false);
+      Alert.alert('Report Sent', "Thank you. We'll review this report.");
+    } catch { Alert.alert('Error', 'Could not submit report'); }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -150,6 +187,11 @@ export default function PlayerProfileScreen() {
           <View style={styles.youTag}>
             <Text style={styles.youTagText}>Your Profile</Text>
           </View>
+        )}
+        {!isMe && (
+          <TouchableOpacity onPress={handleMoreOptions} style={styles.moreBtn}>
+            <Ionicons name="ellipsis-vertical" size={20} color={Colors.text} />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -287,6 +329,38 @@ export default function PlayerProfileScreen() {
       })()}
 
       <View style={{ height: 40 }} />
+
+      {/* ── Report modal ── */}
+      <Modal visible={showReportModal} transparent animationType="fade" onRequestClose={() => setShowReportModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowReportModal(false)}>
+          <TouchableOpacity style={styles.reportModal} activeOpacity={1}>
+            <Text style={styles.reportTitle}>Report User</Text>
+            <Text style={styles.reportSubtitle}>Why are you reporting this user?</Text>
+            {(['spam', 'harassment', 'inappropriate', 'other'] as const).map(r => (
+              <TouchableOpacity
+                key={r}
+                style={[styles.reasonRow, reportReason === r && styles.reasonRowActive]}
+                onPress={() => setReportReason(r)}
+              >
+                <View style={[styles.reasonRadio, reportReason === r && styles.reasonRadioActive]} />
+                <Text style={[styles.reasonText, reportReason === r && { color: Colors.text }]}>
+                  {r === 'spam' ? 'Spam' : r === 'harassment' ? 'Harassment' : r === 'inappropriate' ? 'Inappropriate content' : 'Other'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.reportSubmitBtn, !reportReason && { opacity: 0.4 }]}
+              onPress={submitReport}
+              disabled={!reportReason}
+            >
+              <Text style={styles.reportSubmitText}>Submit Report</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowReportModal(false)} style={styles.reportCancelBtn}>
+              <Text style={styles.reportCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 }
@@ -304,6 +378,7 @@ const styles = StyleSheet.create({
   heroBlob2: { position: 'absolute', width: 180, height: 180, borderRadius: 90,  top: -50,  left: -60 },
   heroBlob3: { position: 'absolute', width: 140, height: 140, borderRadius: 70,  bottom: -60, right: 60 },
   backBtn:   { position: 'absolute', top: 56, left: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
+  moreBtn:   { position: 'absolute', top: 56, right: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
   youTag:    { position: 'absolute', bottom: 12, right: 20, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
   youTagText: { color: Colors.text, fontSize: 12, fontWeight: '800' },
 
@@ -344,4 +419,19 @@ const styles = StyleSheet.create({
   errorText:         { color: Colors.textMuted, fontSize: 16, marginTop: 14 },
   backBtnCenter:     { marginTop: 20, backgroundColor: Colors.surface, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.md },
   backBtnCenterText: { color: Colors.text, fontWeight: '700' },
+
+  // Report modal
+  modalOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  reportModal:       { width: '85%', backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.xl },
+  reportTitle:       { fontSize: 18, fontWeight: '900', color: Colors.text, marginBottom: 4 },
+  reportSubtitle:    { fontSize: 13, color: Colors.textMuted, marginBottom: Spacing.lg },
+  reasonRow:         { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 8, borderRadius: Radius.md, marginBottom: 4 },
+  reasonRowActive:   { backgroundColor: Colors.accentFaint },
+  reasonRadio:       { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: Colors.border },
+  reasonRadioActive: { borderColor: Colors.accent, backgroundColor: Colors.accent },
+  reasonText:        { fontSize: 14, color: Colors.textMuted, fontWeight: '600' },
+  reportSubmitBtn:   { backgroundColor: Colors.accent, borderRadius: Radius.pill, paddingVertical: 13, alignItems: 'center', marginTop: Spacing.lg },
+  reportSubmitText:  { color: Colors.bg, fontWeight: '800', fontSize: 15 },
+  reportCancelBtn:   { paddingVertical: 10, alignItems: 'center' },
+  reportCancelText:  { color: Colors.textMuted, fontWeight: '600' },
 });
