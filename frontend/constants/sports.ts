@@ -22,6 +22,22 @@ export const SPORT_ICONS: Record<string, string> = {
   swimming:   'swim',
 };
 
+const SPORT_LABELS: Record<string, string> = {
+  basketball: 'Basketball',
+  football:   'Football',
+  tennis:     'Tennis',
+  volleyball: 'Volleyball',
+  yoga:       'Yoga',
+  gym:        'Gym',
+  studio:     'Studio',
+  footvolley: 'Footvolley',
+  swimming:   'Swimming',
+};
+
+export function sportLabel(type: string): string {
+  return SPORT_LABELS[type] ?? (type.charAt(0).toUpperCase() + type.slice(1));
+}
+
 // { key, label } pairs used by map and discover filter rows
 export const SPORT_FILTER_ITEMS = [
   { key: 'all',        label: 'All Sports' },

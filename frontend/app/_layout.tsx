@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ function navigateFromNotification(data: Record<string, any>, router: ReturnType<
 function AppServices() {
   const { token, logout } = useAuth();
   const router = useRouter();
+  const coldStartHandled = useRef(false);
 
   useEffect(() => {
     setUnauthorizedHandler(logout);
@@ -36,9 +37,10 @@ function AppServices() {
     return () => sub.remove();
   }, [router]);
 
-  // Handle tap that cold-started the app (runs after auth resolves)
+  // Handle tap that cold-started the app — runs once after auth resolves
   useEffect(() => {
-    if (!token) return;
+    if (!token || coldStartHandled.current) return;
+    coldStartHandled.current = true;
     Notifications.getLastNotificationResponseAsync().then(response => {
       if (response) navigateFromNotification(response.notification.request.content.data as Record<string, any>, router);
     });

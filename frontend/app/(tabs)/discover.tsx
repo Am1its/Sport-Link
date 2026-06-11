@@ -10,7 +10,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { isPastGame } from '../../utils/time';
-import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { DiscoverSkeleton } from '../../components/SkeletonLoader';
 import type { Game } from '../../types';
@@ -34,7 +34,7 @@ function GameCard({
   onViewParticipants: () => void;
 }) {
   const handleShare = async () => {
-    const sportLabel = game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1);
+    const sportLabel = sportLabel(game.sport_type);
     const title = game.title || `${sportLabel} Game`;
     await Share.share({
       message: `Join my ${sportLabel} game on SportLink!\n${title}${game.scheduled_time ? `\n🕒 ${game.scheduled_time}` : ''}${game.location_desc ? `\n📍 ${game.location_desc}` : ''}\n\nsportlink://game/${game.id}`,
@@ -139,7 +139,7 @@ function GameCard({
 
             {/* Title */}
             <Text style={styles.cardTitle} numberOfLines={1}>
-              {game.title || `${game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1)} Game`}
+              {game.title || `${sportLabel(game.sport_type)} Game`}
             </Text>
 
             {/* Meta row */}
@@ -393,7 +393,7 @@ export default function DiscoverScreen() {
                   pathname: '/game-participants',
                   params: {
                     gameId: String(item.id),
-                    title: item.title ?? `${item.sport_type.charAt(0).toUpperCase() + item.sport_type.slice(1)} Game`,
+                    title: item.title ?? `${sportLabel(item.sport_type)} Game`,
                   },
                 } as any)
               }

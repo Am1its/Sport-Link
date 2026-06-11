@@ -6,6 +6,15 @@ const sendPushNotifications = require('../utils/sendPushNotification');
 
 const router = express.Router();
 
+// Decode JWT from Authorization header without requiring it.
+// Returns the user id, or null if missing/invalid/expired.
+function optionalUserId(req) {
+  try {
+    const raw = req.headers['authorization']?.split(' ')[1];
+    return raw ? (jwt.verify(raw, process.env.JWT_SECRET)?.id ?? null) : null;
+  } catch { return null; }
+}
+
 const toMapGame = (row) => ({
   id: row.id,
   place_id: `game_${row.id}`,
@@ -41,13 +50,7 @@ router.get('/', async (req, res) => {
   const { lat, lng, radius_km } = req.query;
   const useRadius = lat && lng && radius_km;
 
-  // Optionally decode userId from Bearer token if present
-  let userId = null;
-  try {
-    const header = req.headers['authorization'];
-    const raw = header && header.split(' ')[1];
-    if (raw) userId = jwt.verify(raw, process.env.JWT_SECRET)?.id ?? null;
-  } catch { /* invalid/expired token — treat as unauthenticated */ }
+  const userId = optionalUserId(req);
 
   try {
     const haversineExpr = `(6371 * ACOS(
@@ -134,11 +137,7 @@ router.get('/:id', async (req, res) => {
   const gameId = parseInt(req.params.id);
   if (isNaN(gameId)) return res.status(400).json({ success: false, message: 'Invalid game id' });
 
-  let userId = null;
-  try {
-    const raw = req.headers['authorization']?.split(' ')[1];
-    if (raw) userId = jwt.verify(raw, process.env.JWT_SECRET)?.id ?? null;
-  } catch { /* unauthenticated */ }
+  const userId = optionalUserId(req);
 
   try {
     const params = [];

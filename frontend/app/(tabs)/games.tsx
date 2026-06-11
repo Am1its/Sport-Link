@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { isPastGame } from '../../utils/time';
-import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
+import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { GamesSkeleton } from '../../components/SkeletonLoader';
 import type { Game } from '../../types';
@@ -266,7 +266,7 @@ export default function GamesScreen() {
     game: item,
     onChat: () => router.push({
       pathname: '/game-chat',
-      params: { id: String(item.id), name: `${item.sport_type.charAt(0).toUpperCase() + item.sport_type.slice(1)} Game` },
+      params: { id: String(item.id), name: `${sportLabel(item.sport_type)} Game` },
     }),
     onRatePlayers: () => router.push({
       pathname: '/rate-players',
@@ -295,7 +295,7 @@ export default function GamesScreen() {
     onLeave:  () => handleLeave(item),
     onViewParticipants: () => router.push({
       pathname: '/game-participants',
-      params: { gameId: String(item.id), title: item.title ?? `${item.sport_type.charAt(0).toUpperCase() + item.sport_type.slice(1)} Game` },
+      params: { gameId: String(item.id), title: item.title ?? `${sportLabel(item.sport_type)} Game` },
     } as any),
   });
 
