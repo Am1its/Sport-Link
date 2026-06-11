@@ -14,6 +14,20 @@ import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { ProfileStatsSkeleton } from '../../components/SkeletonLoader';
 
 type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
+type Badge = { badge_key: string; earned_at: string };
+
+const BADGE_LABELS: Record<string, string> = {
+  first_game:       '🏅 First Game',
+  game_5:           '⭐ 5 Games',
+  game_25:          '🔥 25 Games',
+  game_50:          '💎 50 Games',
+  host_5:           '🎯 5 Hosted',
+  host_25:          '🏆 25 Hosted',
+  streak_3:         '🔥 3 Streak',
+  streak_7:         '⚡ 7 Streak',
+  streak_30:        '🌟 30 Streak',
+  social_butterfly: '🦋 Social',
+};
 
 type Stats = {
   id: number;
@@ -24,7 +38,10 @@ type Stats = {
   games_joined: number;
   karma: number;
   top_sport: string | null;
+  current_streak: number;
+  longest_streak: number;
   sport_preferences: SportPref[];
+  badges: Badge[];
 };
 
 const SKILL_LABELS = ['', 'Beginner', 'Casual', 'Intermediate', 'Advanced', 'Pro'];
@@ -126,11 +143,13 @@ export default function ProfileScreen() {
       ? `data:image/jpeg;base64,${stats.avatar}`
       : null;
 
-  const totalGames = (stats?.games_hosted ?? 0) + (stats?.games_joined ?? 0);
-  const karma      = stats?.karma ?? 0;
-  const karmaStr   = karma > 0 ? `+${karma}` : `${karma}`;
-  const karmaColor = karma > 0 ? Colors.accent : karma < 0 ? Colors.error : Colors.textMuted;
-  const prefs      = stats?.sport_preferences ?? [];
+  const totalGames    = (stats?.games_hosted ?? 0) + (stats?.games_joined ?? 0);
+  const karma         = stats?.karma ?? 0;
+  const karmaStr      = karma > 0 ? `+${karma}` : `${karma}`;
+  const karmaColor    = karma > 0 ? Colors.accent : karma < 0 ? Colors.error : Colors.textMuted;
+  const prefs         = stats?.sport_preferences ?? [];
+  const badges        = stats?.badges ?? [];
+  const currentStreak = stats?.current_streak ?? 0;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -233,6 +252,29 @@ export default function ProfileScreen() {
               {i < arr.length - 1 && <View style={styles.statDivider} />}
             </React.Fragment>
           ))}
+        </View>
+      )}
+
+      {/* ── Streak pill ── */}
+      {currentStreak > 0 && (
+        <View style={styles.streakRow}>
+          <View style={styles.streakPill}>
+            <Text style={styles.streakText}>🔥 {currentStreak} game streak</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Badges ── */}
+      {badges.length > 0 && (
+        <View style={styles.badgesSection}>
+          <Text style={styles.badgesSectionTitle}>Badges</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesScroll}>
+            {badges.map(b => (
+              <View key={b.badge_key} style={styles.badgeChip}>
+                <Text style={styles.badgeText}>{BADGE_LABELS[b.badge_key] ?? b.badge_key}</Text>
+              </View>
+            ))}
+          </ScrollView>
         </View>
       )}
 
@@ -390,6 +432,18 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, backgroundColor: Colors.border },
   statValue:   { ...Type.stat, marginBottom: 3 },
   statLabel:   { ...Type.statLabel, color: Colors.textMuted },
+
+  // Streak
+  streakRow:  { alignItems: 'center', marginTop: Spacing.md, marginBottom: 2 },
+  streakPill: { paddingHorizontal: Spacing.lg, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.orange + '22', borderWidth: 1, borderColor: Colors.orange + '55' },
+  streakText: { color: Colors.orange, fontSize: 13, fontWeight: '700' },
+
+  // Badges
+  badgesSection:      { marginHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: 4 },
+  badgesSectionTitle: { ...Type.sectionLabel, color: Colors.textMuted, marginBottom: 10 },
+  badgesScroll:       { gap: 8, paddingRight: 4 },
+  badgeChip:          { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border },
+  badgeText:          { color: Colors.text, fontSize: 13, fontWeight: '600' },
 
   // Sports
   sportsSection:       { marginHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: 6 },

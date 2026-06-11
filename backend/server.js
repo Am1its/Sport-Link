@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const pool                 = require('./db');
 const sendPushNotifications = require('./utils/sendPushNotification');
 const { isUserInGame }     = require('./utils/gameUtils');
+const { checkAndAwardBadges } = require('./utils/badgeUtils');
 
 const authRoutes          = require('./routes/auth');
 const gamesRoutes         = require('./routes/games');
@@ -491,6 +492,14 @@ io.on('connection', (socket) => {
       console.error('Socket send_message error:', err.message);
     }
   });
+
+  // DM typing indicator — route to receiver's personal room
+  socket.on('dm_typing', ({ to }) => {
+    const receiverId = parseInt(to);
+    if (!isNaN(receiverId) && receiverId !== socket.user.id) {
+      io.to(`user_${receiverId}`).emit('dm_typing', { from: socket.user.id });
+    }
+  });
 });
 
 // --- Game-start reminder notifications ---
@@ -624,14 +633,48 @@ async function autoCompleteGames() {
       `, [game.host_id, game.id]);
 
       const tokens = rows.map(r => r.push_token).filter(Boolean);
-      if (tokens.length === 0) continue;
 
-      await sendPushNotifications(tokens.map(to => ({
-        to,
-        title: '🏅 Rate your teammates!',
-        body:  `${gameTitle} has ended. How did everyone do?`,
-        data:  { gameId: game.id },
-      })));
+      if (tokens.length > 0) {
+        await sendPushNotifications(tokens.map(to => ({
+          to,
+          title: '🏅 Rate your teammates!',
+          body:  `${gameTitle} has ended. How did everyone do?`,
+          data:  { gameId: game.id },
+        })));
+      }
+
+      // Update streaks + check badges for all participants
+      try {
+        const [participants] = await pool.execute(`
+          SELECT user_id FROM GameParticipants WHERE game_id = ? AND status = 'joined'
+          UNION SELECT ? AS user_id
+        `, [game.id, game.host_id]);
+
+        for (const { user_id } of participants) {
+          const [[u]] = await pool.execute(
+            'SELECT current_streak, longest_streak, last_game_date FROM Users WHERE id = ?', [user_id]
+          );
+          if (!u) continue;
+
+          const lastDate = u.last_game_date ? new Date(u.last_game_date) : null;
+          const now = new Date();
+          const daysSinceLast = lastDate
+            ? Math.floor((now - lastDate) / 86400000)
+            : 999;
+
+          const newStreak = daysSinceLast <= 8 ? (u.current_streak || 0) + 1 : 1;
+          const newLongest = Math.max(newStreak, u.longest_streak || 0);
+
+          await pool.execute(
+            'UPDATE Users SET current_streak = ?, longest_streak = ?, last_game_date = CURDATE() WHERE id = ?',
+            [newStreak, newLongest, user_id]
+          );
+
+          await checkAndAwardBadges(user_id, pool);
+        }
+      } catch (streakErr) {
+        console.error(`Streak update error for game ${game.id}:`, streakErr.message);
+      }
     }
   } catch (err) {
     console.error('Auto-complete games error:', err.message);

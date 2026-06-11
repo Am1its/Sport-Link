@@ -12,6 +12,20 @@ import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
+type Badge = { badge_key: string; earned_at: string };
+
+const BADGE_LABELS: Record<string, string> = {
+  first_game:       '🏅 First Game',
+  game_5:           '⭐ 5 Games',
+  game_25:          '🔥 25 Games',
+  game_50:          '💎 50 Games',
+  host_5:           '🎯 5 Hosted',
+  host_25:          '🏆 25 Hosted',
+  streak_3:         '🔥 3 Streak',
+  streak_7:         '⚡ 7 Streak',
+  streak_30:        '🌟 30 Streak',
+  social_butterfly: '🦋 Social',
+};
 
 type PublicUser = {
   id: number;
@@ -22,7 +36,10 @@ type PublicUser = {
   games_hosted: number;
   games_joined: number;
   top_sport: string | null;
+  current_streak: number;
+  longest_streak: number;
   sport_preferences: SportPref[];
+  badges: Badge[];
   friendship_status: FriendshipStatus;
   friendship_id: number | null;
 };
@@ -164,12 +181,14 @@ export default function PlayerProfileScreen() {
     );
   }
 
-  const isMe = me?.id === profile.id;
-  const color = (profile.top_sport ? SPORT_COLORS[profile.top_sport] : null) ?? getAvatarColor(profile.username);
-  const karmaStr = profile.karma > 0 ? `+${profile.karma}` : `${profile.karma}`;
-  const karmaColor = profile.karma > 0 ? Colors.accent : profile.karma < 0 ? Colors.error : Colors.textMuted;
-  const totalGames = profile.games_hosted + profile.games_joined;
-  const prefs = profile.sport_preferences ?? [];
+  const isMe         = me?.id === profile.id;
+  const color        = (profile.top_sport ? SPORT_COLORS[profile.top_sport] : null) ?? getAvatarColor(profile.username);
+  const karmaStr     = profile.karma > 0 ? `+${profile.karma}` : `${profile.karma}`;
+  const karmaColor   = profile.karma > 0 ? Colors.accent : profile.karma < 0 ? Colors.error : Colors.textMuted;
+  const totalGames   = profile.games_hosted + profile.games_joined;
+  const prefs        = profile.sport_preferences ?? [];
+  const badges       = profile.badges ?? [];
+  const currentStreak = profile.current_streak ?? 0;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -246,6 +265,29 @@ export default function PlayerProfileScreen() {
           <Text style={styles.statLabel}>Karma</Text>
         </View>
       </View>
+
+      {/* ── Streak pill ── */}
+      {currentStreak > 0 && (
+        <View style={styles.streakRow}>
+          <View style={styles.streakPill}>
+            <Text style={styles.streakText}>🔥 {currentStreak} game streak</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Badges ── */}
+      {badges.length > 0 && (
+        <View style={styles.badgesSection}>
+          <Text style={styles.badgesSectionTitle}>Badges</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesScroll}>
+            {badges.map(b => (
+              <View key={b.badge_key} style={styles.badgeChip}>
+                <Text style={styles.badgeText}>{BADGE_LABELS[b.badge_key] ?? b.badge_key}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* ── Sport Preferences ── */}
       {prefs.length > 0 && (
@@ -400,6 +442,18 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, backgroundColor: Colors.border },
   statValue:   { ...Type.stat, marginBottom: 2 },
   statLabel:   { ...Type.statLabel, color: Colors.textMuted },
+
+  // Streak
+  streakRow:  { alignItems: 'center', marginTop: Spacing.md, marginBottom: 2 },
+  streakPill: { paddingHorizontal: Spacing.lg, paddingVertical: 6, borderRadius: Radius.pill, backgroundColor: Colors.orange + '22', borderWidth: 1, borderColor: Colors.orange + '55' },
+  streakText: { color: Colors.orange, fontSize: 13, fontWeight: '700' },
+
+  // Badges
+  badgesSection:      { marginHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: 4 },
+  badgesSectionTitle: { ...Type.sectionLabel, color: Colors.textMuted, marginBottom: 10 },
+  badgesScroll:       { gap: 8 },
+  badgeChip:          { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border },
+  badgeText:          { color: Colors.text, fontSize: 13, fontWeight: '600' },
 
   // Sports
   sportsSection:      { marginHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: 6 },
