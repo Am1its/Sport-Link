@@ -264,7 +264,13 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
               SELECT g2.sport_type FROM Games g2
               JOIN GameParticipants gp2 ON gp2.game_id = g2.id AND gp2.user_id = u.id
             ) ts GROUP BY sport_type ORDER BY COUNT(*) DESC LIMIT 1
-          ) AS top_sport
+          ) AS top_sport,
+          (
+            SELECT COUNT(DISTINCT g.id) FROM Games g
+            WHERE g.status = 'completed'
+              AND (g.host_id = u.id OR EXISTS (SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = u.id))
+              AND (g.host_id = ? OR EXISTS (SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?))
+          ) AS shared_game_count
         FROM Users u
         WHERE u.id != ?
           AND NOT EXISTS (
@@ -272,9 +278,9 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
             WHERE (requester_id=? AND addressee_id=u.id) OR (requester_id=u.id AND addressee_id=?)
           )
           ${locationClause}
-        ORDER BY karma DESC
+        ORDER BY shared_game_count DESC, karma DESC
         LIMIT 20
-      `, [userId, userId, userId]);
+      `, [userId, userId, userId, userId, userId]);
     } else {
       // Match by shared sport preferences (or specific sport filter)
       const sportJoinClause = sport
@@ -312,7 +318,13 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
               SELECT g2.sport_type FROM Games g2
               JOIN GameParticipants gp2 ON gp2.game_id = g2.id AND gp2.user_id = u.id
             ) ts GROUP BY sport_type ORDER BY COUNT(*) DESC LIMIT 1
-          ) AS top_sport
+          ) AS top_sport,
+          (
+            SELECT COUNT(DISTINCT g.id) FROM Games g
+            WHERE g.status = 'completed'
+              AND (g.host_id = u.id OR EXISTS (SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = u.id))
+              AND (g.host_id = ? OR EXISTS (SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?))
+          ) AS shared_game_count
         FROM Users u
         ${sportJoinClause}
         WHERE u.id != ?
@@ -322,9 +334,9 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
           )
           ${locationClause}
         GROUP BY u.id, u.username, u.avatar
-        ORDER BY shared_count DESC, karma DESC
+        ORDER BY shared_count DESC, shared_game_count DESC, karma DESC
         LIMIT 20
-      `, [param1, userId, userId, userId]);
+      `, [param1, userId, userId, userId, userId, userId]);
     }
 
     const enriched = rows.map(r => ({
@@ -332,6 +344,7 @@ router.get('/suggestions', authMiddleware, async (req, res) => {
       shared_sports: r.shared_sports ? r.shared_sports.split(',') : [],
       karma: Number(r.karma),
       shared_count: Number(r.shared_count),
+      shared_game_count: Number(r.shared_game_count ?? 0),
       top_sport: r.top_sport ?? null,
     }));
 

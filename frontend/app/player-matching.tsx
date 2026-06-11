@@ -19,6 +19,7 @@ type Suggestion = {
   top_sport: string | null;
   shared_count: number;
   shared_sports: string[];
+  shared_game_count: number;
 };
 
 export default function PlayerMatchingScreen() {
@@ -161,10 +162,22 @@ export default function PlayerMatchingScreen() {
             </View>
           )}
 
-          {item.shared_count > 0 && (
-            <Text style={styles.sharedLabel}>
-              {item.shared_count} sport{item.shared_count !== 1 ? 's' : ''} in common
-            </Text>
+          {(item.shared_count > 0 || item.shared_game_count > 0) && (
+            <View style={styles.metaRow}>
+              {item.shared_count > 0 && (
+                <Text style={styles.sharedLabel}>
+                  {item.shared_count} sport{item.shared_count !== 1 ? 's' : ''} in common
+                </Text>
+              )}
+              {item.shared_game_count > 0 && (
+                <View style={styles.gamesPlayed}>
+                  <Ionicons name="checkmark-circle" size={11} color="#0FEA95" />
+                  <Text style={styles.gamesPlayedText}>
+                    {item.shared_game_count} game{item.shared_game_count !== 1 ? 's' : ''} together
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
         </View>
 
@@ -310,7 +323,10 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 10, fontWeight: '700' },
   moreChips: { fontSize: 10, color: '#636366', alignSelf: 'center' },
 
-  sharedLabel: { fontSize: 11, color: '#48484A', fontStyle: 'italic' },
+  metaRow:        { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 2 },
+  sharedLabel:    { fontSize: 11, color: '#48484A', fontStyle: 'italic' },
+  gamesPlayed:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  gamesPlayedText: { fontSize: 11, color: '#0FEA95', fontWeight: '700' },
 
   addBtn:        { width: 38, height: 38, borderRadius: 12, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center' },
   addBtnPending: { backgroundColor: '#2C2C2E', borderWidth: 1, borderColor: '#3A3A3C' },
