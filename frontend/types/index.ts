@@ -22,6 +22,13 @@ export type Game = {
   created_at?: string;
   photo: string | null;
   recurrence?: 'none' | 'weekly' | 'biweekly';
+  participant_status?: 'joined' | 'waitlist' | null;
+  waitlist_position?: number | null;
+  checked_in?: boolean;
+  post_game_photo?: string | null;
+  boosted_at?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type MapItem = {

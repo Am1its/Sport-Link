@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
@@ -8,12 +9,22 @@ import { isPastGame } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { GamesSkeleton } from '../../components/SkeletonLoader';
+import { isOutdoorSport, fetchWeatherForGame, WeatherResult } from '../../utils/weather';
 import type { Game } from '../../types';
 
+function isWithinCheckinWindow(scheduledTime: string | null): boolean {
+  if (!scheduledTime) return false;
+  const scheduled = new Date(scheduledTime.replace(' ', 'T') + ':00');
+  const now = new Date();
+  const diffMin = (now.getTime() - scheduled.getTime()) / 60000;
+  return diffMin >= -30 && diffMin <= 30;
+}
+
 function GameCard({
-  game, onRatePlayers, onViewResults, onCloseGame, onEdit, onDelete, onLeave, onChat, onViewParticipants,
+  game, token, onRatePlayers, onViewResults, onCloseGame, onEdit, onDelete, onLeave, onChat, onViewParticipants, onPhotoAdded,
 }: {
   game: Game;
+  token: string | null;
   onRatePlayers: () => void;
   onViewResults: () => void;
   onCloseGame: () => void;
@@ -22,6 +33,7 @@ function GameCard({
   onLeave: () => void;
   onChat: () => void;
   onViewParticipants: () => void;
+  onPhotoAdded?: (gameId: number, photo: string) => void;
 }) {
   const color        = SPORT_COLORS[game.sport_type] ?? Colors.accent;
   const icon         = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
@@ -30,6 +42,68 @@ function GameCard({
     ? `${displayCount}/${game.max_players} players`
     : `${displayCount} player${displayCount !== 1 ? 's' : ''}`;
   const past = isPastGame(game.scheduled_time);
+
+  const [weather, setWeather] = useState<WeatherResult | null>(null);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [boosting, setBoosting] = useState(false);
+  const [boostedAt, setBoostedAt] = useState(game.boosted_at ?? null);
+  const [checkedIn, setCheckedIn] = useState(game.checked_in ?? false);
+
+  useEffect(() => {
+    if (!past && isOutdoorSport(game.sport_type) && game.latitude && game.longitude && game.scheduled_time) {
+      fetchWeatherForGame(game.id, game.latitude, game.longitude, game.scheduled_time).then(setWeather);
+    }
+  }, [game.id]);
+
+  const handleCheckIn = async () => {
+    setCheckingIn(true);
+    try {
+      const res  = await apiFetch(`/api/games/${game.id}/checkin`, { method: 'POST', token });
+      const data = await res.json();
+      if (!data.success) return Alert.alert('Error', data.message);
+      setCheckedIn(true);
+      Alert.alert('Checked In!', "You've been checked in.");
+    } catch (err: any) {
+      if (err?.name === 'UnauthorizedError') return;
+      Alert.alert('Error', 'Could not connect to server');
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  const handleBoost = async () => {
+    setBoosting(true);
+    try {
+      const res  = await apiFetch(`/api/games/${game.id}/boost`, { method: 'POST', token });
+      const data = await res.json();
+      if (!data.success) return Alert.alert('Error', data.message);
+      setBoostedAt(new Date().toISOString());
+      Alert.alert('Boosted!', 'Nearby players with this sport will be notified!');
+    } catch (err: any) {
+      if (err?.name === 'UnauthorizedError') return;
+      Alert.alert('Error', 'Could not connect to server');
+    } finally {
+      setBoosting(false);
+    }
+  };
+
+  const handleAddPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, base64: true });
+    if (result.canceled || !result.assets[0]?.base64) return;
+    const base64 = result.assets[0].base64;
+    try {
+      const res  = await apiFetch(`/api/games/${game.id}/post-photo`, {
+        method: 'PUT', token, body: JSON.stringify({ photo: base64 }),
+      });
+      const data = await res.json();
+      if (!data.success) return Alert.alert('Error', data.message);
+      onPhotoAdded?.(game.id, base64);
+      Alert.alert('Photo Added!', 'Post-game memory saved.');
+    } catch (err: any) {
+      if (err?.name === 'UnauthorizedError') return;
+      Alert.alert('Error', 'Could not upload photo');
+    }
+  };
 
   return (
     <View style={[styles.card, Shadow.card]}>
@@ -49,11 +123,19 @@ function GameCard({
             <Text style={[styles.sportLabel, { color }]}>
               {game.sport_type.toUpperCase()}
             </Text>
-            <View style={[styles.badge, game.is_host ? styles.badgeHost : styles.badgeJoined]}>
-              <Text style={[styles.badgeText, { color: game.is_host ? Colors.accent : Colors.orange }]}>
-                {game.is_host ? 'HOST' : 'JOINED'}
-              </Text>
-            </View>
+            {game.participant_status === 'waitlist' ? (
+              <View style={[styles.badge, styles.badgeWaitlist]}>
+                <Text style={[styles.badgeText, { color: Colors.warning }]}>
+                  WAITLIST{game.waitlist_position ? ` #${game.waitlist_position}` : ''}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.badge, game.is_host ? styles.badgeHost : styles.badgeJoined]}>
+                <Text style={[styles.badgeText, { color: game.is_host ? Colors.accent : Colors.orange }]}>
+                  {game.is_host ? 'HOST' : 'JOINED'}
+                </Text>
+              </View>
+            )}
             {game.recurrence && game.recurrence !== 'none' && (
               <View style={styles.badgeRecurring}>
                 <Ionicons name="repeat-outline" size={10} color={Colors.blue} />
@@ -90,6 +172,12 @@ function GameCard({
               <Ionicons name="flash-outline" size={13} color={Colors.textMuted} />
               <Text style={styles.metaText}>Level {game.level}</Text>
             </View>
+            {weather && !past && (
+              <View style={styles.metaItem}>
+                <Text style={{ fontSize: 13 }}>{weather.icon}</Text>
+                <Text style={styles.metaText}>{weather.tempC}° {weather.condition}</Text>
+              </View>
+            )}
           </View>
 
           {/* Actions — upcoming games */}
@@ -113,12 +201,45 @@ function GameCard({
                     <Ionicons name="trash-outline" size={13} color={Colors.error} />
                     <Text style={[styles.btnGhostText, { color: Colors.error }]}>Delete</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.btnGhost, boostedAt
+                      ? { borderColor: Colors.border, backgroundColor: Colors.surface2 }
+                      : { borderColor: Colors.orange + '55', backgroundColor: Colors.orange + '15' }
+                    ]}
+                    onPress={handleBoost}
+                    disabled={!!boostedAt || boosting}
+                  >
+                    <Ionicons name="rocket-outline" size={13} color={boostedAt ? Colors.textMuted : Colors.orange} />
+                    <Text style={[styles.btnGhostText, { color: boostedAt ? Colors.textMuted : Colors.orange }]}>
+                      {boostedAt ? 'Boosted' : 'Boost'}
+                    </Text>
+                  </TouchableOpacity>
                 </>
               ) : (
-                <TouchableOpacity style={[styles.btnGhost, { borderColor: Colors.orange + '55', backgroundColor: Colors.orange + '15' }]} onPress={onLeave}>
-                  <Ionicons name="exit-outline" size={13} color={Colors.orange} />
-                  <Text style={[styles.btnGhostText, { color: Colors.orange }]}>Leave</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity style={[styles.btnGhost, { borderColor: Colors.orange + '55', backgroundColor: Colors.orange + '15' }]} onPress={onLeave}>
+                    <Ionicons name="exit-outline" size={13} color={Colors.orange} />
+                    <Text style={[styles.btnGhostText, { color: Colors.orange }]}>Leave</Text>
+                  </TouchableOpacity>
+                  {game.participant_status === 'joined' && isWithinCheckinWindow(game.scheduled_time) && !checkedIn && (
+                    <TouchableOpacity
+                      style={[styles.btnGhost, { borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint }]}
+                      onPress={handleCheckIn}
+                      disabled={checkingIn}
+                    >
+                      <Ionicons name="location" size={13} color={Colors.accent} />
+                      <Text style={[styles.btnGhostText, { color: Colors.accent }]}>
+                        {checkingIn ? '...' : 'Check In'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {game.participant_status === 'joined' && checkedIn && (
+                    <View style={[styles.btnGhost, { borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint }]}>
+                      <Ionicons name="checkmark-circle" size={13} color={Colors.accent} />
+                      <Text style={[styles.btnGhostText, { color: Colors.accent }]}>Checked In</Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           )}
@@ -152,6 +273,15 @@ function GameCard({
                   <Text style={[styles.btnGhostText, { color: Colors.yellow }]}>Results</Text>
                 </TouchableOpacity>
               )}
+              {game.status === 'completed' && game.is_host && !game.post_game_photo && (
+                <TouchableOpacity
+                  style={[styles.btnGhost, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]}
+                  onPress={handleAddPhoto}
+                >
+                  <Ionicons name="camera-outline" size={13} color={Colors.purple} />
+                  <Text style={[styles.btnGhostText, { color: Colors.purple }]}>Add Photo</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -167,9 +297,11 @@ export default function GamesScreen() {
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const removeGame    = (id: number) => setGames(prev => prev.filter(g => g.id !== id));
-  const markCompleted = (id: number) =>
+  const removeGame      = (id: number) => setGames(prev => prev.filter(g => g.id !== id));
+  const markCompleted   = (id: number) =>
     setGames(prev => prev.map(g => g.id === id ? { ...g, status: 'completed' } : g));
+  const handlePhotoAdded = (gameId: number, photo: string) =>
+    setGames(prev => prev.map(g => g.id === gameId ? { ...g, post_game_photo: photo } : g));
 
   const handleClose = (game: Game) => {
     Alert.alert(
@@ -272,6 +404,8 @@ export default function GamesScreen() {
 
   const makeCardProps = (item: Game) => ({
     game: item,
+    token,
+    onPhotoAdded: handlePhotoAdded,
     onChat: () => router.push({
       pathname: '/game-chat',
       params: { id: String(item.id), name: `${sportLabel(item.sport_type)} Game` },
@@ -379,8 +513,9 @@ const styles = StyleSheet.create({
   cardTopRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   sportLabel:  { ...Type.cardSport },
   badge:       { paddingHorizontal: 9, paddingVertical: 3, borderRadius: Radius.sm },
-  badgeHost:   { backgroundColor: Colors.accentFaint },
-  badgeJoined: { backgroundColor: Colors.orange + '22' },
+  badgeHost:     { backgroundColor: Colors.accentFaint },
+  badgeJoined:   { backgroundColor: Colors.orange + '22' },
+  badgeWaitlist: { backgroundColor: Colors.warning + '22' },
   badgeText:   { fontSize: 10, fontWeight: '800' },
   badgeRecurring:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.blueFaint, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   badgeRecurringText: { fontSize: 9, fontWeight: '800', color: Colors.blue },
