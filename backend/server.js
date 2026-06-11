@@ -20,12 +20,16 @@ const notificationsRoutes = require('./routes/notifications');
 const courtsRoutes        = require('./routes/courts');
 const dmRoutes            = require('./routes/dm');
 
+const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : '*';
+
 const app = express();
 const httpServer = http.createServer(app);
-const io = new IOServer(httpServer, { cors: { origin: '*' } });
+const io = new IOServer(httpServer, { cors: { origin: ALLOWED_ORIGINS } });
 app.set('io', io);
 
-app.use(cors());
+app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json({ limit: '10mb' }));
 
 // Strict rate limit for auth endpoints (brute-force protection)
