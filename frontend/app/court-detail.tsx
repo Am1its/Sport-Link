@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { API_BASE } from '../constants/api';
+import AvatarCircle from '../components/AvatarCircle';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 
@@ -399,15 +400,7 @@ export default function CourtDetailScreen() {
           {/* Court manager / claim banner */}
           {claimedBy ? (
             <View style={styles.claimBanner}>
-              <View style={[styles.claimAvatar, { backgroundColor: getAvatarColor(claimedBy.username) + '22', borderColor: getAvatarColor(claimedBy.username) }]}>
-                {claimedBy.avatar ? (
-                  <Image source={{ uri: `data:image/jpeg;base64,${claimedBy.avatar}` }} style={styles.claimAvatarImg} />
-                ) : (
-                  <Text style={[styles.claimAvatarLetter, { color: getAvatarColor(claimedBy.username) }]}>
-                    {claimedBy.username.charAt(0).toUpperCase()}
-                  </Text>
-                )}
-              </View>
+              <AvatarCircle username={claimedBy.username} avatar={claimedBy.avatar} size={36} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.claimLabel}>Managed by</Text>
                 <Text style={styles.claimUsername}>{claimedBy.username}</Text>
@@ -555,9 +548,6 @@ const styles = StyleSheet.create({
   replySaveText:  { fontSize: 13, color: Colors.bg, fontWeight: '900' },
 
   claimBanner: { marginHorizontal: Spacing.xl, marginBottom: Spacing.xl, backgroundColor: Colors.accentFaint, borderRadius: Radius.xl, padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: Colors.accentBorder },
-  claimAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
-  claimAvatarImg:    { width: '100%', height: '100%' },
-  claimAvatarLetter: { fontSize: 15, fontWeight: '900' },
   claimLabel:    { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
   claimUsername: { fontSize: 13, fontWeight: '800', color: Colors.text },
   unclaimBtn:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.pill, borderWidth: 1, borderColor: Colors.error },

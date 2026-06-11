@@ -127,7 +127,8 @@ export default function FriendsScreen() {
         <TouchableOpacity
           style={styles.inviteBtn}
           onPress={() => {
-            const url = `${API_BASE}/invite/${user?.id}`;
+            if (!user?.id) return;
+            const url = `${API_BASE}/invite/${user.id}`;
             Share.share({ title: 'Join me on SportLink!', message: `Join me on SportLink! ${url}`, url });
           }}
         >

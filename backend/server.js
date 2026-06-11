@@ -58,6 +58,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'SportLink API is running!' });
 });
 
+// Escape user-controlled strings before interpolating into HTML
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 // --- Game share landing page (Open Graph social preview + deep link) ---
 const SPORT_LABELS = {
   basketball: 'Basketball', football: 'Football', tennis: 'Tennis',
@@ -123,13 +134,19 @@ function buildLandingHtml({ title, description, deepLink, pageUrl, game, sport, 
   const textColor = '#FFFFFF';
   const subColor  = '#AEAEB2';
 
+  const safeTitle       = escapeHtml(game?.title || (sport + ' Game'));
+  const safeLocation    = escapeHtml(game?.location_desc);
+  const safeHost        = escapeHtml(game?.host_username);
+  const safeOgTitle     = escapeHtml(title);
+  const safeDescription = escapeHtml(description);
+
   const gameBlock = game ? `
     <div class="game-card">
-      <div class="sport-badge">${emoji} ${sport ?? ''}</div>
-      <h1 class="game-title">${game.title || (sport + ' Game')}</h1>
-      ${game.scheduled_time ? `<div class="meta"><span class="meta-icon">🕒</span> ${game.scheduled_time}</div>` : ''}
-      ${game.location_desc  ? `<div class="meta"><span class="meta-icon">📍</span> ${game.location_desc}</div>` : ''}
-      <div class="meta"><span class="meta-icon">👤</span> Hosted by <strong>${game.host_username}</strong></div>
+      <div class="sport-badge">${emoji} ${escapeHtml(sport ?? '')}</div>
+      <h1 class="game-title">${safeTitle}</h1>
+      ${game.scheduled_time ? `<div class="meta"><span class="meta-icon">🕒</span> ${escapeHtml(game.scheduled_time)}</div>` : ''}
+      ${safeLocation ? `<div class="meta"><span class="meta-icon">📍</span> ${safeLocation}</div>` : ''}
+      <div class="meta"><span class="meta-icon">👤</span> Hosted by <strong>${safeHost}</strong></div>
       ${game.max_players
         ? `<div class="meta"><span class="meta-icon">👥</span> ${game.participant_count + 1} / ${game.max_players} players</div>`
         : ''}
@@ -141,19 +158,19 @@ function buildLandingHtml({ title, description, deepLink, pageUrl, game, sport, 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title}</title>
+  <title>${safeOgTitle}</title>
 
   <!-- Open Graph -->
-  <meta property="og:title"       content="${title}" />
-  <meta property="og:description" content="${description}" />
-  <meta property="og:url"         content="${pageUrl}" />
+  <meta property="og:title"       content="${safeOgTitle}" />
+  <meta property="og:description" content="${safeDescription}" />
+  <meta property="og:url"         content="${escapeHtml(pageUrl)}" />
   <meta property="og:type"        content="website" />
   <meta property="og:site_name"   content="SportLink" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary" />
-  <meta name="twitter:title"       content="${title}" />
-  <meta name="twitter:description" content="${description}" />
+  <meta name="twitter:title"       content="${safeOgTitle}" />
+  <meta name="twitter:description" content="${safeDescription}" />
 
   <!-- iOS deep link -->
   <meta name="apple-itunes-app" content="app-id=PLACEHOLDER, app-argument=${deepLink}" />
@@ -222,8 +239,8 @@ app.get('/invite/:userId', async (req, res) => {
       : `Join SportLink and play ${SPORT_LABELS[user.top_sport] ?? 'sports'} together!`;
 
     const avatarHtml = user.avatar
-      ? `<img class="avatar" src="data:image/jpeg;base64,${user.avatar}" alt="${user.username}" />`
-      : `<div class="avatar avatar-fallback">${user.username.charAt(0).toUpperCase()}</div>`;
+      ? `<img class="avatar" src="data:image/jpeg;base64,${user.avatar}" alt="${escapeHtml(user.username)}" />`
+      : `<div class="avatar avatar-fallback">${escapeHtml(user.username.charAt(0).toUpperCase())}</div>`;
 
     const bgColor  = '#1C1C1E';
     const accent   = '#0FEA95';
@@ -236,15 +253,15 @@ app.get('/invite/:userId', async (req, res) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${ogTitle}</title>
-  <meta property="og:title"       content="${ogTitle}" />
-  <meta property="og:description" content="${ogDesc}" />
-  <meta property="og:url"         content="${pageUrl}" />
+  <title>${escapeHtml(ogTitle)}</title>
+  <meta property="og:title"       content="${escapeHtml(ogTitle)}" />
+  <meta property="og:description" content="${escapeHtml(ogDesc)}" />
+  <meta property="og:url"         content="${escapeHtml(pageUrl)}" />
   <meta property="og:type"        content="website" />
   <meta property="og:site_name"   content="SportLink" />
   <meta name="twitter:card"        content="summary" />
-  <meta name="twitter:title"       content="${ogTitle}" />
-  <meta name="twitter:description" content="${ogDesc}" />
+  <meta name="twitter:title"       content="${escapeHtml(ogTitle)}" />
+  <meta name="twitter:description" content="${escapeHtml(ogDesc)}" />
   <meta name="apple-itunes-app"   content="app-id=PLACEHOLDER, app-argument=${deepLink}" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -272,9 +289,9 @@ app.get('/invite/:userId', async (req, res) => {
   <div class="logo">Sport<span>Link</span></div>
   <div class="card">
     ${avatarHtml}
-    <div class="username">${user.username}</div>
-    ${user.bio ? `<div class="bio">"${user.bio}"</div>` : ''}
-    <div class="headline">${sportEmoji} invited you to play ${SPORT_LABELS[user.top_sport] ?? 'sports'} on SportLink!</div>
+    <div class="username">${escapeHtml(user.username)}</div>
+    ${user.bio ? `<div class="bio">"${escapeHtml(user.bio)}"</div>` : ''}
+    <div class="headline">${sportEmoji} invited you to play ${escapeHtml(SPORT_LABELS[user.top_sport] ?? 'sports')} on SportLink!</div>
   </div>
   <a class="open-btn" href="${deepLink}">Open in SportLink</a>
   <p class="sub">Don't have SportLink? Download from the App Store.</p>
@@ -536,7 +553,8 @@ async function autoCompleteGames() {
   try {
     const [games] = await pool.execute(`
       SELECT id, title, sport_type, host_id, recurrence, scheduled_time,
-             latitude, longitude, location_desc, equipment_notes, max_players, level, photo
+             latitude, longitude, location_desc, equipment_notes, max_players, level, photo,
+             parent_game_id
       FROM Games
       WHERE status = 'active'
         AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i') <= DATE_SUB(NOW(), INTERVAL ? HOUR)
@@ -556,10 +574,7 @@ async function autoCompleteGames() {
       // Spawn next occurrence for recurring games (only for root games — parent_game_id IS NULL)
       if (game.recurrence && game.recurrence !== 'none' && game.scheduled_time) {
         try {
-          const [[rootCheck]] = await pool.execute(
-            'SELECT parent_game_id FROM Games WHERE id = ?', [game.id]
-          );
-          if (rootCheck && rootCheck.parent_game_id == null) {
+          if (game.parent_game_id == null) {
             const days = game.recurrence === 'weekly' ? 7 : 14;
             // Parse YYYY-MM-DD HH:MM format
             const [datePart, timePart] = game.scheduled_time.split(' ');
