@@ -4,6 +4,59 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 15] — June 2026 — Animations, Haptics & UX Polish
+
+**Goal:** Elevate SportLink to a premium sports-brand feel — purposeful motion, haptic feedback at every high-stakes moment, smooth screen transitions. No audio; haptics-only.
+
+**Shared Animation Primitives (`frontend/hooks/useAnimations.ts`)**
+- `usePressAnimation(config?)` — spring scale-down/up on any pressable; accepts `{ scaleDown, scaleUp, stiffness, damping }` overrides
+- `useEntranceAnimation(delay?)` — translateY +12→0 + opacity 0→1 entrance
+- `useStaggerEntrance(index, baseDelay)` — staggered entrance with 60ms per-item offset
+- `useSuccessBurst()` — 6-dot particle burst for join celebrations
+
+**Shared Components**
+- `BackButton` — animated 36×36 circle (`usePressAnimation` + `Haptics.Light`); replaces inline back buttons across 9 screens
+- `ChatBubble` — extracted from both chat screens; Reanimated entrance (slide + fade, direction-aware for own vs. other messages)
+
+**Joining a Game (`GameCard.tsx`)**
+- 3-phase press animation: scale-down → overshoot → settle
+- `useSuccessBurst` particle burst on successful join
+- Haptic: `Medium` on press → `notificationAsync(Success)` on join
+
+**Sending a Message (`game-chat.tsx`, `direct-chat.tsx`)**
+- Send button: `withTiming` opacity 0.35→1 as text is typed; spring press animation
+- Outgoing bubble: slides up 12px + fades in (250ms spring)
+- Incoming bubble: slides in from left + fades (220ms spring)
+- Haptic: `Light` on send
+
+**Rating Players (`rate-players.tsx`)**
+- `AttendanceButton` — scale pulse + background `withTiming(180ms)`; `Heavy` haptic for No-Show, `Medium` for Arrived
+- `ThumbButton` — scale pulse + `nudgeY` -4→0 spring for thumb-up; `selectionAsync` haptic
+- `AnimatedStar` — staggered cascade fill (60ms per star, scale 1.3→1.0 spring); `selectionAsync` once per tap
+- Done screen: `circleScale` spring 0.3→1.0, `useEntranceAnimation` for text, `useStaggerEntrance` for buttons, `notificationAsync(Success)` on submit
+
+**Create Game Modal (`modal.tsx`)**
+- `SportTile` component — scale spring + `selectionAsync` haptic per chip
+- Photo preview: scale 0.92→1.0 spring on image selected
+- Submit button: `usePressAnimation` + `impactAsync(Heavy)` before API call
+- Success dismiss: opacity→0 + scale→0.97 over 250ms, `notificationAsync(Success)`, `setTimeout(router.back, 260)`
+
+**Map Screen (`(tabs)/index.tsx`)**
+- `FilterChip` component — scale 0.94→1.0 spring + `selectionAsync` per chip
+- Bottom card: slides up from 30px + fades in on marker tap; slides down + fades out with deferred unmount (`runOnJS`) so exit animation plays before React unmounts the node
+- Marker tap: `impactAsync(Light)` on court and game markers
+
+**Screen Transition Tiers (`_layout.tsx`)**
+- Peek (contextual): `presentation: 'modal'` — `player-profile`, `game-participants`, `notification-inbox`
+- Destination: `animationDuration: 380` — `court-detail`, `game-results`, `leaderboard`, `rate-players`
+- Auth/onboarding: `animation: 'fade'` — `login`, `register`, `onboarding`
+
+**Tab Bar (`(tabs)/_layout.tsx` + 5 tab screens)**
+- `AnimatedTabIcon` — active icon scales 1.0→1.15 with `withSpring` on focus
+- Each tab's root view fades in with `withTiming(1, { duration: 180 })` via `useFocusEffect` — removes harsh cut on tab switch
+
+---
+
 ## [Sprint 14] — June 2026 — Safety, Game UX, Discovery, Social, Courts, Android
 
 ### 14A — Safety & Trust

@@ -275,6 +275,7 @@ eas submit --platform ios --profile production
 | May 10, 2026 | [Full Prototype](docs/FULL_PROTOTYPE.md) | ✅ Done |
 | Jun 11, 2026 | Production-ready build (Sprint 13) | ✅ Done |
 | Jun 12, 2026 | Sprint 14 — Safety, Game UX, Social, Courts, Android | ✅ Done |
+| Jun 12, 2026 | Sprint 15 — Animations, Haptics & UX Polish | ✅ Done |
 | Sep 8, 2026 | Final Submission | ⏳ Pending |
 
 ---
