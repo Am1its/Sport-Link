@@ -156,7 +156,7 @@ export default function DiscoverScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.dateChipsRow}
-        style={{ marginBottom: Spacing.sm, flexGrow: 0 }}
+        style={{ marginBottom: Spacing.sm, flexGrow: 0, flexShrink: 0 }}
       >
         {([
           { key: 'any',     label: 'Any time' },
@@ -238,60 +238,62 @@ export default function DiscoverScreen() {
       </View>
 
       {/* Content */}
-      {loading ? (
-        <FlatList
-          data={[]}
-          renderItem={null}
-          ListHeaderComponent={<DiscoverSkeleton />}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : filtered.length === 0 ? (
-        <View style={styles.center}>
-          <View style={styles.emptyIconWrap}>
-            <Ionicons name="compass-outline" size={42} color={Colors.textMuted} />
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <FlatList
+            data={[]}
+            renderItem={null}
+            ListHeaderComponent={<DiscoverSkeleton />}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : filtered.length === 0 ? (
+          <View style={styles.center}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="compass-outline" size={42} color={Colors.textMuted} />
+            </View>
+            <Text style={styles.emptyTitle}>No games found</Text>
+            <Text style={styles.emptySub}>
+              {search || sportFilter !== 'all' || radiusKm !== null
+                ? 'Try adjusting your filters'
+                : 'Create one on the map!'}
+            </Text>
           </View>
-          <Text style={styles.emptyTitle}>No games found</Text>
-          <Text style={styles.emptySub}>
-            {search || sportFilter !== 'all' || radiusKm !== null
-              ? 'Try adjusting your filters'
-              : 'Create one on the map!'}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={item => String(item.id)}
-          renderItem={({ item }) => (
-            <GameCard
-              game={item}
-              userId={user?.id}
-              token={token}
-              onJoined={handleJoined}
-              onNeighborhoodPress={handleNeighborhoodPress}
-              onViewParticipants={() =>
-                router.push({
-                  pathname: '/game-participants',
-                  params: {
-                    gameId: String(item.id),
-                    title: item.title ?? `${sportLabel(item.sport_type)} Game`,
-                  },
-                } as any)
-              }
-            />
-          )}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchGames(true)}
-              tintColor={Colors.accent}
-              colors={[Colors.accent]}
-            />
-          }
-        />
-      )}
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={item => String(item.id)}
+            renderItem={({ item }) => (
+              <GameCard
+                game={item}
+                userId={user?.id}
+                token={token}
+                onJoined={handleJoined}
+                onNeighborhoodPress={handleNeighborhoodPress}
+                onViewParticipants={() =>
+                  router.push({
+                    pathname: '/game-participants',
+                    params: {
+                      gameId: String(item.id),
+                      title: item.title ?? `${sportLabel(item.sport_type)} Game`,
+                    },
+                  } as any)
+                }
+              />
+            )}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => fetchGames(true)}
+                tintColor={Colors.accent}
+                colors={[Colors.accent]}
+              />
+            }
+          />
+        )}
+      </View>
 
       {/* Sport picker modal */}
       <Modal visible={showSportModal} transparent animationType="fade" onRequestClose={() => setShowSportModal(false)}>

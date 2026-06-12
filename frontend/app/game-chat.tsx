@@ -40,6 +40,7 @@ export default function GameChatScreen() {
   // Messages stored newest-first for the inverted FlatList
   const [messages, setMessages]       = useState<Message[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [fetchError, setFetchError]   = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore]         = useState(false);
   const [input, setInput]             = useState('');
@@ -76,6 +77,8 @@ export default function GameChatScreen() {
   };
 
   const fetchMessages = async () => {
+    setFetchError(null);
+    setLoading(true);
     try {
       const res  = await apiFetch(`/api/chats/${id}/messages?limit=${PAGE_SIZE}`, { token });
       const data = await res.json();
@@ -89,9 +92,14 @@ export default function GameChatScreen() {
             .map((m: Message) => m.user_id)
         )];
         fetchAvatars(otherIds);
+      } else {
+        setFetchError(`${res.status}: ${data.message ?? 'Unknown error'}`);
       }
     } catch (err) {
-      console.warn('Fetch messages error:', err);
+      if (!(err instanceof UnauthorizedError)) {
+        console.warn('Fetch messages error:', err);
+        setFetchError('Network error');
+      }
     } finally {
       setLoading(false);
     }
@@ -191,6 +199,21 @@ export default function GameChatScreen() {
         <View style={styles.center}>
           <ActivityIndicator color={Colors.accent} size="large" />
         </View>
+      ) : fetchError ? (
+        <View style={styles.center}>
+          <View style={styles.emptyChatIconWrap}>
+            <Ionicons name="alert-circle-outline" size={38} color={Colors.error} />
+          </View>
+          <Text style={[styles.emptyChatText, { color: Colors.error, marginBottom: 4 }]}>
+            Could not load messages
+          </Text>
+          <Text style={[styles.emptyChatText, { fontSize: 12, color: Colors.textMuted, marginBottom: 16 }]}>
+            {fetchError}
+          </Text>
+          <Pressable onPress={fetchMessages} style={styles.retryBtn}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </Pressable>
+        </View>
       ) : (
         <FlatList
           data={messages}
@@ -264,6 +287,8 @@ const styles = StyleSheet.create({
   emptyChat: { flex: 1, alignItems: 'center', paddingTop: 80 },
   emptyChatIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   emptyChatText: { color: Colors.textMuted, fontSize: 15 },
+  retryBtn: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: 100, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  retryBtnText: { color: Colors.text, fontSize: 15, fontWeight: '700' },
 
   inputRow:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.bg },
   inputWrap:  { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 22, backgroundColor: Colors.surface, marginRight: 8 },

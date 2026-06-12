@@ -40,14 +40,19 @@ type ClusterItem = MapItem & {
 };
 
 function clusterGames(items: MapItem[], latDelta: number): ClusterItem[] {
-  // Show individual markers only when very zoomed in
-  if (latDelta < 0.012) {
-    return items.map(i => ({ ...i, _isCluster: false, _clusterCount: 1, _clusterItems: [i] }));
+  // Drop any items with invalid coordinates to prevent native map crashes
+  const valid = items.filter(i => {
+    const { lat, lng } = i.geometry.location;
+    return typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+  });
+
+  if (latDelta < 0.015) {
+    return valid.map(i => ({ ...i, _isCluster: false, _clusterCount: 1, _clusterItems: [i] }));
   }
-  // Larger cells = more aggressive clustering (3×3 grid instead of 5×5)
-  const gridSize = latDelta / 3;
+
+  const gridSize = latDelta / 2.5;
   const grid = new Map<string, MapItem[]>();
-  for (const item of items) {
+  for (const item of valid) {
     const key = `${Math.floor(item.geometry.location.lat / gridSize)},${Math.floor(item.geometry.location.lng / gridSize)}`;
     const cell = grid.get(key);
     if (cell) cell.push(item);
@@ -56,8 +61,13 @@ function clusterGames(items: MapItem[], latDelta: number): ClusterItem[] {
   return Array.from(grid.values()).map(cell => {
     const avgLat = cell.reduce((s, i) => s + i.geometry.location.lat, 0) / cell.length;
     const avgLng = cell.reduce((s, i) => s + i.geometry.location.lng, 0) / cell.length;
+    // Use the most common sport's color for the cluster
+    const sportCounts: Record<string, number> = {};
+    cell.forEach(i => { sportCounts[i.sport_type] = (sportCounts[i.sport_type] ?? 0) + 1; });
+    const dominantSport = Object.entries(sportCounts).sort((a, b) => b[1] - a[1])[0][0];
     return {
       ...cell[0],
+      sport_type: dominantSport,
       place_id: `cluster_${cell.map(c => c.place_id).join('_')}`,
       geometry: { location: { lat: avgLat, lng: avgLng } },
       _isCluster: cell.length > 1,
@@ -413,7 +423,13 @@ export default function HomeScreen() {
         try {
           const res = await apiFetch('/api/games', { token });
           const data = await res.json();
-          if (data.success) setGames(data.games);
+          if (data.success) {
+            // Strip base64 photos — not used on the map, keeping them in memory causes crashes
+            setGames(data.games.map((g: any) => {
+              const { photo: _p, post_game_photo: _pp, ...rest } = g;
+              return rest;
+            }));
+          }
         } catch (err) {
           console.warn('Games fetch error:', err);
         }
@@ -499,6 +515,8 @@ export default function HomeScreen() {
       >
         {/* Court / venue markers */}
         {displayedCourts.map((item) => {
+          const { lat, lng } = item.geometry.location;
+          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
           const sportStyle = getSportStyle(item.sport_type);
           const vt = item.venue_type ?? 'court';
           // Gyms & studios: solid dark background (indoor facility feel)
@@ -527,8 +545,11 @@ export default function HomeScreen() {
 
         {/* Game markers (clustered) */}
         {clusteredGames.map((item) => {
+          const { lat, lng } = item.geometry.location;
+          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
           const sportStyle = getSportStyle(item.sport_type);
           if (item._isCluster) {
+            const clusterColor = SPORT_COLORS[item.sport_type] ?? Colors.accent;
             return (
               <Marker
                 key={item.place_id}
@@ -539,14 +560,16 @@ export default function HomeScreen() {
                     mapRef.current?.animateToRegion({
                       latitude: item.geometry.location.lat,
                       longitude: item.geometry.location.lng,
-                      latitudeDelta: currentDelta / 4,
-                      longitudeDelta: currentDelta / 4,
+                      latitudeDelta: currentDelta / 3,
+                      longitudeDelta: currentDelta / 3,
                     }, 350);
                   }
                 }}
               >
-                <View style={styles.clusterMarker}>
-                  <Text style={styles.clusterText}>{item._clusterCount}</Text>
+                <View style={[styles.clusterMarker, { borderColor: clusterColor, shadowColor: clusterColor }]}>
+                  <View style={[styles.clusterInner, { backgroundColor: clusterColor }]}>
+                    <Text style={styles.clusterText}>{item._clusterCount}</Text>
+                  </View>
                 </View>
               </Marker>
             );
@@ -852,8 +875,9 @@ const styles = StyleSheet.create({
   markerGameDot:    { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: '#1C1C1E' },
   markerJoinedBadge:{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: 7, backgroundColor: '#0FEA95', borderWidth: 1.5, borderColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center' },
   markerPointer: { width: 3, height: 6, marginTop: -1 },
-  clusterMarker: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0FEA95', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFFFFF', shadowColor: '#0FEA95', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.5, shadowRadius: 6, elevation: 8 },
-  clusterText: { color: '#1C1C1E', fontWeight: '900', fontSize: 15 },
+  clusterMarker: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.bg + 'EB', justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 8, elevation: 10 },
+  clusterInner:  { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  clusterText:   { color: Colors.bg, fontWeight: '900', fontSize: 14 },
 
   headerContainer: { position: 'absolute', top: 0, width: '100%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.95)', marginHorizontal: 20, marginTop: 15, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
@@ -879,9 +903,9 @@ const styles = StyleSheet.create({
   filterText: { color: '#3A3A3C', fontSize: 14, fontWeight: 'bold' },
   filterTextActive: { color: '#1C1C1E' },
 
-  sportChip: { width: 38, height: 38, borderRadius: 19, marginRight: 8, borderWidth: 1.5, borderColor: 'rgba(180,180,180,0.4)', backgroundColor: 'rgba(255,255,255,0.88)', justifyContent: 'center', alignItems: 'center' },
-  sportChipActiveAll: { backgroundColor: '#1C1C1E', borderColor: '#1C1C1E' },
-  sportActiveLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', paddingHorizontal: 15, marginBottom: 4, letterSpacing: 0.3 },
+  sportChip: { width: 38, height: 38, borderRadius: 19, marginRight: 8, borderWidth: 1.5, borderColor: Colors.textSub + '66', backgroundColor: Colors.text + 'E0', justifyContent: 'center', alignItems: 'center' },
+  sportChipActiveAll: { backgroundColor: Colors.bg, borderColor: Colors.bg },
+  sportActiveLabel: { color: Colors.text + 'B3', fontSize: 11, fontWeight: '700', paddingHorizontal: 15, marginBottom: 4, letterSpacing: 0.3 },
 
   bottomCardAnimWrapper: { position: 'absolute', bottom: 30, alignSelf: 'center', width: width * 0.9 },
   bottomCard: { backgroundColor: 'white', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
