@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Image, Modal, FlatList, Alert,
+  Image, Modal, FlatList, Alert, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
@@ -17,6 +19,8 @@ import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
 import { SOCKET_EVENTS } from '../constants/events';
+import { usePressAnimation } from '../hooks/useAnimations';
+import { ChatBubble } from '../components/ChatBubble';
 
 type DmMessage = {
   id: number;
@@ -79,6 +83,17 @@ export default function DirectChatScreen() {
   const seenIds          = useRef<Set<number>>(new Set());
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEmit   = useRef<number>(0);
+
+  const { animatedStyle: sendPressStyle, onPressIn: sendPressIn, onPressOut: sendPressOut } = usePressAnimation({
+    scaleDown: 0.88,
+    scaleUp: 1.0,
+    stiffness: 500,
+    damping: 20,
+  });
+  const sendOpacity = useSharedValue(0.35);
+  const sendBtnStyle = useAnimatedStyle(() => ({
+    opacity: sendOpacity.value,
+  }));
 
   const otherId = parseInt(userId, 10);
 
@@ -155,6 +170,7 @@ export default function DirectChatScreen() {
   }, [messages.length, isTyping]);
 
   const sendText = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const content = input.trim();
     if (!content || sending) return;
     setInput('');
@@ -223,6 +239,25 @@ export default function DirectChatScreen() {
     const color      = getAvatarColor(isOwn ? (user?.username ?? '') : username);
     const avatarBase64 = avatarCache[msg.sender_id] ?? null;
 
+    // Text messages: use animated ChatBubble component
+    if (msg.type === 'text') {
+      return (
+        <ChatBubble
+          key={msg.id}
+          messageId={msg.id}
+          userId={msg.sender_id}
+          username={isOwn ? (user?.username ?? '') : username}
+          content={msg.content ?? ''}
+          createdAt={msg.created_at}
+          isMine={isOwn}
+          avatar={avatarBase64}
+          onAvatarPress={!isOwn ? () => router.push({ pathname: '/player-profile', params: { userId: String(msg.sender_id) } } as any) : undefined}
+          formatTime={formatTime}
+        />
+      );
+    }
+
+    // Event messages: keep existing inline rendering
     const avatar = (
       <TouchableOpacity
         onPress={() => !isOwn && router.push({ pathname: '/player-profile' as any, params: { userId: String(msg.sender_id) } })}
@@ -240,19 +275,11 @@ export default function DirectChatScreen() {
       </TouchableOpacity>
     );
 
-    const bubbleContent = msg.type === 'event' ? (
-      <EventCard msg={msg} isOwn={isOwn} onJoin={() => msg.event_id && handleJoinGame(msg.event_id)} />
-    ) : (
-      <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
-        <Text style={[styles.bubbleText, isOwn && styles.bubbleTextOwn]}>{msg.content}</Text>
-      </View>
-    );
-
     if (isOwn) {
       return (
         <View key={msg.id} style={styles.bubbleRowOwn}>
           <View style={styles.bubbleOwnContent}>
-            {bubbleContent}
+            <EventCard msg={msg} isOwn={isOwn} onJoin={() => msg.event_id && handleJoinGame(msg.event_id)} />
             <View style={styles.readReceiptRow}>
               <Text style={[styles.timestamp, { textAlign: 'right' }]}>{formatTime(msg.created_at)}</Text>
               <Ionicons
@@ -270,7 +297,7 @@ export default function DirectChatScreen() {
       <View key={msg.id} style={styles.bubbleRowOther}>
         {avatar}
         <View style={styles.bubbleOtherContent}>
-          {bubbleContent}
+          <EventCard msg={msg} isOwn={isOwn} onJoin={() => msg.event_id && handleJoinGame(msg.event_id)} />
           <Text style={styles.timestamp}>{formatTime(msg.created_at)}</Text>
         </View>
       </View>
@@ -355,6 +382,7 @@ export default function DirectChatScreen() {
           value={input}
           onChangeText={(text) => {
             setInput(text);
+            sendOpacity.value = withTiming(text.length > 0 ? 1 : 0.35, { duration: 150 });
             const now = Date.now();
             if (text.length > 0 && now - lastTypingEmit.current > 2000 && socketRef.current?.connected) {
               socketRef.current.emit(SOCKET_EVENTS.DM_TYPING, { to: otherId });
@@ -366,13 +394,17 @@ export default function DirectChatScreen() {
           returnKeyType="send"
           onSubmitEditing={sendText}
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={sendText}
-          disabled={!input.trim() || sending}
-        >
-          <Ionicons name="send" size={20} color={input.trim() ? Colors.bg : Colors.textMuted} />
-        </TouchableOpacity>
+        <Animated.View style={[sendBtnStyle, sendPressStyle]}>
+          <Pressable
+            onPress={sendText}
+            onPressIn={() => { if (input.trim()) sendPressIn(); }}
+            onPressOut={() => { if (input.trim()) sendPressOut(); }}
+            disabled={!input.trim() || sending}
+            style={styles.sendBtn}
+          >
+            <Ionicons name="send" size={20} color={Colors.bg} />
+          </Pressable>
+        </Animated.View>
       </View>
 
       {/* Event picker modal */}

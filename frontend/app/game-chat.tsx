@@ -1,21 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image,
+  View, Text, TextInput, StyleSheet,
+  FlatList, KeyboardAvoidingView, Platform, ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { io, Socket } from 'socket.io-client';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
-import { getAvatarColor } from '../utils/avatar';
 import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
-import { Colors, Radius } from '../constants/theme';
+import { Colors } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
 import { SOCKET_EVENTS } from '../constants/events';
+import { usePressAnimation } from '../hooks/useAnimations';
+import { ChatBubble } from '../components/ChatBubble';
 
 const MAX_MESSAGE_LENGTH = 1000;
 const PAGE_SIZE = 30;
@@ -44,6 +48,17 @@ export default function GameChatScreen() {
   const [avatarCache, setAvatarCache] = useState<Record<number, string | null>>({});
   const seenUserIds = useRef<Set<number>>(new Set());
   const socketRef   = useRef<Socket | null>(null);
+
+  const { animatedStyle: sendPressStyle, onPressIn: sendPressIn, onPressOut: sendPressOut } = usePressAnimation({
+    scaleDown: 0.88,
+    scaleUp: 1.0,
+    stiffness: 500,
+    damping: 20,
+  });
+  const sendOpacity = useSharedValue(0.35);
+  const sendBtnStyle = useAnimatedStyle(() => ({
+    opacity: sendOpacity.value,
+  }));
 
   const fetchAvatars = async (userIds: number[]) => {
     const newIds = userIds.filter(uid => !seenUserIds.current.has(uid));
@@ -128,6 +143,7 @@ export default function GameChatScreen() {
   }, [id]);
 
   const sendMessage = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!input.trim() || sending) return;
     const content = input.trim();
     setInput('');
@@ -144,52 +160,18 @@ export default function GameChatScreen() {
   };
 
   const renderMessage = ({ item: msg }: { item: Message }) => {
-    const isOwn = msg.user_id === user?.id;
-    const color = getAvatarColor(msg.username);
-    const avatarBase64 = avatarCache[msg.user_id] ?? null;
-
-    const avatarCircle = (
-      <TouchableOpacity
-        onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(msg.user_id) } })}
-        activeOpacity={0.75}
-      >
-        <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
-          {avatarBase64 ? (
-            <Image source={{ uri: `data:image/jpeg;base64,${avatarBase64}` }} style={styles.avatarSmallImage} />
-          ) : (
-            <Text style={[styles.avatarSmallLetter, { color }]}>
-              {msg.username.charAt(0).toUpperCase()}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-
-    if (isOwn) {
-      return (
-        <View style={styles.bubbleRowOwn}>
-          <View style={styles.bubbleOwnContent}>
-            <View style={[styles.bubble, styles.bubbleOwn]}>
-              <Text style={[styles.bubbleText, styles.bubbleTextOwn]}>{msg.content}</Text>
-            </View>
-            <Text style={[styles.timestamp, { textAlign: 'right' }]}>{formatTime(msg.created_at)}</Text>
-          </View>
-          {avatarCircle}
-        </View>
-      );
-    }
-
     return (
-      <View style={styles.bubbleRowOther}>
-        {avatarCircle}
-        <View style={styles.bubbleOtherContent}>
-          <Text style={styles.senderName}>{msg.username}</Text>
-          <View style={[styles.bubble, styles.bubbleOther]}>
-            <Text style={styles.bubbleText}>{msg.content}</Text>
-          </View>
-          <Text style={styles.timestamp}>{formatTime(msg.created_at)}</Text>
-        </View>
-      </View>
+      <ChatBubble
+        messageId={msg.id}
+        userId={msg.user_id}
+        username={msg.username}
+        content={msg.content}
+        createdAt={msg.created_at}
+        isMine={msg.user_id === user?.id}
+        avatar={avatarCache[msg.user_id]}
+        onAvatarPress={() => router.push({ pathname: '/player-profile', params: { id: String(msg.user_id) } } as any)}
+        formatTime={formatTime}
+      />
     );
   };
 
@@ -241,7 +223,10 @@ export default function GameChatScreen() {
             placeholder="Type a message..."
             placeholderTextColor={Colors.textMuted}
             value={input}
-            onChangeText={setInput}
+            onChangeText={(text) => {
+              setInput(text);
+              sendOpacity.value = withTiming(text.length > 0 ? 1 : 0.35, { duration: 150 });
+            }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
             multiline
@@ -250,17 +235,17 @@ export default function GameChatScreen() {
             returnKeyType="send"
           />
         </View>
-        <TouchableOpacity
-          style={[
-            styles.sendBtn,
-            (!input.trim() || sending) && styles.sendBtnDisabled,
-            input.trim() && styles.sendBtnActive,
-          ]}
-          onPress={sendMessage}
-          disabled={!input.trim() || sending}
-        >
-          <Ionicons name="send" size={20} color={input.trim() ? Colors.bg : Colors.textMuted} />
-        </TouchableOpacity>
+        <Animated.View style={[sendBtnStyle, sendPressStyle]}>
+          <Pressable
+            onPress={sendMessage}
+            onPressIn={() => { if (input.trim()) sendPressIn(); }}
+            onPressOut={() => { if (input.trim()) sendPressOut(); }}
+            disabled={!input.trim() || sending}
+            style={[styles.sendBtn, inputFocused && styles.sendBtnActive]}
+          >
+            <Ionicons name="send" size={20} color={Colors.bg} />
+          </Pressable>
+        </Animated.View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -279,23 +264,6 @@ const styles = StyleSheet.create({
   emptyChat: { flex: 1, alignItems: 'center', paddingTop: 80 },
   emptyChatIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   emptyChatText: { color: Colors.textMuted, fontSize: 15 },
-
-  bubbleRowOwn: { flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '85%' },
-  bubbleOwnContent: { flex: 1, alignItems: 'flex-end' },
-  bubbleRowOther: { flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'flex-start', maxWidth: '85%' },
-
-  avatarSmall: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', marginHorizontal: 6 },
-  avatarSmallImage: { width: '100%', height: '100%' },
-  avatarSmallLetter: { fontSize: 14, fontWeight: '900' },
-
-  bubbleOtherContent: { flex: 1 },
-  senderName: { color: Colors.textSub, fontSize: 12, fontWeight: '600', marginBottom: 3, marginLeft: 4 },
-
-  bubble:       { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleOwn:    { backgroundColor: Colors.accent, borderBottomRightRadius: 4 },
-  bubbleOther:  { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 4 },
-  bubbleText:   { color: Colors.text, fontSize: 15, lineHeight: 21 },
-  bubbleTextOwn: { color: Colors.bg },
 
   timestamp: { color: Colors.textMuted, fontSize: 11, marginTop: 3, marginHorizontal: 4 },
 
