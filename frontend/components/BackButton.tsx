@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -16,7 +16,7 @@ export function BackButton({
   bgColor?: string;
   iconColor?: string;
   onPress?: () => void;
-  style?: object;
+  style?: StyleProp<ViewStyle>;
 }) {
   const router = useRouter();
   const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({

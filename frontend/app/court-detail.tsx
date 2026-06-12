@@ -327,7 +327,7 @@ export default function CourtDetailScreen() {
       <View style={[styles.heroBand, { backgroundColor: sportColor + '28' }]}>
         <View style={[styles.heroOrb1, { backgroundColor: sportColor + '18' }]} />
         <View style={[styles.heroOrb2, { backgroundColor: sportColor + '0C' }]} />
-        <BackButton bgColor="rgba(0,0,0,0.35)" style={styles.backBtn} />
+        <BackButton bgColor="rgba(0,0,0,0.35)" />
         <View style={{ flex: 1 }}>
           <Text style={styles.heroTitle} numberOfLines={2}>{displayName}</Text>
           {sport && (
@@ -573,7 +573,6 @@ const styles = StyleSheet.create({
   heroBand:  { flexDirection: 'row', alignItems: 'center', minHeight: 120, paddingTop: 56, paddingBottom: Spacing.xxl, paddingHorizontal: Spacing.xl, gap: 12, overflow: 'hidden' },
   heroOrb1:  { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: -90, right: -70 },
   heroOrb2:  { position: 'absolute', width: 140, height: 140, borderRadius: 70, bottom: -50, left: -40 },
-  backBtn:   {},
   heroTitle: { fontSize: 20, fontWeight: '900', color: Colors.text, lineHeight: 26 },
   sportBadge:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   sportBadgeText: { fontSize: 11, fontWeight: '800' },
