@@ -61,7 +61,7 @@ function AttendanceButton({
 
   useEffect(() => {
     bgOpacity.value = withTiming(isSelected ? 1 : 0, { duration: 180 });
-  }, [isSelected]);
+  }, [isSelected, bgOpacity]);
 
   const bgStyle = useAnimatedStyle(() => ({ opacity: bgOpacity.value }));
 
@@ -136,7 +136,7 @@ function AnimatedStar({
         withSequence(withSpring(1.3, { stiffness: 500 }), withSpring(1, { stiffness: 300 })),
       );
     }
-  }, [filled]);
+  }, [filled, index, scale]);
 
   const starStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -481,14 +481,6 @@ const styles = StyleSheet.create({
   attendanceRow: { flexDirection: 'row', gap: 10 },
   toggleBtn:   { width: 44, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', backgroundColor: Colors.surface2 },
   toggleBtnBg: { borderRadius: 10 },
-
-  // Kept for reference / empty-state compatibility (not used in main flow)
-  attendBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: Radius.md, backgroundColor: Colors.surface2 },
-  attendBtnArrived: { backgroundColor: Colors.accent },
-  attendBtnNoShow:  { backgroundColor: Colors.error },
-  attendText: { fontSize: 14, fontWeight: '700', color: Colors.textSub },
-  attendTextArrived: { color: Colors.bg },
-  attendTextNoShow:  { color: Colors.bg },
 
   // Peer thumb categories
   categoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
