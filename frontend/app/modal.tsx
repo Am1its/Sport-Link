@@ -68,8 +68,7 @@ function SportTile({
             : { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1.5 },
         ]}
       >
-        <MaterialCommunityIcons name={sport.icon as any} size={26} color={isSelected ? c : Colors.textMuted} />
-        <Text style={[styles.sportTileLabel, isSelected && { color: c }]}>{sport.label}</Text>
+        <MaterialCommunityIcons name={sport.icon as any} size={28} color={isSelected ? c : Colors.textMuted} />
       </Pressable>
     </Animated.View>
   );
@@ -279,6 +278,9 @@ export default function GameFormModal() {
               />
             ))}
           </View>
+          <Text style={[styles.sportSelectedLabel, { color: SPORT_COLORS[sport] ?? Colors.accent }]}>
+            {SPORTS.find(s => s.key === sport)?.label ?? ''}
+          </Text>
 
           {/* ── Skill level ── */}
           <SectionLabel>Skill Level</SectionLabel>
@@ -563,9 +565,9 @@ const styles = StyleSheet.create({
   sectionLabel: { ...Type.sectionLabel, color: Colors.textMuted, marginBottom: Spacing.sm, marginTop: 2 },
 
   // Sport grid — 3 columns
-  sportsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.xl },
-  sportTile:   { width: '30.5%', aspectRatio: 1, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center', gap: 6 },
-  sportTileLabel: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, textAlign: 'center' },
+  sportsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
+  sportTile:   { width: '30.5%', aspectRatio: 1.3, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
+  sportSelectedLabel: { fontSize: 15, fontWeight: '800', textAlign: 'center', marginBottom: Spacing.xl, letterSpacing: 0.3 },
 
   // Level chips
   levelRow:   { flexDirection: 'row', gap: 6, marginBottom: Spacing.xl },

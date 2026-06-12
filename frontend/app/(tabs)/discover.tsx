@@ -156,7 +156,7 @@ export default function DiscoverScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.dateChipsRow}
-        style={{ marginBottom: Spacing.sm }}
+        style={{ marginBottom: Spacing.sm, flexGrow: 0 }}
       >
         {([
           { key: 'any',     label: 'Any time' },
