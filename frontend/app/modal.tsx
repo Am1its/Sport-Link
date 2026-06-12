@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  View, Text, StyleSheet, TextInput, TouchableOpacity, Pressable,
   ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
 } from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+} from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +17,7 @@ import { reverseGeocode } from '../utils/geocode';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../constants/theme';
+import { usePressAnimation } from '../hooks/useAnimations';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null };
 
@@ -40,6 +45,33 @@ function SectionLabel({ children }: { children: string }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
 }
 
+function SportTile({
+  sport, isSelected, onPress,
+}: { sport: { key: string; icon: string; label: string }; isSelected: boolean; onPress: () => void }) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({
+    scaleDown: 0.94, scaleUp: 1.08, stiffness: 400, damping: 18,
+  });
+  const c = SPORT_COLORS[sport.key] ?? Colors.accent;
+  return (
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={() => { Haptics.selectionAsync(); onPress(); }}
+        style={[
+          styles.sportTile,
+          isSelected
+            ? { backgroundColor: c + '22', borderColor: c, borderWidth: 2 }
+            : { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1.5 },
+        ]}
+      >
+        <MaterialCommunityIcons name={sport.icon as any} size={26} color={isSelected ? c : Colors.textMuted} />
+        <Text style={[styles.sportTileLabel, isSelected && { color: c }]}>{sport.label}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function GameFormModal() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -62,6 +94,25 @@ export default function GameFormModal() {
 
   const [friends, setFriends]                 = useState<Friend[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<number>>(new Set());
+
+  // Photo entrance animation
+  const photoScale = useSharedValue(0.92);
+  const photoScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: photoScale.value }],
+  }));
+
+  // Submit button animation
+  const { animatedStyle: submitPressStyle, onPressIn: submitPressIn, onPressOut: submitPressOut } = usePressAnimation({
+    scaleDown: 0.96, scaleUp: 1.02, stiffness: 300, damping: 16,
+  });
+
+  // Success dismiss animation
+  const sheetOpacity = useSharedValue(1);
+  const sheetScale = useSharedValue(1);
+  const sheetStyle = useAnimatedStyle(() => ({
+    opacity: sheetOpacity.value,
+    transform: [{ scale: sheetScale.value }],
+  }));
 
   useEffect(() => {
     if (isEdit) return;
@@ -90,7 +141,11 @@ export default function GameFormModal() {
       quality: 0.6,
       base64: true,
     });
-    if (!result.canceled && result.assets[0].base64) setPhoto(result.assets[0].base64);
+    if (!result.canceled && result.assets[0].base64) {
+      setPhoto(result.assets[0].base64);
+      photoScale.value = 0.92;
+      photoScale.value = withSpring(1, { stiffness: 300, damping: 18 });
+    }
   };
 
   const parseInitialDate = (): Date | null => {
@@ -151,7 +206,11 @@ export default function GameFormModal() {
       const res  = await apiFetch(isEdit ? `/api/games/${gameId}` : '/api/games', { method, token, body: JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
-      router.back();
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      sheetOpacity.value = withTiming(0, { duration: 250 });
+      sheetScale.value = withTiming(0.97, { duration: 250 });
+      setTimeout(() => router.back(), 260);
     } catch (err) {
       if (err instanceof UnauthorizedError) return;
       Alert.alert('Error', 'Could not connect to server');
@@ -166,313 +225,308 @@ export default function GameFormModal() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <Animated.View style={[{ flex: 1 }, sheetStyle]}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={20} color={Colors.textSub} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{isEdit ? 'Edit Game' : 'New Game'}</Text>
-          <View style={{ width: 36 }} />
-        </View>
+          {/* ── Header ── */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+              <Ionicons name="close" size={20} color={Colors.textSub} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>{isEdit ? 'Edit Game' : 'New Game'}</Text>
+            <View style={{ width: 36 }} />
+          </View>
 
-        {/* ── Sport hero banner ── */}
-        <View style={[styles.heroBanner, { backgroundColor: sportColor + '18', borderColor: sportColor + '40' }]}>
-          <View style={[styles.heroIconRing, { backgroundColor: sportColor + '22', borderColor: sportColor + '55' }]}>
-            <MaterialCommunityIcons name={selectedSport.icon as any} size={32} color={sportColor} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.heroSportName, { color: sportColor }]}>{selectedSport.label.toUpperCase()}</Text>
-            <Text style={styles.heroSportSub}>Level {level} · {selectedLevel.label}</Text>
-          </View>
-          {scheduledDate && (
-            <View style={styles.heroBadge}>
-              <Ionicons name="calendar" size={12} color={sportColor} />
-              <Text style={[styles.heroBadgeText, { color: sportColor }]}>
-                {scheduledDate.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })}
-              </Text>
+          {/* ── Sport hero banner ── */}
+          <View style={[styles.heroBanner, { backgroundColor: sportColor + '18', borderColor: sportColor + '40' }]}>
+            <View style={[styles.heroIconRing, { backgroundColor: sportColor + '22', borderColor: sportColor + '55' }]}>
+              <MaterialCommunityIcons name={selectedSport.icon as any} size={32} color={sportColor} />
             </View>
-          )}
-        </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.heroSportName, { color: sportColor }]}>{selectedSport.label.toUpperCase()}</Text>
+              <Text style={styles.heroSportSub}>Level {level} · {selectedLevel.label}</Text>
+            </View>
+            {scheduledDate && (
+              <View style={styles.heroBadge}>
+                <Ionicons name="calendar" size={12} color={sportColor} />
+                <Text style={[styles.heroBadgeText, { color: sportColor }]}>
+                  {scheduledDate.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })}
+                </Text>
+              </View>
+            )}
+          </View>
 
-        {/* ── Sport picker ── */}
-        <SectionLabel>What sport?</SectionLabel>
-        <View style={styles.sportsGrid}>
-          {SPORTS.map(s => {
-            const c = SPORT_COLORS[s.key] ?? Colors.accent;
-            const active = sport === s.key;
-            return (
-              <TouchableOpacity
+          {/* ── Sport picker ── */}
+          <SectionLabel>What sport?</SectionLabel>
+          <View style={styles.sportsGrid}>
+            {SPORTS.map(s => (
+              <SportTile
                 key={s.key}
-                style={[
-                  styles.sportTile,
-                  active
-                    ? { backgroundColor: c + '22', borderColor: c, borderWidth: 2 }
-                    : { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1.5 },
-                ]}
+                sport={s}
+                isSelected={sport === s.key}
                 onPress={() => setSport(s.key)}
-                activeOpacity={0.75}
-              >
-                <MaterialCommunityIcons name={s.icon as any} size={26} color={active ? c : Colors.textMuted} />
-                <Text style={[styles.sportTileLabel, active && { color: c }]}>{s.label}</Text>
+              />
+            ))}
+          </View>
+
+          {/* ── Skill level ── */}
+          <SectionLabel>Skill Level</SectionLabel>
+          <View style={styles.levelRow}>
+            {LEVEL_META.map(lv => {
+              const active = level === lv.n;
+              return (
+                <TouchableOpacity
+                  key={lv.n}
+                  style={[
+                    styles.levelChip,
+                    active
+                      ? { backgroundColor: lv.color + '22', borderColor: lv.color, borderWidth: 2 }
+                      : { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1.5 },
+                  ]}
+                  onPress={() => setLevel(lv.n)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.levelNum, active && { color: lv.color }]}>{lv.n}</Text>
+                  <Text style={[styles.levelLabel, active && { color: lv.color }]}>{lv.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* ── Title ── */}
+          <SectionLabel>Title (optional)</SectionLabel>
+          <View style={styles.inputRow}>
+            <Ionicons name="trophy-outline" size={18} color={Colors.textMuted} />
+            <TextInput
+              style={styles.inputField}
+              placeholder="e.g. Friday night pickup"
+              placeholderTextColor={Colors.textHint}
+              value={title}
+              onChangeText={setTitle}
+              maxLength={100}
+            />
+          </View>
+
+          {/* ── Location ── */}
+          <SectionLabel>Location Notes</SectionLabel>
+          <View style={styles.inputRow}>
+            <Ionicons name="location-outline" size={18} color={Colors.textMuted} />
+            <TextInput
+              style={styles.inputField}
+              placeholder="e.g. North court, building entrance"
+              placeholderTextColor={Colors.textHint}
+              value={locationDesc}
+              onChangeText={setLocationDesc}
+            />
+          </View>
+
+          {/* ── Neighborhood ── */}
+          <SectionLabel>Neighborhood (optional)</SectionLabel>
+          <View style={styles.inputRow}>
+            <Ionicons name="map-outline" size={18} color={Colors.textMuted} />
+            <TextInput
+              style={styles.inputField}
+              placeholder="e.g. Florentin, Dizengoff"
+              placeholderTextColor={Colors.textHint}
+              value={neighborhood}
+              onChangeText={setNeighborhood}
+              maxLength={100}
+            />
+            {neighborhood.length > 0 && (
+              <TouchableOpacity onPress={() => setNeighborhood('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={16} color={Colors.textHint} />
               </TouchableOpacity>
-            );
-          })}
-        </View>
+            )}
+          </View>
 
-        {/* ── Skill level ── */}
-        <SectionLabel>Skill Level</SectionLabel>
-        <View style={styles.levelRow}>
-          {LEVEL_META.map(lv => {
-            const active = level === lv.n;
-            return (
-              <TouchableOpacity
-                key={lv.n}
-                style={[
-                  styles.levelChip,
-                  active
-                    ? { backgroundColor: lv.color + '22', borderColor: lv.color, borderWidth: 2 }
-                    : { backgroundColor: Colors.surface, borderColor: Colors.border, borderWidth: 1.5 },
-                ]}
-                onPress={() => setLevel(lv.n)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.levelNum, active && { color: lv.color }]}>{lv.n}</Text>
-                <Text style={[styles.levelLabel, active && { color: lv.color }]}>{lv.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* ── Title ── */}
-        <SectionLabel>Title (optional)</SectionLabel>
-        <View style={styles.inputRow}>
-          <Ionicons name="trophy-outline" size={18} color={Colors.textMuted} />
-          <TextInput
-            style={styles.inputField}
-            placeholder="e.g. Friday night pickup"
-            placeholderTextColor={Colors.textHint}
-            value={title}
-            onChangeText={setTitle}
-            maxLength={100}
-          />
-        </View>
-
-        {/* ── Location ── */}
-        <SectionLabel>Location Notes</SectionLabel>
-        <View style={styles.inputRow}>
-          <Ionicons name="location-outline" size={18} color={Colors.textMuted} />
-          <TextInput
-            style={styles.inputField}
-            placeholder="e.g. North court, building entrance"
-            placeholderTextColor={Colors.textHint}
-            value={locationDesc}
-            onChangeText={setLocationDesc}
-          />
-        </View>
-
-        {/* ── Neighborhood ── */}
-        <SectionLabel>Neighborhood (optional)</SectionLabel>
-        <View style={styles.inputRow}>
-          <Ionicons name="map-outline" size={18} color={Colors.textMuted} />
-          <TextInput
-            style={styles.inputField}
-            placeholder="e.g. Florentin, Dizengoff"
-            placeholderTextColor={Colors.textHint}
-            value={neighborhood}
-            onChangeText={setNeighborhood}
-            maxLength={100}
-          />
-          {neighborhood.length > 0 && (
-            <TouchableOpacity onPress={() => setNeighborhood('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={16} color={Colors.textHint} />
+          {/* ── Date & Time ── */}
+          <SectionLabel>When does it start?</SectionLabel>
+          <View style={styles.dateTimeRow}>
+            <TouchableOpacity
+              style={[styles.dateBtn, scheduledDate != null && { borderColor: sportColor, backgroundColor: sportColor + '10' }]}
+              onPress={() => setPickerMode('date')}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="calendar-outline" size={18} color={scheduledDate ? sportColor : Colors.textMuted} />
+              <Text style={[styles.dateBtnText, scheduledDate != null && { color: Colors.text, fontWeight: '700' }]}>
+                {dateLabel}
+              </Text>
             </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ── Date & Time ── */}
-        <SectionLabel>When does it start?</SectionLabel>
-        <View style={styles.dateTimeRow}>
-          <TouchableOpacity
-            style={[styles.dateBtn, scheduledDate != null && { borderColor: sportColor, backgroundColor: sportColor + '10' }]}
-            onPress={() => setPickerMode('date')}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="calendar-outline" size={18} color={scheduledDate ? sportColor : Colors.textMuted} />
-            <Text style={[styles.dateBtnText, scheduledDate != null && { color: Colors.text, fontWeight: '700' }]}>
-              {dateLabel}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.dateBtn, styles.dateBtnTime, scheduledDate != null && { borderColor: sportColor, backgroundColor: sportColor + '10' }]}
-            onPress={() => setPickerMode('time')}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="time-outline" size={18} color={scheduledDate ? sportColor : Colors.textMuted} />
-            <Text style={[styles.dateBtnText, scheduledDate != null && { color: Colors.text, fontWeight: '700' }]}>
-              {timeLabel}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {pickerMode != null && (
-          <DateTimePicker
-            value={scheduledDate ?? new Date(Date.now() + 3_600_000)}
-            mode={pickerMode}
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            minimumDate={pickerMode === 'date' ? new Date() : undefined}
-            themeVariant="dark"
-            onChange={(_, selected) => {
-              if (Platform.OS === 'android') setPickerMode(null);
-              if (!selected) return;
-              setScheduledDate(prev => {
-                const base = new Date(prev ?? Date.now() + 3_600_000);
-                if (pickerMode === 'date') base.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-                else base.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
-                return base;
-              });
-            }}
-          />
-        )}
-        {pickerMode != null && Platform.OS === 'ios' && (
-          <TouchableOpacity style={styles.pickerDone} onPress={() => setPickerMode(null)}>
-            <Text style={styles.pickerDoneText}>Done</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* ── Max Players ── */}
-        <SectionLabel>Max Players</SectionLabel>
-        <View style={styles.inputRow}>
-          <Ionicons name="people-outline" size={18} color={Colors.textMuted} />
-          <TextInput
-            style={styles.inputField}
-            placeholder="e.g. 10"
-            placeholderTextColor={Colors.textHint}
-            value={maxPlayers}
-            onChangeText={setMaxPlayers}
-            keyboardType="number-pad"
-          />
-        </View>
-
-        {/* ── Equipment ── */}
-        <SectionLabel>Equipment Notes (optional)</SectionLabel>
-        <View style={styles.inputRow}>
-          <Ionicons name="bag-add-outline" size={18} color={Colors.textMuted} />
-          <TextInput
-            style={styles.inputField}
-            placeholder="e.g. Who's bringing the ball?"
-            placeholderTextColor={Colors.textHint}
-            value={equipment}
-            onChangeText={setEquipment}
-          />
-        </View>
-
-        {/* ── Photo ── */}
-        <SectionLabel>Game Photo (optional)</SectionLabel>
-        {photo ? (
-          <View style={styles.photoWrap}>
-            <Image source={{ uri: `data:image/jpeg;base64,${photo}` }} style={styles.photoPreview} resizeMode="cover" />
-            <TouchableOpacity style={styles.photoRemove} onPress={() => setPhoto(null)}>
-              <Ionicons name="close-circle" size={28} color={Colors.error} />
+            <TouchableOpacity
+              style={[styles.dateBtn, styles.dateBtnTime, scheduledDate != null && { borderColor: sportColor, backgroundColor: sportColor + '10' }]}
+              onPress={() => setPickerMode('time')}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="time-outline" size={18} color={scheduledDate ? sportColor : Colors.textMuted} />
+              <Text style={[styles.dateBtnText, scheduledDate != null && { color: Colors.text, fontWeight: '700' }]}>
+                {timeLabel}
+              </Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <TouchableOpacity style={styles.photoPicker} onPress={pickPhoto} activeOpacity={0.75}>
-            <View style={styles.photoPickerIcon}>
-              <Ionicons name="camera-outline" size={22} color={Colors.textMuted} />
-            </View>
-            <Text style={styles.photoPickerText}>Add a court or action photo</Text>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textHint} />
-          </TouchableOpacity>
-        )}
 
-        {/* ── Invite Friends ── */}
-        {!isEdit && friends.length > 0 && (
-          <>
-            <SectionLabel>Invite Friends</SectionLabel>
-            <View style={styles.friendsRow}>
-              {friends.map(f => {
-                const selected = selectedFriendIds.has(f.id);
-                const c = getAvatarColor(f.username);
-                return (
-                  <TouchableOpacity
-                    key={f.id}
-                    style={[styles.friendChip, selected && { borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint }]}
-                    onPress={() => toggleFriend(f.id)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[styles.friendAvatar, { backgroundColor: c + '22', borderColor: c }]}>
-                      {f.avatar
-                        ? <Image source={{ uri: `data:image/jpeg;base64,${f.avatar}` }} style={styles.friendAvatarImg} />
-                        : <Text style={[styles.friendAvatarLetter, { color: c }]}>{f.username.charAt(0).toUpperCase()}</Text>}
-                    </View>
-                    <Text style={[styles.friendName, selected && { color: Colors.accent }]} numberOfLines={1}>{f.username}</Text>
-                    {selected && <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {selectedFriendIds.size > 0 && (
-              <View style={styles.inviteNote}>
-                <Ionicons name="people" size={14} color={Colors.accent} />
-                <Text style={styles.inviteNoteText}>
-                  {selectedFriendIds.size} friend{selectedFriendIds.size > 1 ? 's' : ''} will be added automatically
-                </Text>
+          {pickerMode != null && (
+            <DateTimePicker
+              value={scheduledDate ?? new Date(Date.now() + 3_600_000)}
+              mode={pickerMode}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              minimumDate={pickerMode === 'date' ? new Date() : undefined}
+              themeVariant="dark"
+              onChange={(_, selected) => {
+                if (Platform.OS === 'android') setPickerMode(null);
+                if (!selected) return;
+                setScheduledDate(prev => {
+                  const base = new Date(prev ?? Date.now() + 3_600_000);
+                  if (pickerMode === 'date') base.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+                  else base.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+                  return base;
+                });
+              }}
+            />
+          )}
+          {pickerMode != null && Platform.OS === 'ios' && (
+            <TouchableOpacity style={styles.pickerDone} onPress={() => setPickerMode(null)}>
+              <Text style={styles.pickerDoneText}>Done</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* ── Max Players ── */}
+          <SectionLabel>Max Players</SectionLabel>
+          <View style={styles.inputRow}>
+            <Ionicons name="people-outline" size={18} color={Colors.textMuted} />
+            <TextInput
+              style={styles.inputField}
+              placeholder="e.g. 10"
+              placeholderTextColor={Colors.textHint}
+              value={maxPlayers}
+              onChangeText={setMaxPlayers}
+              keyboardType="number-pad"
+            />
+          </View>
+
+          {/* ── Equipment ── */}
+          <SectionLabel>Equipment Notes (optional)</SectionLabel>
+          <View style={styles.inputRow}>
+            <Ionicons name="bag-add-outline" size={18} color={Colors.textMuted} />
+            <TextInput
+              style={styles.inputField}
+              placeholder="e.g. Who's bringing the ball?"
+              placeholderTextColor={Colors.textHint}
+              value={equipment}
+              onChangeText={setEquipment}
+            />
+          </View>
+
+          {/* ── Photo ── */}
+          <SectionLabel>Game Photo (optional)</SectionLabel>
+          {photo ? (
+            <Animated.View style={photoScaleStyle}>
+              <View style={styles.photoWrap}>
+                <Image source={{ uri: `data:image/jpeg;base64,${photo}` }} style={styles.photoPreview} resizeMode="cover" />
+                <TouchableOpacity style={styles.photoRemove} onPress={() => setPhoto(null)}>
+                  <Ionicons name="close-circle" size={28} color={Colors.error} />
+                </TouchableOpacity>
               </View>
-            )}
-          </>
-        )}
-
-        {/* ── Recurrence (new games only) ── */}
-        {!isEdit && (
-          <>
-            <SectionLabel>Repeat</SectionLabel>
-            <View style={styles.recurrenceRow}>
-              {(['none', 'weekly', 'biweekly'] as const).map(opt => {
-                const labels = { none: 'One-time', weekly: 'Weekly', biweekly: 'Bi-weekly' };
-                const active = recurrence === opt;
-                return (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[styles.recurrenceChip, active && { backgroundColor: sportColor + '22', borderColor: sportColor, borderWidth: 2 }]}
-                    onPress={() => setRecurrence(opt)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[styles.recurrenceText, active && { color: sportColor, fontWeight: '800' }]}>{labels[opt]}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {recurrence !== 'none' && (
-              <View style={styles.recurrenceNote}>
-                <Ionicons name="repeat-outline" size={14} color={Colors.accent} />
-                <Text style={styles.recurrenceNoteText}>
-                  A new game will be scheduled automatically after each session.
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* ── Submit ── */}
-        <TouchableOpacity
-          style={[styles.submitBtn, loading && { opacity: 0.75 }, { shadowColor: sportColor }]}
-          onPress={handleSubmit}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator color={Colors.bg} size="small" />
+            </Animated.View>
           ) : (
+            <TouchableOpacity style={styles.photoPicker} onPress={pickPhoto} activeOpacity={0.75}>
+              <View style={styles.photoPickerIcon}>
+                <Ionicons name="camera-outline" size={22} color={Colors.textMuted} />
+              </View>
+              <Text style={styles.photoPickerText}>Add a court or action photo</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textHint} />
+            </TouchableOpacity>
+          )}
+
+          {/* ── Invite Friends ── */}
+          {!isEdit && friends.length > 0 && (
             <>
-              <Text style={styles.submitBtnText}>{isEdit ? 'Save Changes' : 'Post on Map'}</Text>
-              <Ionicons name="arrow-forward-circle" size={22} color={Colors.bg} />
+              <SectionLabel>Invite Friends</SectionLabel>
+              <View style={styles.friendsRow}>
+                {friends.map(f => {
+                  const selected = selectedFriendIds.has(f.id);
+                  const c = getAvatarColor(f.username);
+                  return (
+                    <TouchableOpacity
+                      key={f.id}
+                      style={[styles.friendChip, selected && { borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint }]}
+                      onPress={() => toggleFriend(f.id)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.friendAvatar, { backgroundColor: c + '22', borderColor: c }]}>
+                        {f.avatar
+                          ? <Image source={{ uri: `data:image/jpeg;base64,${f.avatar}` }} style={styles.friendAvatarImg} />
+                          : <Text style={[styles.friendAvatarLetter, { color: c }]}>{f.username.charAt(0).toUpperCase()}</Text>}
+                      </View>
+                      <Text style={[styles.friendName, selected && { color: Colors.accent }]} numberOfLines={1}>{f.username}</Text>
+                      {selected && <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {selectedFriendIds.size > 0 && (
+                <View style={styles.inviteNote}>
+                  <Ionicons name="people" size={14} color={Colors.accent} />
+                  <Text style={styles.inviteNoteText}>
+                    {selectedFriendIds.size} friend{selectedFriendIds.size > 1 ? 's' : ''} will be added automatically
+                  </Text>
+                </View>
+              )}
             </>
           )}
-        </TouchableOpacity>
 
-      </ScrollView>
+          {/* ── Recurrence (new games only) ── */}
+          {!isEdit && (
+            <>
+              <SectionLabel>Repeat</SectionLabel>
+              <View style={styles.recurrenceRow}>
+                {(['none', 'weekly', 'biweekly'] as const).map(opt => {
+                  const labels = { none: 'One-time', weekly: 'Weekly', biweekly: 'Bi-weekly' };
+                  const active = recurrence === opt;
+                  return (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.recurrenceChip, active && { backgroundColor: sportColor + '22', borderColor: sportColor, borderWidth: 2 }]}
+                      onPress={() => setRecurrence(opt)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.recurrenceText, active && { color: sportColor, fontWeight: '800' }]}>{labels[opt]}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {recurrence !== 'none' && (
+                <View style={styles.recurrenceNote}>
+                  <Ionicons name="repeat-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.recurrenceNoteText}>
+                    A new game will be scheduled automatically after each session.
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ── Submit ── */}
+          <Animated.View style={submitPressStyle}>
+            <Pressable
+              onPressIn={submitPressIn}
+              onPressOut={submitPressOut}
+              onPress={handleSubmit}
+              style={[styles.submitBtn, loading && { opacity: 0.75 }, { shadowColor: sportColor }]}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={Colors.bg} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.submitBtnText}>{isEdit ? 'Save Changes' : 'Post on Map'}</Text>
+                  <Ionicons name="arrow-forward-circle" size={22} color={Colors.bg} />
+                </>
+              )}
+            </Pressable>
+          </Animated.View>
+
+        </ScrollView>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
