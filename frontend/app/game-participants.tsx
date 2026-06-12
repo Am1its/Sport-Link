@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
+import { BackButton } from '../components/BackButton';
 
 type Participant = {
   id: number;
@@ -41,9 +42,7 @@ export default function GameParticipantsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
+        <BackButton />
         <Text style={styles.title} numberOfLines={1}>{title ?? 'Players'}</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -97,7 +96,6 @@ const styles = StyleSheet.create({
     paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20,
     borderBottomWidth: 1, borderBottomColor: '#2C2C2E',
   },
-  backBtn: { width: 40 },
   title: { flex: 1, fontSize: 18, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
 
   list: { paddingTop: 10, paddingBottom: 30 },

@@ -14,6 +14,7 @@ import { getAvatarColor } from '../utils/avatar';
 import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
 import { Colors, Radius } from '../constants/theme';
+import { BackButton } from '../components/BackButton';
 import { SOCKET_EVENTS } from '../constants/events';
 
 const MAX_MESSAGE_LENGTH = 1000;
@@ -199,9 +200,7 @@ export default function GameChatScreen() {
       keyboardVerticalOffset={0}
     >
       <SafeAreaView style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={26} color={Colors.text} />
-        </TouchableOpacity>
+        <BackButton />
         <Text style={styles.headerTitle} numberOfLines={1}>{name ?? 'Game Chat'}</Text>
         <View style={{ width: 40 }} />
       </SafeAreaView>
@@ -271,7 +270,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.bg },
 
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.bg },
-  backBtn: { width: 40 },
   headerTitle: { flex: 1, color: Colors.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },

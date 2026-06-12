@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { BackButton } from '../components/BackButton';
 import { API_BASE } from '../constants/api';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null; karma: number };
@@ -120,9 +121,7 @@ export default function FriendsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color={Colors.text} />
-        </TouchableOpacity>
+        <BackButton />
         <Text style={styles.title}>Friends</Text>
         <TouchableOpacity
           style={styles.inviteBtn}
@@ -301,7 +300,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 60, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.lg },
-  backBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
   inviteBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.accentFaint, borderWidth: 1, borderColor: Colors.accentBorder, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 22, fontWeight: '900', color: Colors.text },
 

@@ -15,6 +15,7 @@ import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { BackButton } from '../components/BackButton';
 import { SOCKET_EVENTS } from '../constants/events';
 
 type DmMessage = {
@@ -283,9 +284,7 @@ export default function DirectChatScreen() {
       keyboardVerticalOffset={0}
     >
       <SafeAreaView style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={26} color={Colors.text} />
-        </TouchableOpacity>
+        <BackButton />
         <TouchableOpacity
           style={styles.headerCenter}
           onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId } })}
@@ -468,7 +467,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.bg },
 
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.borderSub, backgroundColor: Colors.bg },
-  backBtn:      { width: 40 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   headerAvatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   headerAvatarImg:    { width: '100%', height: '100%' },

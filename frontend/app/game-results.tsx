@@ -10,6 +10,7 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { BackButton } from '../components/BackButton';
 
 type ResultEntry = {
   id: number;
@@ -73,9 +74,7 @@ export default function GameResultsScreen() {
     <View style={styles.header}>
       <View style={[styles.resultOrb1, { backgroundColor: sportColor + '12' }]} />
       <View style={[styles.resultOrb2, { backgroundColor: sportColor + '08' }]} />
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Ionicons name="chevron-back" size={26} color={Colors.text} />
-      </TouchableOpacity>
+      <BackButton bgColor="rgba(0,0,0,0.35)" style={styles.backBtn} />
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>Game Results</Text>
         <Text style={styles.subtitle}>
@@ -232,7 +231,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.xl, paddingHorizontal: Spacing.xl, backgroundColor: Colors.bg, overflow: 'hidden' },
   resultOrb1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, top: -80, right: -60 },
   resultOrb2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, top: 20, left: -40 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md },
+  backBtn: { marginRight: Spacing.md },
   title:   { fontSize: 20, fontWeight: '900', color: Colors.text },
   subtitle: { fontSize: 12, color: Colors.textSub, marginTop: 2 },
   sportIcon: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },

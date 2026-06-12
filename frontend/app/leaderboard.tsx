@@ -10,6 +10,7 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
+import { BackButton } from '../components/BackButton';
 
 type Entry = {
   id: number;
@@ -100,9 +101,7 @@ export default function LeaderboardScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.text} />
-        </TouchableOpacity>
+        <BackButton />
         <Text style={styles.title}>Leaderboard</Text>
         <View style={{ width: 36 }} />
       </View>
@@ -162,7 +161,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   header: { flexDirection: 'row', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.lg, paddingHorizontal: Spacing.xl },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
   title: { flex: 1, textAlign: 'center', fontSize: 22, fontWeight: '900', color: Colors.text },
 
   list: { paddingHorizontal: Spacing.xl, paddingBottom: 40 },

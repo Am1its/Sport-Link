@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
+import { BackButton } from '../components/BackButton';
 
 type Notification = {
   id: number;
@@ -70,9 +71,7 @@ export default function NotificationInboxScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#FFFFFF" />
-        </TouchableOpacity>
+        <BackButton />
         <Text style={styles.headerTitle}>Notifications</Text>
         {unreadCount > 0 ? (
           <TouchableOpacity onPress={markAllRead} disabled={markingAll}>
@@ -124,7 +123,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1C1C1E' },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
-  backBtn: { width: 40 },
   headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
   markAllText: { color: '#0FEA95', fontSize: 13, fontWeight: '700', width: 80, textAlign: 'right' },
 

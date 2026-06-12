@@ -9,6 +9,7 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
+import { BackButton } from '../components/BackButton';
 
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
@@ -199,9 +200,7 @@ export default function PlayerProfileScreen() {
         <View style={[styles.heroBlob2, { backgroundColor: color + '28' }]} />
         <View style={[styles.heroBlob3, { backgroundColor: color + '18' }]} />
         {/* Back button inside hero */}
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.text} />
-        </TouchableOpacity>
+        <BackButton bgColor="rgba(0,0,0,0.35)" style={styles.backBtn} />
         {isMe && (
           <View style={styles.youTag}>
             <Text style={styles.youTagText}>Your Profile</Text>
@@ -419,7 +418,7 @@ const styles = StyleSheet.create({
   heroBlob1: { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: -90,  right: -50 },
   heroBlob2: { position: 'absolute', width: 180, height: 180, borderRadius: 90,  top: -50,  left: -60 },
   heroBlob3: { position: 'absolute', width: 140, height: 140, borderRadius: 70,  bottom: -60, right: 60 },
-  backBtn:   { position: 'absolute', top: 56, left: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
+  backBtn:   { position: 'absolute', top: 56, left: 16 },
   moreBtn:   { position: 'absolute', top: 56, right: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' },
   youTag:    { position: 'absolute', bottom: 12, right: 20, backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5 },
   youTagText: { color: Colors.text, fontSize: 12, fontWeight: '800' },
