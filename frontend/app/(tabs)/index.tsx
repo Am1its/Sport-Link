@@ -700,19 +700,38 @@ export default function HomeScreen() {
             {/* Sport sub-filter row */}
             {showSportFilter && (
               <View style={styles.sportFiltersWrapper}>
+                {sportFilter !== 'all' && (
+                  <Text style={styles.sportActiveLabel}>
+                    {SPORT_FILTER_ITEMS.find(f => f.key === sportFilter)?.label}
+                  </Text>
+                )}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
-                  {SPORT_FILTER_ITEMS.map(f => (
-                    <FilterChip
-                      key={f.key}
-                      label={f.label}
-                      isActive={sportFilter === f.key}
-                      onPress={() => setSportFilter(f.key)}
-                      chipStyle={styles.sportChip}
-                      textStyle={styles.sportChipText}
-                      activeChipStyle={styles.sportChipActive}
-                      activeTextStyle={styles.sportChipTextActive}
-                    />
-                  ))}
+                  {SPORT_FILTER_ITEMS.map(f => {
+                    const isActive = sportFilter === f.key;
+                    const sportColor = SPORT_COLORS[f.key] ?? Colors.accent;
+                    const iconName = f.key === 'all' ? 'view-grid' : (SPORT_ICONS[f.key] ?? 'help-circle');
+                    return (
+                      <TouchableOpacity
+                        key={f.key}
+                        style={[
+                          styles.sportChip,
+                          isActive && (f.key === 'all'
+                            ? styles.sportChipActiveAll
+                            : { backgroundColor: sportColor + '22', borderColor: sportColor }),
+                        ]}
+                        onPress={() => { Haptics.selectionAsync(); setSportFilter(f.key); }}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialCommunityIcons
+                          name={iconName as any}
+                          size={18}
+                          color={isActive
+                            ? (f.key === 'all' ? Colors.accent : sportColor)
+                            : 'rgba(100,100,100,0.7)'}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             )}
@@ -860,10 +879,9 @@ const styles = StyleSheet.create({
   filterText: { color: '#3A3A3C', fontSize: 14, fontWeight: 'bold' },
   filterTextActive: { color: '#1C1C1E' },
 
-  sportChip: { backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16, marginRight: 8, borderWidth: 1, borderColor: '#E5E5EA' },
-  sportChipActive: { backgroundColor: '#1C1C1E', borderColor: '#1C1C1E' },
-  sportChipText: { color: '#636366', fontSize: 13, fontWeight: '700' },
-  sportChipTextActive: { color: '#0FEA95' },
+  sportChip: { width: 38, height: 38, borderRadius: 19, marginRight: 8, borderWidth: 1.5, borderColor: 'rgba(180,180,180,0.4)', backgroundColor: 'rgba(255,255,255,0.88)', justifyContent: 'center', alignItems: 'center' },
+  sportChipActiveAll: { backgroundColor: '#1C1C1E', borderColor: '#1C1C1E' },
+  sportActiveLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', paddingHorizontal: 15, marginBottom: 4, letterSpacing: 0.3 },
 
   bottomCardAnimWrapper: { position: 'absolute', bottom: 30, alignSelf: 'center', width: width * 0.9 },
   bottomCard: { backgroundColor: 'white', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },

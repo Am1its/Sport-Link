@@ -28,7 +28,7 @@ router.get('/', authMiddleware, async (req, res) => {
            SELECT game_id, MAX(id) AS max_id FROM Messages GROUP BY game_id
          ) latest ON m.id = latest.max_id
        ) lm ON lm.game_id = g.id
-       WHERE g.status = 'active'
+       WHERE g.status IN ('active', 'completed')
          AND (g.host_id = ? OR EXISTS (
            SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?
          ))

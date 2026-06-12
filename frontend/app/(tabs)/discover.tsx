@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList, Modal,
-  TouchableOpacity, RefreshControl,
+  TouchableOpacity, RefreshControl, ScrollView,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import * as Location from 'expo-location';
@@ -152,7 +152,12 @@ export default function DiscoverScreen() {
       </View>
 
       {/* Date filter chips */}
-      <View style={styles.dateChipsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.dateChipsRow}
+        style={{ marginBottom: Spacing.sm }}
+      >
         {([
           { key: 'any',     label: 'Any time' },
           { key: 'today',   label: 'Today' },
@@ -168,7 +173,7 @@ export default function DiscoverScreen() {
             <Text style={[styles.dateChipText, dateFilter === key && styles.dateChipTextActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Neighborhood filter banner (when active) */}
       {neighborhoodFilter && (
@@ -354,7 +359,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: Colors.text, fontSize: 15 },
 
   // Date chips
-  dateChipsRow:      { flexDirection: 'row', gap: 6, marginBottom: Spacing.sm, flexWrap: 'wrap' },
+  dateChipsRow:      { flexDirection: 'row', gap: 6, paddingBottom: 2 },
   dateChip:          { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   dateChipActive:    { backgroundColor: Colors.purple + '22', borderColor: Colors.purple + '66' },
   dateChipText:      { fontSize: 12, fontWeight: '700', color: Colors.textMuted },

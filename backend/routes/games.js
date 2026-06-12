@@ -117,7 +117,7 @@ router.get('/', async (req, res) => {
         AND (
           g.scheduled_time IS NULL
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') IS NULL
-          OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > NOW()
+          OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > DATE_SUB(NOW(), INTERVAL 3 HOUR)
         )
         ${userId ? `AND g.host_id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
         AND g.host_id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)` : ''}
