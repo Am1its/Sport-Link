@@ -1,8 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  Alert, Animated, Image, Share,
+  Alert, Image, Share, Pressable,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { usePressAnimation, useSuccessBurst } from '../hooks/useAnimations';
 import * as Haptics from 'expo-haptics';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiFetch, UnauthorizedError } from '../utils/api';
@@ -35,7 +37,13 @@ export function GameCard({
   const [joining, setJoining] = useState(false);
   const [isJoined, setIsJoined] = useState(!!game.is_joined);
   const [isWaitlisted, setIsWaitlisted] = useState(false);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { animatedStyle: joinPressStyle, onPressIn: joinPressIn, onPressOut: joinPressOut } = usePressAnimation({
+    scaleDown: 0.94,
+    scaleUp: 1.08,
+    stiffness: 400,
+    damping: 20,
+  });
+  const { trigger: triggerBurst, dotStyles } = useSuccessBurst();
   const color  = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon   = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
   const isOwn  = game.host_id === userId;
@@ -49,12 +57,8 @@ export function GameCard({
     ? `${displayCount}/${game.max_players}`
     : `${displayCount}`;
 
-  const springBack = () =>
-    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
-
   const handleJoin = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Animated.spring(scaleAnim, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!isFull) onJoined(game.id, game.participant_count + 1);
     setJoining(true);
     try {
@@ -62,23 +66,21 @@ export function GameCard({
       const data = await res.json();
       if (!data.success) {
         if (!isFull) onJoined(game.id, game.participant_count);
-        springBack();
         return Alert.alert('Error', data.message);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsJoined(true);
+      triggerBurst();
       if (data.waitlisted) {
         setIsWaitlisted(true);
-        Alert.alert("You're on the waitlist!", `You're #${data.waitlist_position} in line. You'll be notified if a spot opens.`);
+        Alert.alert("You're on the waitlist!", `You're #${data.waitlist_position} in line.`);
       } else {
         onJoined(game.id, data.participant_count);
         Alert.alert("You're in!", 'Game added to My Schedule.');
       }
-      springBack();
     } catch (err) {
       if (err instanceof UnauthorizedError) return;
       if (!isFull) onJoined(game.id, game.participant_count);
-      springBack();
       Alert.alert('Error', 'Could not connect to server');
     } finally {
       setJoining(false);
@@ -198,6 +200,13 @@ export function GameCard({
 
       {/* Join + Share row */}
       <View style={styles.joinBtnWrap}>
+        {dotStyles.map((dotStyle, i) => (
+          <Animated.View
+            key={i}
+            style={[styles.burstDot, dotStyle]}
+            pointerEvents="none"
+          />
+        ))}
         <View style={styles.joinRow}>
           {isOwn ? (
             <View style={[styles.joinBtn, styles.joinBtnMuted]}>
@@ -215,26 +224,26 @@ export function GameCard({
               <Text style={[styles.joinBtnText, { color: Colors.accent }]}>Joined</Text>
             </View>
           ) : isFull ? (
-            <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, { flex: 1 }]}>
-              <TouchableOpacity style={[styles.joinBtn, styles.joinBtnWaitlist]} onPress={handleJoin} disabled={joining} activeOpacity={0.85}>
+            <Animated.View style={[joinPressStyle, { flex: 1 }]}>
+              <Pressable style={[styles.joinBtn, styles.joinBtnWaitlist]} onPress={handleJoin} onPressIn={joinPressIn} onPressOut={joinPressOut} disabled={joining}>
                 {joining
                   ? <ActivityIndicator color={Colors.warning} size="small" />
                   : <>
                       <Ionicons name="time-outline" size={16} color={Colors.warning} />
                       <Text style={[styles.joinBtnText, { color: Colors.warning }]}>Join Waitlist</Text>
                     </>}
-              </TouchableOpacity>
+              </Pressable>
             </Animated.View>
           ) : (
-            <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, { flex: 1 }]}>
-              <TouchableOpacity style={styles.joinBtn} onPress={handleJoin} disabled={joining} activeOpacity={0.85}>
+            <Animated.View style={[joinPressStyle, { flex: 1 }]}>
+              <Pressable style={styles.joinBtn} onPress={handleJoin} onPressIn={joinPressIn} onPressOut={joinPressOut} disabled={joining}>
                 {joining
                   ? <ActivityIndicator color={Colors.bg} size="small" />
                   : <>
                       <Text style={styles.joinBtnText}>Join Game</Text>
                       <Ionicons name="arrow-forward" size={16} color={Colors.bg} />
                     </>}
-              </TouchableOpacity>
+              </Pressable>
             </Animated.View>
           )}
           <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.7}>
@@ -294,4 +303,14 @@ const styles = StyleSheet.create({
 
   neighborhoodTag:  { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4, alignSelf: 'flex-start' },
   neighborhoodText: { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
+
+  burstDot: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.accent,
+    bottom: 22,
+    left: '50%',
+  },
 });
