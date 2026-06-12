@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback, ComponentProps, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated, FlatList, Image, TextInput, Keyboard } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dimensions, ScrollView, Animated, FlatList, Image, TextInput, Keyboard, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import ReAnimated, {
+  useSharedValue, useAnimatedStyle,
+  withSpring, withTiming,
+} from 'react-native-reanimated';
+import { usePressAnimation } from '../../hooks/useAnimations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -225,6 +230,34 @@ function BottomCard({ court, userId, token, onJoined }: {
   );
 }
 
+function FilterChip({
+  label, isActive, onPress, chipStyle, textStyle, activeChipStyle, activeTextStyle,
+}: {
+  label: string;
+  isActive: boolean;
+  onPress: () => void;
+  chipStyle: any;
+  textStyle: any;
+  activeChipStyle: any;
+  activeTextStyle: any;
+}) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({
+    scaleDown: 0.94, scaleUp: 1.0, stiffness: 400, damping: 18,
+  });
+  return (
+    <ReAnimated.View style={animatedStyle}>
+      <Pressable
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={() => { Haptics.selectionAsync(); onPress(); }}
+        style={[chipStyle, isActive && activeChipStyle]}
+      >
+        <Text style={[textStyle, isActive && activeTextStyle]}>{label}</Text>
+      </Pressable>
+    </ReAnimated.View>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
@@ -255,6 +288,24 @@ export default function HomeScreen() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+
+  // Bottom card entrance/exit animation
+  const cardY = useSharedValue(30);
+  const cardOpacity = useSharedValue(0);
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: cardY.value }],
+    opacity: cardOpacity.value,
+  }));
+
+  useEffect(() => {
+    if (selectedCourt) {
+      cardY.value = withSpring(0, { damping: 16, stiffness: 220 });
+      cardOpacity.value = withTiming(1, { duration: 200 });
+    } else {
+      cardY.value = withTiming(30, { duration: 200 });
+      cardOpacity.value = withTiming(0, { duration: 200 });
+    }
+  }, [selectedCourt]);
 
   const isPastGame = (scheduledTime: string | null) => {
     if (!scheduledTime) return false;
@@ -415,7 +466,7 @@ export default function HomeScreen() {
             <Marker
               key={item.place_id}
               coordinate={{ latitude: item.geometry.location.lat, longitude: item.geometry.location.lng }}
-              onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(item); }}
+              onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedCourt(item); } }}
             >
               <View style={styles.markerWrapper}>
                 <View style={[
@@ -463,7 +514,7 @@ export default function HomeScreen() {
             <Marker
               key={item.place_id}
               coordinate={{ latitude: item.geometry.location.lat, longitude: item.geometry.location.lng }}
-              onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) setSelectedCourt(item); }}
+              onPress={(e) => { e.stopPropagation(); if (!isSelectingLocation) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedCourt(item); } }}
             >
               <View style={styles.markerWrapper}>
                 <View style={[
@@ -578,13 +629,16 @@ export default function HomeScreen() {
                   { key: 'games', label: 'Community Games' },
                   { key: 'courts', label: 'Courts' },
                 ].map(f => (
-                  <TouchableOpacity
+                  <FilterChip
                     key={f.key}
-                    style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
+                    label={f.label}
+                    isActive={activeFilter === f.key}
                     onPress={() => { setActiveFilter(f.key); setSportFilter('all'); }}
-                  >
-                    <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>{f.label}</Text>
-                  </TouchableOpacity>
+                    chipStyle={styles.filterChip}
+                    textStyle={styles.filterText}
+                    activeChipStyle={styles.filterChipActive}
+                    activeTextStyle={styles.filterTextActive}
+                  />
                 ))}
               </ScrollView>
             </View>
@@ -594,15 +648,16 @@ export default function HomeScreen() {
               <View style={styles.sportFiltersWrapper}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
                   {SPORT_FILTER_ITEMS.map(f => (
-                    <TouchableOpacity
+                    <FilterChip
                       key={f.key}
-                      style={[styles.sportChip, sportFilter === f.key && styles.sportChipActive]}
+                      label={f.label}
+                      isActive={sportFilter === f.key}
                       onPress={() => setSportFilter(f.key)}
-                    >
-                      <Text style={[styles.sportChipText, sportFilter === f.key && styles.sportChipTextActive]}>
-                        {f.label}
-                      </Text>
-                    </TouchableOpacity>
+                      chipStyle={styles.sportChip}
+                      textStyle={styles.sportChipText}
+                      activeChipStyle={styles.sportChipActive}
+                      activeTextStyle={styles.sportChipTextActive}
+                    />
                   ))}
                 </ScrollView>
               </View>
@@ -612,15 +667,17 @@ export default function HomeScreen() {
       </SafeAreaView>
 
       {selectedCourt && !isSelectingLocation && (
-        <BottomCard
-          court={selectedCourt}
-          userId={user?.id}
-          token={token}
-          onJoined={(newCount) => {
-            setGames(prev => prev.map(g => g.id === selectedCourt.id ? { ...g, participant_count: newCount, is_joined: true } : g));
-            setSelectedCourt(prev => prev ? { ...prev, participant_count: newCount, is_joined: true } : prev);
-          }}
-        />
+        <ReAnimated.View style={[styles.bottomCardAnimWrapper, cardStyle]}>
+          <BottomCard
+            court={selectedCourt}
+            userId={user?.id}
+            token={token}
+            onJoined={(newCount) => {
+              setGames(prev => prev.map(g => g.id === selectedCourt.id ? { ...g, participant_count: newCount, is_joined: true } : g));
+              setSelectedCourt(prev => prev ? { ...prev, participant_count: newCount, is_joined: true } : prev);
+            }}
+          />
+        </ReAnimated.View>
       )}
 
       {!selectedCourt && (
@@ -754,7 +811,8 @@ const styles = StyleSheet.create({
   sportChipText: { color: '#636366', fontSize: 13, fontWeight: '700' },
   sportChipTextActive: { color: '#0FEA95' },
 
-  bottomCard: { position: 'absolute', bottom: 30, alignSelf: 'center', width: width * 0.9, backgroundColor: 'white', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
+  bottomCardAnimWrapper: { position: 'absolute', bottom: 30, alignSelf: 'center', width: width * 0.9 },
+  bottomCard: { backgroundColor: 'white', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#1C1C1E' },
   cardBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
