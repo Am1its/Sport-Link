@@ -182,6 +182,7 @@ export default function GameFormModal() {
     if (maxPlayers && parseInt(maxPlayers) < 2)
       return Alert.alert('Invalid Players', 'Max players must be at least 2');
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setLoading(true);
     try {
       const method = isEdit ? 'PUT' : 'POST';
