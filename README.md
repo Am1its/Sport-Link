@@ -273,9 +273,9 @@ eas submit --platform ios --profile production
 | Mar 29, 2026 | [Business & Growth Strategy](docs/BUSINESS_STRATEGY.md) | ✅ Done |
 | Apr 1, 2026 | [Authentication & Trust Model](docs/AUTHENTICATION_MODEL.md) | ✅ Done |
 | May 10, 2026 | [Full Prototype](docs/FULL_PROTOTYPE.md) | ✅ Done |
-| Jun 11, 2026 | Production-ready build (Sprint 13) | ✅ Done |
-| Jun 12, 2026 | Sprint 14 — Safety, Game UX, Social, Courts, Android | ✅ Done |
-| Jun 12, 2026 | Sprint 15 — Animations, Haptics & UX Polish | ✅ Done |
+| Jun 11, 2026 | Production-ready build  | ✅ Done |
+| Jun 12, 2026 | Safety, Game UX, Social, Courts, Android | ✅ Done |
+| Jun 12, 2026 |  Animations, Haptics & UX Polish | ✅ Done |
 | Sep 8, 2026 | Final Submission | ⏳ Pending |
 
 ---

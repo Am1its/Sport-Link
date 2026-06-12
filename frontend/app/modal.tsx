@@ -278,10 +278,6 @@ export default function GameFormModal() {
               />
             ))}
           </View>
-          <Text style={[styles.sportSelectedLabel, { color: SPORT_COLORS[sport] ?? Colors.accent }]}>
-            {SPORTS.find(s => s.key === sport)?.label ?? ''}
-          </Text>
-
           {/* ── Skill level ── */}
           <SectionLabel>Skill Level</SectionLabel>
           <View style={styles.levelRow}>
@@ -565,9 +561,8 @@ const styles = StyleSheet.create({
   sectionLabel: { ...Type.sectionLabel, color: Colors.textMuted, marginBottom: Spacing.sm, marginTop: 2 },
 
   // Sport grid — 3 columns
-  sportsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
-  sportTile:   { width: '30.5%', aspectRatio: 1.3, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
-  sportSelectedLabel: { fontSize: 15, fontWeight: '800', textAlign: 'center', marginBottom: Spacing.xl, letterSpacing: 0.3 },
+  sportsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.xl },
+  sportTile:   { width: '30.5%', aspectRatio: 1, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
 
   // Level chips
   levelRow:   { flexDirection: 'row', gap: 6, marginBottom: Spacing.xl },
