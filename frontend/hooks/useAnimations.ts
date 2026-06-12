@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import {
   useSharedValue, useAnimatedStyle,
   withSpring, withTiming, withSequence, withDelay,
@@ -18,16 +18,16 @@ export function usePressAnimation(config?: {
     transform: [{ scale: scale.value }],
   }));
 
-  const onPressIn = () => {
+  const onPressIn = useCallback(() => {
     scale.value = withSpring(scaleDown, { stiffness, damping });
-  };
+  }, [scale, scaleDown, stiffness, damping]);
 
-  const onPressOut = () => {
+  const onPressOut = useCallback(() => {
     scale.value = withSequence(
       withSpring(scaleUp, { stiffness, damping }),
       withSpring(1, { stiffness, damping }),
     );
-  };
+  }, [scale, scaleUp, stiffness, damping]);
 
   return { animatedStyle, onPressIn, onPressOut };
 }
@@ -39,7 +39,7 @@ export function useEntranceAnimation(delay = 0) {
   useEffect(() => {
     opacity.value = withDelay(delay, withSpring(1, { stiffness: 200, damping: 20 }));
     translateY.value = withDelay(delay, withSpring(0, { stiffness: 200, damping: 20 }));
-  }, []);
+  }, [delay]);
 
   return useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -74,12 +74,12 @@ export function useSuccessBurst() {
   const dot4 = useAnimatedStyle(() => makeDotStyle(progress.value, DOT_ANGLES[4]));
   const dot5 = useAnimatedStyle(() => makeDotStyle(progress.value, DOT_ANGLES[5]));
 
-  const trigger = (onComplete?: () => void) => {
+  const trigger = useCallback((onComplete?: () => void) => {
     progress.value = 0;
     progress.value = withTiming(1, { duration: 400 }, (finished) => {
       if (finished && onComplete) runOnJS(onComplete)();
     });
-  };
+  }, [progress]);
 
   return { trigger, dotStyles: [dot0, dot1, dot2, dot3, dot4, dot5] };
 }
