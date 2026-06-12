@@ -143,8 +143,8 @@ export default function GameChatScreen() {
   }, [id]);
 
   const sendMessage = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!input.trim() || sending) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const content = input.trim();
     setInput('');
     if (socketRef.current?.connected) {
@@ -169,7 +169,7 @@ export default function GameChatScreen() {
         createdAt={msg.created_at}
         isMine={msg.user_id === user?.id}
         avatar={avatarCache[msg.user_id]}
-        onAvatarPress={() => router.push({ pathname: '/player-profile', params: { id: String(msg.user_id) } } as any)}
+        onAvatarPress={() => router.push({ pathname: '/player-profile', params: { userId: String(msg.user_id) } } as any)}
         formatTime={formatTime}
       />
     );
@@ -265,14 +265,11 @@ const styles = StyleSheet.create({
   emptyChatIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   emptyChatText: { color: Colors.textMuted, fontSize: 15 },
 
-  timestamp: { color: Colors.textMuted, fontSize: 11, marginTop: 3, marginHorizontal: 4 },
-
   inputRow:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.bg },
   inputWrap:  { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 22, backgroundColor: Colors.surface, marginRight: 8 },
   inputWrapFocused: { borderColor: Colors.accent },
   input:      { paddingHorizontal: 16, paddingVertical: 10, color: Colors.text, fontSize: 15, maxHeight: 120 },
   sendBtn:    { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
-  sendBtnDisabled: { backgroundColor: Colors.surface2 },
   sendBtnActive:   {
     backgroundColor: Colors.accent,
     shadowColor: Colors.accent,
