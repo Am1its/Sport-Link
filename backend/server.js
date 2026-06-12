@@ -32,6 +32,7 @@ const httpServer = http.createServer(app);
 const io = new IOServer(httpServer, { cors: { origin: ALLOWED_ORIGINS } });
 app.set('io', io);
 
+app.set('trust proxy', 1);
 app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json({ limit: '10mb' }));
 
