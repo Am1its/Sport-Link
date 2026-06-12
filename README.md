@@ -49,11 +49,22 @@ Built as a full-stack production app with a live Railway backend, real-time sock
 | Feature | Description |
 |---|---|
 | **Friends** | Send/accept friend requests. View friends' karma. |
-| **Direct Messages** | Real-time 1-on-1 DMs with socket.io. Share game invites via event cards. |
+| **Direct Messages** | Real-time 1-on-1 DMs with socket.io. Share game invites via event cards. Read receipt ticks + typing indicator. |
 | **Activity Feed** | See what games your friends joined or created. |
 | **Invite by Link** | Share a personal invite link (`/invite/:userId`) — opens the app or a web landing page. |
 | **Player Matching** | Discover other players with shared sports + skill level. Ranked by games played together. |
 | **Leaderboard** | Top 20 players by karma with podium display. |
+| **Block & Report** | Block users (mutual invisibility across all features). Report users for review. |
+| **Streaks & Badges** | Consecutive game streaks tracked automatically. 11 achievement badges auto-awarded (first game, 5/25/50 games, host milestones, streak milestones, social butterfly). |
+
+### Game UX
+| Feature | Description |
+|---|---|
+| **Waitlist** | Games auto-enroll latecomers on a waitlist when full. Waitlist position shown on card. |
+| **Check-In** | Players check in within 30 minutes of game start. Tracks attendance more precisely. |
+| **Game Boost** | Host can boost a game once to send a push notification to nearby same-sport players. |
+| **Post-Game Photo** | Host attaches a photo after game completion — visible on the game card. |
+| **Weather Widget** | Weather forecast shown on outdoor-sport game cards (via Open-Meteo, no API key required). |
 
 ### Courts
 | Feature | Description |
@@ -61,7 +72,8 @@ Built as a full-stack production app with a live Railway backend, real-time sock
 | **Court Discovery** | Google Places API (4 parallel queries) with mock fallback. Filter by sport. |
 | **Court Detail** | Photos, hours, phone, Google rating + SportLink community reviews. |
 | **Court Reviews** | Rate courts 1–5 stars + comment. One review per user per court. |
-| **Court Ownership** | Any user can claim a court as manager. Managers can reply to community reviews. |
+| **Court Ownership** | Any user can claim a court as manager. Managers can reply to reviews and post announcements. |
+| **Court Announcements** | Court managers post pinned notices (e.g. "Closed this weekend"). Visible to all visitors. |
 
 ### Auth & Profile
 | Feature | Description |
@@ -70,8 +82,8 @@ Built as a full-stack production app with a live Railway backend, real-time sock
 | **Google Sign-In** | PKCE flow via expo-auth-session. New users routed to onboarding. |
 | **Onboarding** | 4-step wizard: photo → bio → sports (multi-select) → skill levels + favorites. |
 | **Sport Preferences** | Per-sport: skill level (1–5) + favorite toggle. Drives game recommendations and player matching. |
-| **Profile** | Games hosted/joined, karma, top sport, sport preference chips. Inline edit. |
-| **Push Notifications** | Expo push tokens. Sent for: friend requests, game joins, friend acceptance, post-game rating nudge. |
+| **Profile** | Games hosted/joined, karma, top sport, sport preference chips, streak pill, badge scroll row. Inline edit. |
+| **Push Notifications** | Expo push tokens. Sent for: friend requests, game joins, friend acceptance, post-game rating nudge, badge earned. |
 
 ---
 
@@ -98,7 +110,7 @@ Built as a full-stack production app with a live Railway backend, real-time sock
 | Maps | `react-native-maps` + Google Places | Court discovery, game markers, clustering |
 | Real-time | socket.io v4 | Same port as REST; JWT auth on handshake; game rooms + DM rooms |
 | Backend | Node.js + Express | Raw SQL via `mysql2/promise` pool — no ORM |
-| Database | MySQL / MariaDB | 11 tables; raw SQL; FULLTEXT search on Games |
+| Database | MySQL / MariaDB | 17 tables; raw SQL; FULLTEXT search on Games |
 | Auth | JWT (90-day) + Google OAuth (PKCE) | Stored in `AsyncStorage`; global 401 handler |
 | Push | Expo Push API | Backend sends via `https://exp.host/--/api/v2/push/send` |
 | Error monitoring | Sentry (`@sentry/react-native`) | Wraps root layout; DSN in env var |
@@ -163,6 +175,7 @@ Create `frontend/.env`:
 EXPO_PUBLIC_API_URL=http://<your-lan-ip>:3000
 EXPO_PUBLIC_GOOGLE_CLIENT_ID=your_google_web_client_id
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your_google_ios_client_id
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your_google_android_client_id  # optional, needed for Android Google Sign-In
 EXPO_PUBLIC_SENTRY_DSN=your_sentry_dsn
 ```
 
@@ -192,6 +205,8 @@ The backend deploys automatically to Railway on every push to `main`.
 | `/health` | Health check |
 | `/game/:id` | Game share landing (OG meta + deep link) |
 | `/invite/:userId` | Referral landing page |
+| `/share/game/:id` | Rich game share preview page (OG tags + deep link) |
+| `/share/court/:placeId` | Court share preview page with community review aggregate |
 | `/privacy` | Privacy policy |
 | `/terms` | Terms of service |
 | `/api/*` | REST API (see [`docs/API.md`](docs/API.md)) |
@@ -239,6 +254,10 @@ eas submit --platform ios --profile production
 | `SportPreferences` | Per-user per-sport: skill level + favorite flag |
 | `DirectMessages` | 1-on-1 messages (text or game event cards) |
 | `CourtClaims` | Court manager claims (one manager per court) |
+| `BlockedUsers` | Mutual block relationships |
+| `Reports` | User reports with reason + context |
+| `Badges` | Earned achievement badges per user |
+| `CourtAnnouncements` | Manager-posted court notices |
 
 ---
 
@@ -255,6 +274,7 @@ eas submit --platform ios --profile production
 | Apr 1, 2026 | [Authentication & Trust Model](docs/AUTHENTICATION_MODEL.md) | ✅ Done |
 | May 10, 2026 | [Full Prototype](docs/FULL_PROTOTYPE.md) | ✅ Done |
 | Jun 11, 2026 | Production-ready build (Sprint 13) | ✅ Done |
+| Jun 12, 2026 | Sprint 14 — Safety, Game UX, Social, Courts, Android | ✅ Done |
 | Sep 8, 2026 | Final Submission | ⏳ Pending |
 
 ---

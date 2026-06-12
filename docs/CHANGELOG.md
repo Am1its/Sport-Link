@@ -4,6 +4,122 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 14] — June 2026 — Safety, Game UX, Discovery, Social, Courts, Android
+
+### 14A — Safety & Trust
+**Backend:**
+- **Migration 020** — `BlockedUsers` table (`blocker_id`, `blocked_id`, UNIQUE); `Reports` table (`reporter_id`, `reported_id`, `reason` ENUM, `context`).
+- `POST /api/users/:id/block`, `DELETE /api/users/:id/block` — block/unblock.
+- `GET /api/users/blocked` — list blocked users.
+- `POST /api/users/:id/report` — report with reason (spam/harassment/inappropriate/other).
+- All social queries (games, DMs, users, suggestions, friends) filter out mutually blocked users via two correlated subqueries.
+
+**Frontend:**
+- `player-profile.tsx` — 3-dot "..." header button opens Block/Report action sheet.
+- Report modal: reason radio group + Submit button.
+- `blocked-users.tsx` — new screen listing blocked users with Unblock action. Accessible from Profile → Blocked Users menu item.
+
+---
+
+### 14B — Game UX
+**Database (`backend/migrations/021_game_ux.sql`):**
+- `GameParticipants` gains `status ENUM('joined','waitlist')` and `waitlist_position INT`.
+- `GameParticipants` gains `checked_in_at DATETIME`.
+- `Games` gains `boosted_at DATETIME` and `post_game_photo MEDIUMTEXT`.
+
+**Backend (`backend/routes/games.js`):**
+- All participant counts now use `COUNT(CASE WHEN status='joined' THEN user_id END)` so waitlisted players don't inflate the displayed count.
+- `POST /:id/join` → auto-adds to waitlist when game is full (returns `status: 'waitlist'`, `waitlist_position`).
+- `POST /:id/checkin` — participant checks in (enforces ±30 min window around `scheduled_time`).
+- `POST /:id/boost` — host boosts the game (sets `boosted_at`; one boost per game; triggers push to nearby-sport users).
+- `PUT /:id/post-photo` — host attaches post-game photo (base64) after game is completed.
+- `GET /mine` returns `participant_status`, `waitlist_position`, `checked_in`.
+
+**Frontend:**
+- `frontend/utils/weather.ts` — Open-Meteo weather fetch; WMO code map; session cache per game.
+- `discover.tsx` — "Join Waitlist" button (orange) when full; waitlist chip on joined games; date filter chips (Today / Weekend / Week).
+- `games.tsx` — Waitlist badge; weather chip for outdoor sports; Boost button for host; Check In button in 30-min window; Add Photo on completed host games.
+
+---
+
+### 14C — Discovery
+**Database (`backend/migrations/022_neighborhood.sql`):**
+- `Games` gains `neighborhood VARCHAR(100)`; indexed.
+
+**Backend (`backend/routes/geocode.js`):**
+- `GET /api/geocode?q=` — forward geocode via Google → `[{name, lat, lng}]`.
+- `GET /api/geocode?reverse=1&lat=&lng=` — reverse geocode → neighborhood name.
+
+**Frontend:**
+- `frontend/utils/geocode.ts` — `searchPlaces()` + `reverseGeocode()`.
+- `index.tsx` (Map) — collapsible search bar in header; debounced geocode search; recent searches persisted in `AsyncStorage`.
+- `discover.tsx` — neighborhood filter banner with clear button; tappable neighborhood tag on game cards.
+- `modal.tsx` (Create/Edit Game) — neighborhood auto-filled via reverse geocode on new game; editable field.
+
+---
+
+### 14D — Social (Streaks, Badges, DM Polish)
+**Database (`backend/migrations/023_streaks_badges.sql`):**
+- `Users` gains `current_streak INT`, `longest_streak INT`, `last_game_date DATE`.
+- `Badges` table: `(id, user_id, badge_key VARCHAR(50), earned_at)`. UNIQUE on `(user_id, badge_key)`.
+
+**Backend (`backend/utils/badgeUtils.js`):**
+- 11 badge definitions: `first_game`, `game_5/25/50`, `host_5/25`, `streak_3/7/30`, `social_butterfly`.
+- `checkAndAwardBadges(userId, pool)` — queries stats, awards new badges via `INSERT IGNORE`, sends push notification per badge.
+
+**Backend (`backend/server.js`):**
+- `autoCompleteGames` now updates streaks (`current_streak`, `longest_streak`, `last_game_date`) for every participant when a game completes; calls `checkAndAwardBadges`.
+- `dm_typing` socket handler: `socket.on('dm_typing', { to })` → `io.to('user_${to}').emit('dm_typing', { from })`.
+
+**Backend (`backend/routes/dm.js`):**
+- `GET /:userId` and `PUT /:userId/read` both emit `dm_read` socket event to `user_${other}` after marking messages read.
+
+**Backend (`backend/routes/users.js`):**
+- `fetchUser` now selects `current_streak`, `longest_streak`.
+- `fetchBadges(userId)` helper queries `Badges` table.
+- `GET /me` and `GET /:id` both return `badges[]` and streak fields.
+
+**Frontend:**
+- `profile.tsx` — 🔥 streak pill (orange) below stats bar; horizontal badge chip scroll row.
+- `player-profile.tsx` — same streak pill + badge row on public profiles.
+- `direct-chat.tsx` — read receipt ticks on own messages (single gray / double green via `dm_read` socket); typing indicator `• • •` bubble (via `dm_typing` socket, 3s timeout); typing emitted debounced 2s on input change.
+
+---
+
+### 14E — Court Announcements
+**Database (`backend/migrations/024_court_announcements.sql`):**
+- `CourtAnnouncements` table: `(id, place_id, user_id FK, message VARCHAR(500), created_at)`. Indexed on `place_id`.
+
+**Backend (`backend/routes/courts.js`):**
+- `GET /:placeId` now returns `announcements[]` (last 5, newest first).
+- `POST /:placeId/announcements` — manager-only; creates announcement; returns created row.
+- `DELETE /:placeId/announcements/:annId` — manager-only; removes announcement.
+
+**Frontend (`frontend/app/court-detail.tsx`):**
+- Announcements section between manager banner and community reviews.
+- Orange-tinted cards per announcement with manager delete option.
+- Manager input row with Post button.
+
+---
+
+### 14F — Android Polish & Web Share
+**`frontend/app.json`:**
+- Android `package` set to `com.am1its.sportlink`.
+- Added `softwareKeyboardLayoutMode: "pan"` (prevents layout jumps on Android keyboards).
+- Added `VIBRATE` + `RECEIVE_BOOT_COMPLETED` permissions.
+
+**`frontend/app/_layout.tsx`:**
+- Explicit `<StatusBar barStyle="light-content" backgroundColor="#1C1C1E">` for correct Android status bar theming.
+
+**`frontend/hooks/useGoogleAuth.ts`:**
+- `androidClientId` wired from `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` env var (no-op until Android OAuth client created in Google Cloud Console).
+
+**`backend/routes/share.js`:**
+- `GET /share/game/:id` — renders HTML with OG meta tags (title, description, sport emoji); mobile browsers auto-redirect to `sportlink://game/:id`.
+- `GET /share/court/:placeId` — renders HTML with OG meta + community review aggregate; deep-links to `sportlink://court-detail?placeId=...`.
+
+---
+
 ## [Sprint 13] — June 2026 — App Store Prep, Sentry, Court Ownership
 
 ### App Store Readiness
