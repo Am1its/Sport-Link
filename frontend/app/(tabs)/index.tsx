@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dim
 import * as Haptics from 'expo-haptics';
 import ReAnimated, {
   useSharedValue, useAnimatedStyle,
-  withSpring, withTiming,
+  withSpring, withTiming, runOnJS,
 } from 'react-native-reanimated';
 import { usePressAnimation } from '../../hooks/useAnimations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -267,6 +267,7 @@ export default function HomeScreen() {
   const [games, setGames] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourt, setSelectedCourt] = useState<MapItem | null>(null);
+  const [isCardVisible, setIsCardVisible] = useState(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [currentDelta, setCurrentDelta] = useState(0.05);
@@ -299,12 +300,20 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (selectedCourt) {
+      // Mount the card first, then animate in
+      setIsCardVisible(true);
+      cardY.value = 30;
+      cardOpacity.value = 0;
       cardY.value = withSpring(0, { damping: 16, stiffness: 220 });
       cardOpacity.value = withTiming(1, { duration: 200 });
-    } else {
+    } else if (isCardVisible) {
+      // Animate out, then unmount
       cardY.value = withTiming(30, { duration: 200 });
-      cardOpacity.value = withTiming(0, { duration: 200 });
+      cardOpacity.value = withTiming(0, { duration: 200 }, (finished) => {
+        if (finished) runOnJS(setIsCardVisible)(false);
+      });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCourt]);
 
   const isPastGame = (scheduledTime: string | null) => {
@@ -666,14 +675,14 @@ export default function HomeScreen() {
         )}
       </SafeAreaView>
 
-      {selectedCourt && !isSelectingLocation && (
+      {isCardVisible && !isSelectingLocation && (
         <ReAnimated.View style={[styles.bottomCardAnimWrapper, cardStyle]}>
           <BottomCard
-            court={selectedCourt}
+            court={selectedCourt!}
             userId={user?.id}
             token={token}
             onJoined={(newCount) => {
-              setGames(prev => prev.map(g => g.id === selectedCourt.id ? { ...g, participant_count: newCount, is_joined: true } : g));
+              setGames(prev => prev.map(g => g.id === selectedCourt!.id ? { ...g, participant_count: newCount, is_joined: true } : g));
               setSelectedCourt(prev => prev ? { ...prev, participant_count: newCount, is_joined: true } : prev);
             }}
           />
