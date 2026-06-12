@@ -311,7 +311,7 @@ export default function HomeScreen() {
         setMapRegion({ latitude, longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 });
         await fetchCourts(latitude, longitude);
       } catch (err) {
-        console.error('Location error:', err);
+        console.warn('Location error:', err);
         await fetchCourts(32.0853, 34.7818);
       }
     };
@@ -324,7 +324,7 @@ export default function HomeScreen() {
       const data = await res.json();
       if (data.success) setCourts(data.courts);
     } catch (err) {
-      console.error('Courts fetch error:', err);
+      console.warn('Courts fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -339,7 +339,7 @@ export default function HomeScreen() {
           const data = await res.json();
           if (data.success) setGames(data.games);
         } catch (err) {
-          console.error('Games fetch error:', err);
+          console.warn('Games fetch error:', err);
         }
       };
       const fetchMe = async () => {
