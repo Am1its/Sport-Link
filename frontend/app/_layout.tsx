@@ -67,20 +67,26 @@ function RootLayout() {
       <AppServices />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="register" />
-        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="login" options={{ animation: 'fade' }} />
+        <Stack.Screen name="register" options={{ animation: 'fade' }} />
+        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="game-chat" />
         <Stack.Screen name="friends" />
-        <Stack.Screen name="court-detail" />
+        <Stack.Screen name="court-detail" options={{ animationDuration: 380 }} />
         <Stack.Screen name="player-matching" />
         <Stack.Screen name="direct-chat" />
         <Stack.Screen name="game/[id]" />
         <Stack.Screen name="activity" />
         <Stack.Screen name="invite/[id]" />
         <Stack.Screen name="blocked-users" />
+        <Stack.Screen name="player-profile" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="game-participants" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="notification-inbox" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="game-results" options={{ animationDuration: 380 }} />
+        <Stack.Screen name="leaderboard" options={{ animationDuration: 380 }} />
+        <Stack.Screen name="rate-players" options={{ animationDuration: 380 }} />
       </Stack>
     </AuthProvider>
   );
