@@ -290,6 +290,17 @@ export default function HomeScreen() {
     longitudeDelta: 0.05,
   });
 
+  // Tab entrance fade
+  const tabOpacity = useSharedValue(0);
+  const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
+
+  useFocusEffect(
+    useCallback(() => {
+      tabOpacity.value = 0;
+      tabOpacity.value = withTiming(1, { duration: 180 });
+    }, [])
+  );
+
   // Bottom card entrance/exit animation
   const cardY = useSharedValue(30);
   const cardOpacity = useSharedValue(0);
@@ -446,7 +457,7 @@ export default function HomeScreen() {
   const visibleGameCount = filteredGames.length;
 
   return (
-    <View style={styles.container}>
+    <ReAnimated.View style={[styles.container, tabFadeStyle]}>
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -771,7 +782,7 @@ export default function HomeScreen() {
           />
         </View>
       )}
-    </View>
+    </ReAnimated.View>
   );
 }
 

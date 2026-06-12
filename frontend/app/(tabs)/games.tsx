@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -295,6 +296,16 @@ export default function GamesScreen() {
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const tabOpacity = useSharedValue(0);
+  const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
+
+  useFocusEffect(
+    useCallback(() => {
+      tabOpacity.value = 0;
+      tabOpacity.value = withTiming(1, { duration: 180 });
+    }, [])
+  );
+
   const removeGame      = (id: number) => setGames(prev => prev.filter(g => g.id !== id));
   const markCompleted   = (id: number) =>
     setGames(prev => prev.map(g => g.id === id ? { ...g, status: 'completed' } : g));
@@ -440,7 +451,7 @@ export default function GamesScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, tabFadeStyle]}>
       <Text style={styles.title}>My Schedule</Text>
 
       {loading ? (
@@ -486,7 +497,7 @@ export default function GamesScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

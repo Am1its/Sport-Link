@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Image, TextInput, Alert, ActivityIndicator,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -57,6 +58,16 @@ export default function ProfileScreen() {
   const [editAvatar, setEditAvatar]     = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  const tabOpacity = useSharedValue(0);
+  const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
+
+  useFocusEffect(
+    useCallback(() => {
+      tabOpacity.value = 0;
+      tabOpacity.value = withTiming(1, { duration: 180 });
+    }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -152,6 +163,7 @@ export default function ProfileScreen() {
   const currentStreak = stats?.current_streak ?? 0;
 
   return (
+    <Animated.View style={[{ flex: 1, backgroundColor: Colors.bg }, tabFadeStyle]}>
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
       {/* ── Hero band — layered for depth ── */}
@@ -389,6 +401,7 @@ export default function ProfileScreen() {
       </View>
 
     </ScrollView>
+    </Animated.View>
   );
 }
 

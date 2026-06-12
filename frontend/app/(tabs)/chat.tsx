@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
@@ -44,6 +45,16 @@ export default function ChatScreen() {
   const [loading, setLoading]     = useState(true);
 
   const totalUnread = dms.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+
+  const tabOpacity = useSharedValue(0);
+  const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
+
+  useFocusEffect(
+    useCallback(() => {
+      tabOpacity.value = 0;
+      tabOpacity.value = withTiming(1, { duration: 180 });
+    }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -154,7 +165,7 @@ export default function ChatScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, tabFadeStyle]}>
       <Text style={styles.title}>Messages</Text>
 
       {/* Tab switcher */}
@@ -230,7 +241,7 @@ export default function ChatScreen() {
           />
         )
       )}
-    </View>
+    </Animated.View>
   );
 }
 

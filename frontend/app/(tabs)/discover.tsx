@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TextInput, FlatList, Modal,
   TouchableOpacity, RefreshControl,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -39,6 +40,16 @@ export default function DiscoverScreen() {
   const userLocation = useRef<{ lat: number; lng: number } | null>(null);
   const searchRef    = useRef('');
   searchRef.current  = search;
+
+  const tabOpacity = useSharedValue(0);
+  const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
+
+  useFocusEffect(
+    useCallback(() => {
+      tabOpacity.value = 0;
+      tabOpacity.value = withTiming(1, { duration: 180 });
+    }, [])
+  );
 
   const fetchGames = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -120,7 +131,7 @@ export default function DiscoverScreen() {
   const radiusLabel = radiusKm === null ? 'Any Distance' : `${radiusKm} km`;
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, tabFadeStyle]}>
       <Text style={styles.title}>Find Games</Text>
 
       {/* Search bar */}
@@ -328,7 +339,7 @@ export default function DiscoverScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </Animated.View>
   );
 }
 
