@@ -1,14 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Alert, Image,
+  ActivityIndicator, Alert, Image, Pressable,
 } from 'react-native';
+import Animated, {
+  useSharedValue, useAnimatedStyle,
+  withSpring, withTiming, withSequence, withDelay,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
-import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
+import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { usePressAnimation, useEntranceAnimation, useStaggerEntrance } from '../hooks/useAnimations';
 
 type Player = { id: number; username: string; avatar: string | null };
 
@@ -45,6 +51,110 @@ function AvatarCircle({ player, onPress }: { player: Player; onPress?: () => voi
   return inner;
 }
 
+function AttendanceButton({
+  value, isSelected, onPress, isNoShow,
+}: { value: boolean; isSelected: boolean; onPress: () => void; isNoShow?: boolean }) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({
+    scaleDown: 0.88, scaleUp: 1.12, stiffness: 500, damping: 18,
+  });
+  const bgOpacity = useSharedValue(isSelected ? 1 : 0);
+
+  useEffect(() => {
+    bgOpacity.value = withTiming(isSelected ? 1 : 0, { duration: 180 });
+  }, [isSelected]);
+
+  const bgStyle = useAnimatedStyle(() => ({ opacity: bgOpacity.value }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={() => {
+          Haptics.impactAsync(isNoShow ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium);
+          onPress();
+        }}
+        style={styles.toggleBtn}
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, styles.toggleBtnBg, bgStyle,
+          { backgroundColor: isNoShow ? Colors.errorFaint : Colors.accentFaint }]} />
+        <Ionicons
+          name={value ? 'checkmark-circle' : 'close-circle'}
+          size={26}
+          color={isSelected ? (isNoShow ? Colors.error : Colors.accent) : Colors.textMuted}
+        />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function ThumbButton({
+  isUp, isSelected, onPress,
+}: { isUp: boolean; isSelected: boolean; onPress: () => void }) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({
+    scaleDown: 0.88, scaleUp: 1.12, stiffness: 500, damping: 18,
+  });
+  const nudgeY = useSharedValue(0);
+
+  const handlePress = () => {
+    Haptics.selectionAsync();
+    if (isUp) nudgeY.value = withSequence(withSpring(-4, { stiffness: 600 }), withSpring(0, { stiffness: 300 }));
+    onPress();
+  };
+
+  const nudgeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: nudgeY.value }],
+  }));
+
+  return (
+    <Animated.View style={[animatedStyle, nudgeStyle]}>
+      <Pressable
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={handlePress}
+        style={[styles.thumbBtn, isSelected && (isUp ? styles.thumbBtnUp : styles.thumbBtnDown)]}
+      >
+        <Ionicons
+          name={isUp ? 'thumbs-up' : 'thumbs-down'}
+          size={20}
+          color={isSelected ? (isUp ? Colors.accent : Colors.error) : Colors.textMuted}
+        />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function AnimatedStar({
+  index, filled, onPress,
+}: { index: number; filled: boolean; onPress: () => void }) {
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (filled) {
+      scale.value = withDelay(
+        index * 60,
+        withSequence(withSpring(1.3, { stiffness: 500 }), withSpring(1, { stiffness: 300 })),
+      );
+    }
+  }, [filled]);
+
+  const starStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable onPress={() => { Haptics.selectionAsync(); onPress(); }}>
+      <Animated.View style={starStyle}>
+        <Ionicons
+          name={filled ? 'star' : 'star-outline'}
+          size={28}
+          color={filled ? Colors.yellow : Colors.textMuted}
+        />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function RatePlayersScreen() {
   const router = useRouter();
   const { gameId, sport, scheduledTime } = useLocalSearchParams();
@@ -57,6 +167,24 @@ export default function RatePlayersScreen() {
   const [loading, setLoading]       = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]             = useState(false);
+
+  // Done screen entrance animations
+  const circleScale    = useSharedValue(0.3);
+  const circleEntrance = useEntranceAnimation(0);
+  const textEntrance   = useEntranceAnimation(300);
+  const btn1Entrance   = useStaggerEntrance(0, 500);
+  const btn2Entrance   = useStaggerEntrance(1, 500);
+
+  useEffect(() => {
+    if (done) {
+      circleScale.value = withSpring(1, { stiffness: 200, damping: 14 });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [done]);
+
+  const circleScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: circleScale.value }],
+  }));
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -151,25 +279,31 @@ export default function RatePlayersScreen() {
   if (done) {
     return (
       <View style={styles.center}>
-        <View style={styles.doneIconWrap}>
-          <Ionicons name="checkmark-circle" size={56} color={Colors.accent} />
-        </View>
-        <Text style={styles.doneTitle}>{isHost ? 'Attendance Saved!' : 'Ratings Submitted!'}</Text>
-        <Text style={styles.doneSubtitle}>
-          {isHost ? 'Player karma has been updated.' : 'Your feedback helps build a trustworthy community.'}
-        </Text>
-        <TouchableOpacity
-          style={styles.doneBtn}
-          onPress={() => router.replace({
-            pathname: '/game-results' as any,
-            params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
-          })}
-        >
-          <Text style={styles.doneBtnText}>View Results</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.doneSecondaryBtn} onPress={() => router.back()}>
-          <Text style={styles.doneSecondaryBtnText}>Back to My Games</Text>
-        </TouchableOpacity>
+        <Animated.View style={[styles.doneIconWrap, circleScaleStyle, circleEntrance]}>
+          <Ionicons name="checkmark" size={52} color={Colors.success} />
+        </Animated.View>
+        <Animated.View style={textEntrance}>
+          <Text style={styles.doneTitle}>{isHost ? 'Attendance Saved!' : 'Ratings Submitted!'}</Text>
+          <Text style={styles.doneSubtitle}>
+            {isHost ? 'Player karma has been updated.' : 'Your feedback helps build a trustworthy community.'}
+          </Text>
+        </Animated.View>
+        <Animated.View style={btn1Entrance}>
+          <TouchableOpacity
+            style={styles.doneBtn}
+            onPress={() => router.replace({
+              pathname: '/game-results' as any,
+              params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
+            })}
+          >
+            <Text style={styles.doneBtnText}>View Results</Text>
+          </TouchableOpacity>
+        </Animated.View>
+        <Animated.View style={btn2Entrance}>
+          <TouchableOpacity style={styles.doneSecondaryBtn} onPress={() => router.back()}>
+            <Text style={styles.doneSecondaryBtnText}>Back to My Games</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     );
   }
@@ -236,20 +370,18 @@ export default function RatePlayersScreen() {
                       )}
                     </View>
                     <View style={styles.attendanceRow}>
-                      <TouchableOpacity
-                        style={[styles.attendBtn, status === true && styles.attendBtnArrived]}
+                      <AttendanceButton
+                        value={true}
+                        isSelected={status === true}
                         onPress={() => setAttended(item.id, true)}
-                      >
-                        <Ionicons name="checkmark-circle" size={20} color={status === true ? Colors.bg : Colors.textSub} />
-                        <Text style={[styles.attendText, status === true && styles.attendTextArrived]}>Arrived</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.attendBtn, status === false && styles.attendBtnNoShow]}
+                        isNoShow={false}
+                      />
+                      <AttendanceButton
+                        value={false}
+                        isSelected={status === false}
                         onPress={() => setAttended(item.id, false)}
-                      >
-                        <Ionicons name="close-circle" size={20} color={status === false ? Colors.bg : Colors.textSub} />
-                        <Text style={[styles.attendText, status === false && styles.attendTextNoShow]}>No-Show</Text>
-                      </TouchableOpacity>
+                        isNoShow={true}
+                      />
                     </View>
                   </View>
                 );
@@ -273,18 +405,16 @@ export default function RatePlayersScreen() {
                           <Text style={styles.categoryLabel}>{cat.label}</Text>
                         </View>
                         <View style={styles.thumbRow}>
-                          <TouchableOpacity
-                            style={[styles.thumbBtn, positive && styles.thumbBtnUp]}
+                          <ThumbButton
+                            isUp={true}
+                            isSelected={positive}
                             onPress={() => setPeer(item.id, { [cat.key]: true })}
-                          >
-                            <Ionicons name={positive ? 'thumbs-up' : 'thumbs-up-outline'} size={17} color={positive ? Colors.bg : Colors.textSub} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.thumbBtn, !positive && styles.thumbBtnDown]}
+                          />
+                          <ThumbButton
+                            isUp={false}
+                            isSelected={!positive}
                             onPress={() => setPeer(item.id, { [cat.key]: false })}
-                          >
-                            <Ionicons name={!positive ? 'thumbs-down' : 'thumbs-down-outline'} size={17} color={!positive ? Colors.bg : Colors.textSub} />
-                          </TouchableOpacity>
+                          />
                         </View>
                       </View>
                     );
@@ -298,13 +428,12 @@ export default function RatePlayersScreen() {
                     </View>
                     <View style={styles.starsRow}>
                       {[1, 2, 3, 4, 5].map(star => (
-                        <TouchableOpacity key={star} onPress={() => setPeer(item.id, { skill: star })} hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}>
-                          <Ionicons
-                            name={star <= ratings.skill ? 'star' : 'star-outline'}
-                            size={26}
-                            color={star <= ratings.skill ? Colors.yellow : Colors.surface2}
-                          />
-                        </TouchableOpacity>
+                        <AnimatedStar
+                          key={star}
+                          index={star - 1}
+                          filled={star <= ratings.skill}
+                          onPress={() => setPeer(item.id, { skill: star })}
+                        />
                       ))}
                     </View>
                   </View>
@@ -348,8 +477,12 @@ const styles = StyleSheet.create({
   pendingBadge:     { backgroundColor: Colors.warningFaint, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.warningBorder },
   pendingBadgeText: { color: Colors.warning, fontSize: 11, fontWeight: '700' },
 
-  // Host attendance
+  // Host attendance — new animated toggle buttons
   attendanceRow: { flexDirection: 'row', gap: 10 },
+  toggleBtn:   { width: 44, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', backgroundColor: Colors.surface2 },
+  toggleBtnBg: { borderRadius: 10 },
+
+  // Kept for reference / empty-state compatibility (not used in main flow)
   attendBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: Radius.md, backgroundColor: Colors.surface2 },
   attendBtnArrived: { backgroundColor: Colors.accent },
   attendBtnNoShow:  { backgroundColor: Colors.error },
@@ -362,9 +495,9 @@ const styles = StyleSheet.create({
   categoryLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   categoryLabel: { fontSize: 13, color: Colors.textSub, fontWeight: '600' },
   thumbRow: { flexDirection: 'row', gap: 8 },
-  thumbBtn: { width: 44, height: 40, borderRadius: Radius.sm, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
-  thumbBtnUp:   { backgroundColor: Colors.accent },
-  thumbBtnDown: { backgroundColor: Colors.error },
+  thumbBtn:     { width: 44, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface2 },
+  thumbBtnUp:   { backgroundColor: Colors.accentFaint, borderWidth: 1, borderColor: Colors.accentBorder },
+  thumbBtnDown: { backgroundColor: Colors.errorFaint,  borderWidth: 1, borderColor: Colors.errorBorder },
 
   // Skill stars
   starsRow: { flexDirection: 'row', gap: 4 },
@@ -400,7 +533,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  doneTitle:    { fontSize: 24, fontWeight: '900', color: Colors.text, marginTop: 20 },
+  doneTitle:    { fontSize: 24, fontWeight: '900', color: Colors.text, marginTop: 20, textAlign: 'center' },
   doneSubtitle: { fontSize: 14, color: Colors.textSub, marginTop: 8, textAlign: 'center' },
   doneBtn: {
     marginTop: 30,
