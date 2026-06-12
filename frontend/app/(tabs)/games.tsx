@@ -183,23 +183,21 @@ function MyGameCard({
           {/* Actions — upcoming games */}
           {!past && (
             <View style={[styles.actionRow, { marginTop: Spacing.sm }]}>
-              <TouchableOpacity style={styles.btnGhost} onPress={onChat}>
+              <TouchableOpacity style={[styles.btnGhost, game.is_host && { flex: 1 }]} onPress={onChat}>
                 <Ionicons name="chatbubble-outline" size={13} color={Colors.blue} />
                 <Text style={[styles.btnGhostText, { color: Colors.blue }]}>Chat</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnGhost, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]} onPress={onViewParticipants}>
+              <TouchableOpacity style={[styles.btnGhost, game.is_host && { flex: 1 }, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]} onPress={onViewParticipants}>
                 <Ionicons name="people-outline" size={13} color={Colors.purple} />
                 <Text style={[styles.btnGhostText, { color: Colors.purple }]}>Players</Text>
               </TouchableOpacity>
               {game.is_host ? (
                 <>
-                  <TouchableOpacity style={[styles.btnGhost, { borderColor: Colors.border, backgroundColor: Colors.surface2 }]} onPress={onEdit}>
-                    <Ionicons name="pencil-outline" size={13} color={Colors.text} />
-                    <Text style={[styles.btnGhostText, { color: Colors.text }]}>Edit</Text>
+                  <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.border, backgroundColor: Colors.surface2 }]} onPress={onEdit}>
+                    <Ionicons name="pencil-outline" size={15} color={Colors.text} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.btnGhost, { borderColor: Colors.errorBorder, backgroundColor: Colors.errorFaint }]} onPress={onDelete}>
-                    <Ionicons name="trash-outline" size={13} color={Colors.error} />
-                    <Text style={[styles.btnGhostText, { color: Colors.error }]}>Delete</Text>
+                  <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.errorBorder, backgroundColor: Colors.errorFaint }]} onPress={onDelete}>
+                    <Ionicons name="trash-outline" size={15} color={Colors.error} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.btnGhost, boostedAt
@@ -527,10 +525,11 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { ...Type.meta, color: Colors.textMuted },
 
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: Spacing.md, flexWrap: 'wrap' },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: Spacing.md },
 
   btnGhost:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 32, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.blueBorder, backgroundColor: Colors.blueFaint, paddingHorizontal: 10 },
   btnGhostText: { fontWeight: '700', fontSize: 12, color: Colors.blue },
+  btnIcon:      { width: 32, height: 32, borderRadius: Radius.md, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
 
   btnPrimary:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 36, borderRadius: Radius.md },
   btnPrimaryText: { color: Colors.bg, fontWeight: '800', fontSize: 13 },
