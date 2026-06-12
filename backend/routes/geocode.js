@@ -31,12 +31,12 @@ router.get('/', async (req, res) => {
     const term = typeof q === 'string' ? q.trim() : '';
     if (term.length < 2) return res.json({ success: true, results: [] });
 
-    const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-      params: { address: term, key: API_KEY, language: 'en', region: 'il' },
+    const response = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
+      params: { query: term, key: API_KEY, language: 'en', region: 'il' },
     });
 
     const results = (response.data.results ?? []).slice(0, 5).map(r => ({
-      name: r.formatted_address,
+      name: r.formatted_address || r.name,
       lat:  r.geometry.location.lat,
       lng:  r.geometry.location.lng,
     }));
