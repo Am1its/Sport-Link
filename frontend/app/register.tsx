@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
-  Animated,
+  Animated, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -123,6 +123,8 @@ export default function RegisterScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
@@ -217,6 +219,8 @@ export default function RegisterScreen() {
             <Text style={styles.footerLink}>Sign in →</Text>
           </TouchableOpacity>
         </View>
+      </View>
+      </TouchableWithoutFeedback>
       </ScrollView>
     </KeyboardAvoidingView>
   );
