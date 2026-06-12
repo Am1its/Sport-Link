@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const { SOCKET_EVENTS } = require('../constants/socketEvents');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -78,7 +79,7 @@ router.get('/:userId', async (req, res) => {
     );
     if (markResult.affectedRows > 0) {
       const io = req.app.get('io');
-      if (io) io.to(`user_${other}`).emit('dm_read', { readBy: me });
+      if (io) io.to(`user_${other}`).emit(SOCKET_EVENTS.DM_READ, { readBy: me });
     }
 
     const [messages] = await pool.execute(`
@@ -140,7 +141,7 @@ router.post('/:userId', async (req, res) => {
     ]);
 
     const io = req.app.get('io');
-    if (io) io.to(`user_${other}`).emit('new_dm', msgForReceiver);
+    if (io) io.to(`user_${other}`).emit(SOCKET_EVENTS.NEW_DM, msgForReceiver);
 
     res.status(201).json({ success: true, message: msgForSender });
   } catch (err) {
@@ -162,7 +163,7 @@ router.put('/:userId/read', async (req, res) => {
     );
     // Notify the sender their messages were read
     const io = req.app.get('io');
-    if (io) io.to(`user_${other}`).emit('dm_read', { readBy: me });
+    if (io) io.to(`user_${other}`).emit(SOCKET_EVENTS.DM_READ, { readBy: me });
     res.json({ success: true });
   } catch (err) {
     console.error('DM read error:', err);

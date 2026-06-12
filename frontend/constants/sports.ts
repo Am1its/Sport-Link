@@ -1,3 +1,14 @@
+/**
+ * All supported sport keys — single source of truth.
+ * Use SportType for typed sport parameters throughout the app.
+ */
+export const SPORT_TYPES = [
+  'basketball', 'tennis', 'volleyball', 'football',
+  'yoga', 'gym', 'studio', 'footvolley', 'swimming',
+] as const;
+
+export type SportType = typeof SPORT_TYPES[number];
+
 export const SPORT_COLORS: Record<string, string> = {
   basketball: '#FF8C00',
   tennis:     '#CCFF00',

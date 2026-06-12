@@ -14,6 +14,7 @@ import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { SOCKET_EVENTS } from '../constants/events';
 
 type DmMessage = {
   id: number;
@@ -118,7 +119,7 @@ export default function DirectChatScreen() {
     const socket = io(API_BASE, { auth: { token } });
     socketRef.current = socket;
 
-    socket.on('new_dm', (msg: DmMessage) => {
+    socket.on(SOCKET_EVENTS.NEW_DM, (msg: DmMessage) => {
       if (msg.sender_id !== otherId && msg.receiver_id !== otherId) return;
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
       fetchAvatars([msg.sender_id]);
@@ -126,14 +127,14 @@ export default function DirectChatScreen() {
       setIsTyping(false);
     });
 
-    socket.on('dm_typing', ({ from }: { from: number }) => {
+    socket.on(SOCKET_EVENTS.DM_TYPING, ({ from }: { from: number }) => {
       if (from !== otherId) return;
       setIsTyping(true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
     });
 
-    socket.on('dm_read', ({ readBy }: { readBy: number }) => {
+    socket.on(SOCKET_EVENTS.DM_READ, ({ readBy }: { readBy: number }) => {
       if (readBy !== otherId) return;
       setMessages(prev => prev.map(m => m.sender_id === user?.id ? { ...m, is_read: true } : m));
     });
@@ -356,7 +357,7 @@ export default function DirectChatScreen() {
             setInput(text);
             const now = Date.now();
             if (text.length > 0 && now - lastTypingEmit.current > 2000 && socketRef.current?.connected) {
-              socketRef.current.emit('dm_typing', { to: otherId });
+              socketRef.current.emit(SOCKET_EVENTS.DM_TYPING, { to: otherId });
               lastTypingEmit.current = now;
             }
           }}

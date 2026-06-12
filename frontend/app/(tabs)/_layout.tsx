@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { Colors } from '../../constants/theme';
 import { API_BASE } from '../../constants/api';
+import { SOCKET_EVENTS } from '../../constants/events';
 
 export default function TabLayout() {
   const { token } = useAuth();
@@ -53,7 +54,7 @@ export default function TabLayout() {
   useEffect(() => {
     if (!token) return;
     const socket = io(API_BASE, { auth: { token } });
-    socket.on('new_dm', () => checkUnread());
+    socket.on(SOCKET_EVENTS.NEW_DM, () => checkUnread());
     return () => { socket.disconnect(); };
   }, [token, checkUnread]);
 

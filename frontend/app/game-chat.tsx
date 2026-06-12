@@ -13,6 +13,7 @@ import { getAvatarColor } from '../utils/avatar';
 import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
 import { Colors, Radius } from '../constants/theme';
+import { SOCKET_EVENTS } from '../constants/events';
 
 const MAX_MESSAGE_LENGTH = 1000;
 const PAGE_SIZE = 30;
@@ -108,8 +109,8 @@ export default function GameChatScreen() {
 
     const socket = io(API_BASE, { auth: { token } });
     socketRef.current = socket;
-    socket.emit('join_game', id);
-    socket.on('new_message', (msg: Message) => {
+    socket.emit(SOCKET_EVENTS.JOIN_GAME, id);
+    socket.on(SOCKET_EVENTS.NEW_MESSAGE, (msg: Message) => {
       setMessages(prev => {
         if (prev.some(m => m.id === msg.id)) return prev;
         return [msg, ...prev]; // newest first
@@ -129,7 +130,7 @@ export default function GameChatScreen() {
     const content = input.trim();
     setInput('');
     if (socketRef.current?.connected) {
-      socketRef.current.emit('send_message', { gameId: id, content });
+      socketRef.current.emit(SOCKET_EVENTS.SEND_MESSAGE, { gameId: id, content });
     } else {
       setSending(true);
       apiFetch(`/api/chats/${id}/messages`, { method: 'POST', token, body: JSON.stringify({ content }) })
