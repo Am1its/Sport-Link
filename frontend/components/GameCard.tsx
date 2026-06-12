@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   equipRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   equipText: { color: Colors.textMuted, fontSize: 12, flex: 1 },
 
-  joinBtnWrap: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border },
+  joinBtnWrap: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border, overflow: 'hidden' },
   joinRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   joinBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 44, borderRadius: Radius.pill },
   joinBtnMuted:    { backgroundColor: Colors.surface2 },
@@ -311,6 +311,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: Colors.accent,
     bottom: 22,
-    left: '50%',
+    alignSelf: 'center',
   },
 });
