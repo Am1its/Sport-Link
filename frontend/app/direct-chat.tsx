@@ -122,7 +122,7 @@ export default function DirectChatScreen() {
         fetchAvatars(ids);
       }
     } catch (err) {
-      if (!(err instanceof UnauthorizedError)) console.error('DM fetch error:', err);
+      if (!(err instanceof UnauthorizedError)) console.warn('DM fetch error:', err);
     } finally {
       setLoading(false);
     }

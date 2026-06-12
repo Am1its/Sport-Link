@@ -91,7 +91,7 @@ export default function GameChatScreen() {
         fetchAvatars(otherIds);
       }
     } catch (err) {
-      console.error('Fetch messages error:', err);
+      console.warn('Fetch messages error:', err);
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export default function GameChatScreen() {
       apiFetch(`/api/chats/${id}/messages`, { method: 'POST', token, body: JSON.stringify({ content }) })
         .then(r => r.json())
         .then(data => { if (data.success) setMessages(prev => [data.message, ...prev]); })
-        .catch(err => { if (!(err instanceof UnauthorizedError)) console.error('Send message error:', err); })
+        .catch(err => { if (!(err instanceof UnauthorizedError)) console.warn('Send message error:', err); })
         .finally(() => setSending(false));
     }
   };

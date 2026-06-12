@@ -20,18 +20,15 @@ export function ChatBubble({
   messageId, userId, username, content, createdAt,
   isMine, avatar, onAvatarPress, formatTime,
 }: ChatBubbleProps) {
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(10);
-  const translateX = useSharedValue(isMine ? 0 : -8);
+  const translateY = useSharedValue(8);
+  const translateX = useSharedValue(isMine ? 0 : -6);
 
   useEffect(() => {
-    opacity.value = withSpring(1, { stiffness: 200, damping: 20 });
-    translateY.value = withSpring(0, { stiffness: 200, damping: 20 });
-    translateX.value = withSpring(0, { stiffness: 250, damping: 22 });
+    translateY.value = withSpring(0, { stiffness: 220, damping: 22 });
+    translateX.value = withSpring(0, { stiffness: 260, damping: 24 });
   }, []);
 
   const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
     transform: [{ translateY: translateY.value }, { translateX: translateX.value }],
   }));
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   TextInput, ActivityIndicator, Alert, RefreshControl, Share,
@@ -31,6 +31,7 @@ export default function FriendsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchAll = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -54,16 +55,23 @@ export default function FriendsScreen() {
 
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
 
-  const handleSearch = useCallback(async (q: string) => {
+  const handleSearch = useCallback((q: string) => {
     setSearchQuery(q);
-    if (q.trim().length < 2) { setSearchResults([]); return; }
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (q.trim().length < 2) { setSearchResults([]); setSearching(false); return; }
     setSearching(true);
-    try {
-      const res = await apiFetch(`/api/users/search?q=${encodeURIComponent(q.trim())}`, { token });
-      const data = await res.json();
-      if (data.success) setSearchResults(data.users);
-    } catch {}
-    finally { setSearching(false); }
+    searchDebounce.current = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/users/search?q=${encodeURIComponent(q.trim())}`, { token });
+        const data = await res.json();
+        if (data.success) setSearchResults(data.users);
+      } catch (err) {
+        if (err instanceof UnauthorizedError) return;
+        console.warn('User search error:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
   }, [token]);
 
   const sendRequest = async (addresseeId: number) => {

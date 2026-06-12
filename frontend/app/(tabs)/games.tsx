@@ -184,14 +184,27 @@ function MyGameCard({
           {/* Actions — upcoming games */}
           {!past && (
             <View style={[styles.actionRow, { marginTop: Spacing.sm }]}>
-              <TouchableOpacity style={[styles.btnGhost, game.is_host && { flex: 1 }]} onPress={onChat}>
-                <Ionicons name="chatbubble-outline" size={13} color={Colors.blue} />
-                <Text style={[styles.btnGhostText, { color: Colors.blue }]}>Chat</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnGhost, game.is_host && { flex: 1 }, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]} onPress={onViewParticipants}>
-                <Ionicons name="people-outline" size={13} color={Colors.purple} />
-                <Text style={[styles.btnGhostText, { color: Colors.purple }]}>Players</Text>
-              </TouchableOpacity>
+              {game.is_host ? (
+                <>
+                  <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.blueBorder, backgroundColor: Colors.blueFaint }]} onPress={onChat}>
+                    <Ionicons name="chatbubble-outline" size={15} color={Colors.blue} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]} onPress={onViewParticipants}>
+                    <Ionicons name="people-outline" size={15} color={Colors.purple} />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity style={[styles.btnGhost]} onPress={onChat}>
+                    <Ionicons name="chatbubble-outline" size={13} color={Colors.blue} />
+                    <Text style={[styles.btnGhostText, { color: Colors.blue }]}>Chat</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.btnGhost, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]} onPress={onViewParticipants}>
+                    <Ionicons name="people-outline" size={13} color={Colors.purple} />
+                    <Text style={[styles.btnGhostText, { color: Colors.purple }]}>Players</Text>
+                  </TouchableOpacity>
+                </>
+              )}
               {game.is_host ? (
                 <>
                   <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.border, backgroundColor: Colors.surface2 }]} onPress={onEdit}>

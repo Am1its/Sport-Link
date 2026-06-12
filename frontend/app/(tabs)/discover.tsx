@@ -91,7 +91,7 @@ export default function DiscoverScreen() {
       if (data.success) setGames(data.games);
     } catch (err) {
       if (err instanceof UnauthorizedError) return;
-      console.error('Discover fetch error:', err);
+      console.warn('Discover fetch error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);

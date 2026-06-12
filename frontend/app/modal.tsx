@@ -9,10 +9,13 @@ import Animated, {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
+
+const PENDING_MAP_PAN_KEY = 'pending_map_pan';
 import { reverseGeocode } from '../utils/geocode';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS } from '../constants/sports';
@@ -150,7 +153,8 @@ export default function GameFormModal() {
 
   const parseInitialDate = (): Date | null => {
     if (!params.existingTime) return null;
-    const d = new Date(params.existingTime as string);
+    const raw = (params.existingTime as string).replace(' ', 'T') + ':00';
+    const d = new Date(raw);
     return isNaN(d.getTime()) ? null : d;
   };
   const [scheduledDate, setScheduledDate] = useState<Date | null>(parseInitialDate);
@@ -209,6 +213,12 @@ export default function GameFormModal() {
       if (!data.success) return Alert.alert('Error', data.message);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (!isEdit) {
+        AsyncStorage.setItem(PENDING_MAP_PAN_KEY, JSON.stringify({
+          lat: parseFloat(params.lat as string),
+          lng: parseFloat(params.lng as string),
+        })).catch(() => {});
+      }
       sheetOpacity.value = withTiming(0, { duration: 250 });
       sheetScale.value = withTiming(0.97, { duration: 250 });
       setTimeout(() => router.back(), 260);

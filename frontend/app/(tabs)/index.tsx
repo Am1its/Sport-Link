@@ -22,6 +22,7 @@ import AvatarCircle from '../../components/AvatarCircle';
 import type { MapItem, Participant } from '../../types';
 
 const RECENT_SEARCHES_KEY = 'map_recent_searches';
+const PENDING_MAP_PAN_KEY = 'pending_map_pan';
 
 const { width } = Dimensions.get('window');
 
@@ -281,6 +282,7 @@ export default function HomeScreen() {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery]       = useState('');
   const [searchResults, setSearchResults]   = useState<GeoResult[]>([]);
+  const [searchLoading, setSearchLoading]   = useState(false);
   const [recentSearches, setRecentSearches] = useState<GeoResult[]>([]);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -343,10 +345,12 @@ export default function HomeScreen() {
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
     if (searchDebounce.current) clearTimeout(searchDebounce.current);
-    if (text.trim().length < 2) { setSearchResults([]); return; }
+    if (text.trim().length < 2) { setSearchResults([]); setSearchLoading(false); return; }
+    setSearchLoading(true);
     searchDebounce.current = setTimeout(async () => {
       const results = await searchPlaces(text);
       setSearchResults(results);
+      setSearchLoading(false);
     }, 400);
   };
 
@@ -424,8 +428,25 @@ export default function HomeScreen() {
           }
         } catch {}
       };
+      const panToNewGame = async () => {
+        try {
+          const raw = await AsyncStorage.getItem(PENDING_MAP_PAN_KEY);
+          if (!raw) return;
+          await AsyncStorage.removeItem(PENDING_MAP_PAN_KEY);
+          const { lat, lng } = JSON.parse(raw);
+          setTimeout(() => {
+            mapRef.current?.animateToRegion({
+              latitude: lat,
+              longitude: lng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }, 600);
+          }, 400);
+        } catch {}
+      };
       fetchGames();
       fetchMe();
+      panToNewGame();
     }, [token])
   );
 
@@ -619,7 +640,7 @@ export default function HomeScreen() {
             </View>
 
             {/* Search dropdown */}
-            {searchExpanded && (searchResults.length > 0 || (searchQuery.length < 2 && recentSearches.length > 0)) && (
+            {searchExpanded && (searchQuery.length >= 2 || recentSearches.length > 0) && (
               <View style={styles.searchDropdown}>
                 {searchQuery.length < 2 && recentSearches.length > 0 && (
                   <>
@@ -631,6 +652,18 @@ export default function HomeScreen() {
                       </TouchableOpacity>
                     ))}
                   </>
+                )}
+                {searchQuery.length >= 2 && searchLoading && (
+                  <View style={styles.searchDropdownItem}>
+                    <ActivityIndicator size="small" color="#0FEA95" />
+                    <Text style={[styles.searchDropdownText, { color: '#8E8E93' }]}>Searching...</Text>
+                  </View>
+                )}
+                {searchQuery.length >= 2 && !searchLoading && searchResults.length === 0 && (
+                  <View style={styles.searchDropdownItem}>
+                    <Ionicons name="search-outline" size={15} color="#8E8E93" />
+                    <Text style={[styles.searchDropdownText, { color: '#8E8E93' }]}>No results found</Text>
+                  </View>
                 )}
                 {searchResults.map(place => (
                   <TouchableOpacity key={place.name} style={styles.searchDropdownItem} onPress={() => handleSelectPlace(place)}>
