@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { API_BASE } from '../constants/api';
+import { API } from '../constants/endpoints';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 import type { Game } from '../types';
@@ -57,7 +58,7 @@ export function GameCard({
     if (!isFull) onJoined(game.id, game.participant_count + 1);
     setJoining(true);
     try {
-      const res  = await apiFetch(`/api/games/${game.id}/join`, { method: 'POST', token });
+      const res  = await apiFetch(API.gameJoin(game.id), { method: 'POST', token });
       const data = await res.json();
       if (!data.success) {
         if (!isFull) onJoined(game.id, game.participant_count);

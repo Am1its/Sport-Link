@@ -1,18 +1,16 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList, Modal,
-  TouchableOpacity, ActivityIndicator, Alert, Animated, RefreshControl, Image, Share,
+  TouchableOpacity, RefreshControl,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
-import { API_BASE } from '../../constants/api';
 import { isPastGame, getTodayRange, getThisWeekendRange, getThisWeekRange, DateRange } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS, sportLabel } from '../../constants/sports';
-import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
+import { Colors, Spacing, Radius, Type } from '../../constants/theme';
 import { DiscoverSkeleton } from '../../components/SkeletonLoader';
 import { GameCard } from '../../components/GameCard';
 import type { Game } from '../../types';
@@ -372,53 +370,6 @@ const styles = StyleSheet.create({
   modalOptionHighlight:  { backgroundColor: Colors.accentFaint },
   modalOptionHighlightBlue: { backgroundColor: Colors.blueFaint },
   modalOptionText:       { flex: 1, color: Colors.textSub, fontSize: 15, fontWeight: '600' },
-
-  // Card
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    marginBottom: Spacing.md,
-    overflow: 'hidden',
-  },
-  cardJoined: { borderWidth: 1.5, borderColor: Colors.accentBorder },
-  accentBar:  { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, zIndex: 1 },
-  cardPhoto:   { width: '100%', height: 170 },
-  cardContent: { padding: 14, paddingLeft: 18 },
-  cardTop:     { flexDirection: 'row', gap: 12, marginBottom: Spacing.sm },
-  iconCircle:  { width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
-  cardInfo:    { flex: 1 },
-
-  sportRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  sportLabel:  { ...Type.cardSport },
-  joinedChip:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.accentFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.accentBorder, paddingHorizontal: 6, paddingVertical: 2 },
-  joinedChipText: { color: Colors.accent, fontSize: 10, fontWeight: '800' },
-  waitlistChip:     { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.warningFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.warningBorder, paddingHorizontal: 6, paddingVertical: 2 },
-  waitlistChipText: { color: Colors.warning, fontSize: 10, fontWeight: '800' },
-  myBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.accentFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.accentBorder, paddingHorizontal: 6, paddingVertical: 2 },
-  myBadgeText:    { color: Colors.accent, fontSize: 10, fontWeight: '800' },
-  urgencyBadge:   { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: Colors.warningFaint, borderRadius: 6, borderWidth: 1, borderColor: Colors.warningBorder, paddingHorizontal: 6, paddingVertical: 2 },
-  urgencyText:    { color: Colors.warning, fontSize: 10, fontWeight: '800' },
-
-  cardTitle:   { ...Type.cardTitle, color: Colors.text, marginBottom: 6 },
-
-  metaRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  metaText: { ...Type.meta, color: Colors.textMuted },
-
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, marginBottom: 4 },
-  locationText:{ fontSize: 13, color: Colors.textSub, flex: 1 },
-
-  equipRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  equipText: { color: Colors.textMuted, fontSize: 12, flex: 1 },
-
-  // Join button
-  joinBtnWrap: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border },
-  joinRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  joinBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 44, borderRadius: Radius.pill },
-  joinBtnMuted:    { backgroundColor: Colors.surface2 },
-  joinBtnWaitlist: { backgroundColor: Colors.warning + '22', borderWidth: 1, borderColor: Colors.warningBorder },
-  joinBtnText: { color: Colors.bg, ...Type.btnPrimary },
-  shareBtn:    { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center' },
 
   // Empty state
   emptyIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md },

@@ -20,7 +20,7 @@ function isWithinCheckinWindow(scheduledTime: string | null): boolean {
   return diffMin >= -30 && diffMin <= 30;
 }
 
-function GameCard({
+function MyGameCard({
   game, token, onRatePlayers, onViewResults, onCloseGame, onEdit, onDelete, onLeave, onChat, onViewParticipants, onPhotoAdded,
 }: {
   game: Game;
@@ -477,13 +477,13 @@ export default function GamesScreen() {
           {upcoming.length > 0 && (
             <>
               <Text style={styles.sectionHeader}>Upcoming</Text>
-              {upcoming.map(item => <GameCard key={String(item.id)} {...makeCardProps(item)} />)}
+              {upcoming.map(item => <MyGameCard key={String(item.id)} {...makeCardProps(item)} />)}
             </>
           )}
           {history.length > 0 && (
             <>
               <Text style={[styles.sectionHeader, upcoming.length > 0 && { marginTop: Spacing.lg }]}>History</Text>
-              {history.map(item => <GameCard key={String(item.id)} {...makeCardProps(item)} />)}
+              {history.map(item => <MyGameCard key={String(item.id)} {...makeCardProps(item)} />)}
             </>
           )}
         </ScrollView>

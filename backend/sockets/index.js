@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { SOCKET_EVENTS } = require('../constants/socketEvents');
+const { isUserInGame }  = require('../utils/gameUtils');
 
 /**
  * Registers all socket.io middleware and connection handlers.
@@ -7,7 +8,6 @@ const { SOCKET_EVENTS } = require('../constants/socketEvents');
  * @param {import('mysql2/promise').Pool} pool
  */
 function registerSockets(io, pool) {
-  const { isUserInGame } = require('../utils/gameUtils');
 
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;

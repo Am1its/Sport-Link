@@ -4,11 +4,9 @@ const express = require('express');
 const { Server: IOServer } = require('socket.io');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const jwt = require('jsonwebtoken');
 
-const pool                 = require('./db');
-const sendPushNotifications = require('./utils/sendPushNotification');
-const { isUserInGame }     = require('./utils/gameUtils');
+const pool                    = require('./db');
+const sendPushNotifications   = require('./utils/sendPushNotification');
 const { checkAndAwardBadges } = require('./utils/badgeUtils');
 
 const authRoutes          = require('./routes/auth');
