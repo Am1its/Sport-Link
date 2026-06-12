@@ -267,6 +267,7 @@ export default function HomeScreen() {
   const [games, setGames] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourt, setSelectedCourt] = useState<MapItem | null>(null);
+  const lastCourtRef = useRef<MapItem | null>(null);
   const [isCardVisible, setIsCardVisible] = useState(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -311,14 +312,14 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (selectedCourt) {
-      // Mount the card first, then animate in
+      lastCourtRef.current = selectedCourt;
       setIsCardVisible(true);
       cardY.value = 30;
       cardOpacity.value = 0;
       cardY.value = withSpring(0, { damping: 16, stiffness: 220 });
       cardOpacity.value = withTiming(1, { duration: 200 });
     } else if (isCardVisible) {
-      // Animate out, then unmount
+      // Animate out, then unmount. lastCourtRef keeps the data alive during exit.
       cardY.value = withTiming(30, { duration: 200 });
       cardOpacity.value = withTiming(0, { duration: 200 }, (finished) => {
         if (finished) runOnJS(setIsCardVisible)(false);
@@ -689,7 +690,7 @@ export default function HomeScreen() {
       {isCardVisible && !isSelectingLocation && (
         <ReAnimated.View style={[styles.bottomCardAnimWrapper, cardStyle]}>
           <BottomCard
-            court={selectedCourt!}
+            court={(selectedCourt ?? lastCourtRef.current)!}
             userId={user?.id}
             token={token}
             onJoined={(newCount) => {
