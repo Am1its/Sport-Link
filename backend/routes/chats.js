@@ -49,13 +49,13 @@ router.get('/:gameId/messages', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.gameId);
   const userId = req.user.id;
 
-  if (!(await isUserInGame(gameId, userId)))
-    return res.status(403).json({ success: false, message: 'You are not part of this game' });
-
-  const limit  = Math.min(parseInt(req.query.limit ?? '30', 10) || 30, 50);
-  const before = req.query.before ? parseInt(req.query.before, 10) : null;
-
   try {
+    if (!(await isUserInGame(gameId, userId)))
+      return res.status(403).json({ success: false, message: 'You are not part of this game' });
+
+    const limit  = Math.min(parseInt(req.query.limit ?? '30', 10) || 30, 50);
+    const before = req.query.before ? parseInt(req.query.before, 10) : null;
+
     const params = [gameId];
     const beforeClause = before && !isNaN(before) ? 'AND m.id < ?' : '';
     if (before && !isNaN(before)) params.push(before);
@@ -73,8 +73,8 @@ router.get('/:gameId/messages', authMiddleware, async (req, res) => {
     // Return in chronological ASC order so the client can reverse for its display needs
     res.json({ success: true, messages: messages.reverse() });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error(`[chats] GET /:gameId/messages gameId=${gameId} userId=${userId}`, err.message, err.code);
+    res.status(500).json({ success: false, message: err.message || 'Server error' });
   }
 });
 

@@ -369,12 +369,14 @@ export default function HomeScreen() {
     setSearchExpanded(false);
     setSearchQuery('');
     setSearchResults([]);
-    mapRef.current?.animateToRegion({
-      latitude: place.lat,
-      longitude: place.lng,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
-    }, 500);
+    if (place.lat && place.lng && !isNaN(place.lat) && !isNaN(place.lng)) {
+      mapRef.current?.animateToRegion({
+        latitude: place.lat,
+        longitude: place.lng,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 500);
+    }
     // Save to recent searches (keep last 5, no duplicates)
     setRecentSearches(prev => {
       const next = [place, ...prev.filter(r => r.name !== place.name)].slice(0, 5);
@@ -450,6 +452,7 @@ export default function HomeScreen() {
           if (!raw) return;
           await AsyncStorage.removeItem(PENDING_MAP_PAN_KEY);
           const { lat, lng } = JSON.parse(raw);
+          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
           setTimeout(() => {
             mapRef.current?.animateToRegion({
               latitude: lat,
