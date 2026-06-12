@@ -88,6 +88,7 @@ function BottomCard({ court, userId, token, onJoined }: {
   const [joining, setJoining] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => () => { scaleAnim.stopAnimation(); }, []);
   const isOwnGame  = court.isLocalGame && court.host_id === userId;
   const [isJoined, setIsJoined] = useState(!!court.is_joined);
   // Host occupies one slot; participants fill max_players - 1 remaining spots

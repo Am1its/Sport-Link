@@ -59,7 +59,6 @@ router.get('/:gameId/messages', authMiddleware, async (req, res) => {
     const params = [gameId];
     const beforeClause = before && !isNaN(before) ? 'AND m.id < ?' : '';
     if (before && !isNaN(before)) params.push(before);
-    params.push(limit);
 
     const [messages] = await pool.execute(
       `SELECT m.id, m.user_id, u.username, m.content, m.created_at
@@ -67,7 +66,7 @@ router.get('/:gameId/messages', authMiddleware, async (req, res) => {
        JOIN Users u ON u.id = m.user_id
        WHERE m.game_id = ? ${beforeClause}
        ORDER BY m.id DESC
-       LIMIT ?`,
+       LIMIT ${limit}`,
       params
     );
     // Return in chronological ASC order so the client can reverse for its display needs
