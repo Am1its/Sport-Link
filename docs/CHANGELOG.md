@@ -4,6 +4,21 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Bug Fixes] — June 2026
+
+**Game Chat 500 Error**
+- Root cause: `mysql2` prepared statements do not support `LIMIT ?` bind parameters — throws "incorrect arguments to mysql_stmt_execute". Fixed by inlining the validated integer limit directly in the SQL string (`LIMIT ${limit}`).
+
+**Map Search Always Empty**
+- Root cause: `/api/geocode` was calling the Google **Geocoding API** which is not enabled on the Railway API key (only the Places API is). Switched to `place/textsearch/json` (Places Text Search), which uses the already-enabled Places API and returns equivalent results.
+
+**Map Tab Native Crashes (iOS 26)**
+- Added null/NaN coordinate guards before all `<Marker coordinate=...>` renders and `animateToRegion()` calls — passing nil coordinates causes `NSInvalidArgumentException: insertObject:atIndex: object cannot be nil` in react-native-maps native layer.
+- Stripped base64 `photo` and `post_game_photo` fields from the games list on the map tab (not displayed there; keeping them in state caused memory pressure).
+- Upgraded `react-native-maps` 1.20.1 → 1.27.2 for iOS 26 (Apple's new year-aligned versioning, introduced WWDC 2025) MapKit compatibility.
+
+---
+
 ## [Sprint 15] — June 2026 — Animations, Haptics & UX Polish
 
 **Goal:** Elevate SportLink to a premium sports-brand feel — purposeful motion, haptic feedback at every high-stakes moment, smooth screen transitions. No audio; haptics-only.
