@@ -1,15 +1,23 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Image, Alert, ActivityIndicator,
   Animated, ScrollView, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
+import ReAnimated, {
+  useSharedValue, useAnimatedStyle,
+  withSpring, withTiming,
+} from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Radius } from '../constants/theme';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import { useFloatingOrb, useStaggerEntrance } from '../hooks/useAnimations';
+import { useSound } from '../context/SoundContext';
+import { Springs } from '../constants/motion';
 
 const SPORT_ICONS = [
   'basketball', 'soccer', 'tennis', 'volleyball',
@@ -36,22 +44,36 @@ const ICON_LAYOUT = [
   { top: 145, left: 220, size: 20, opacity: 0.07, rotate: '14deg' },
 ];
 
+function FloatingIcon({ item, iconName, phase }: {
+  item: { top: number; left: number; size: number; opacity: number; rotate: string };
+  iconName: string;
+  phase: number;
+}) {
+  const floatStyle = useFloatingOrb(phase);
+  return (
+    <ReAnimated.View
+      style={[{ position: 'absolute', top: item.top, left: item.left }, floatStyle]}
+      pointerEvents="none"
+    >
+      <MaterialCommunityIcons
+        name={iconName as any}
+        size={item.size}
+        color="#FFFFFF"
+        style={{ opacity: item.opacity, transform: [{ rotate: item.rotate }] }}
+      />
+    </ReAnimated.View>
+  );
+}
+
 function SportsBg() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {ICON_LAYOUT.map((item, i) => (
-        <MaterialCommunityIcons
+        <FloatingIcon
           key={i}
-          name={SPORT_ICONS[i % SPORT_ICONS.length] as any}
-          size={item.size}
-          color="#FFFFFF"
-          style={{
-            position: 'absolute',
-            top: item.top,
-            left: item.left,
-            opacity: item.opacity,
-            transform: [{ rotate: item.rotate }],
-          }}
+          item={item}
+          iconName={SPORT_ICONS[i % SPORT_ICONS.length]}
+          phase={(i % 5) * 0.2}
         />
       ))}
     </View>
@@ -133,6 +155,25 @@ export default function LoginScreen() {
 
   const { promptAsync, loading: googleLoading, disabled: googleDisabled } = useGoogleAuth();
 
+  const { play } = useSound();
+
+  const cardTranslateY = useSharedValue(60);
+  const cardOpacity    = useSharedValue(0);
+
+  useEffect(() => {
+    cardTranslateY.value = withSpring(0, Springs.bouncy);
+    cardOpacity.value    = withTiming(1, { duration: 300 });
+  }, []);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: cardTranslateY.value }],
+    opacity: cardOpacity.value,
+  }));
+
+  const field0Style = useStaggerEntrance(0, 200);
+  const field1Style = useStaggerEntrance(1, 200);
+  const btnStyle    = useStaggerEntrance(2, 200);
+
   const handleLogin = async () => {
     if (!email.trim() || !password) {
       return Alert.alert('Missing fields', 'Please enter your email and password.');
@@ -146,6 +187,8 @@ export default function LoginScreen() {
       const data = await res.json();
       if (!data.success) return Alert.alert('Sign in failed', data.message);
       await login(data.token, data.user);
+      play('chime');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace((redirect ?? '/(tabs)') as any);
     } catch {
       Alert.alert('Error', 'Could not connect to server.');
@@ -190,7 +233,7 @@ export default function LoginScreen() {
       </View>
 
       {/* ── Form card ── */}
-      <View style={styles.card}>
+      <ReAnimated.View style={[styles.card, cardStyle]}>
         {/* Google */}
         <TouchableOpacity
           style={[styles.googleBtn, googleDisabled && { opacity: 0.6 }]}
@@ -214,52 +257,58 @@ export default function LoginScreen() {
         </View>
 
         {/* Email */}
-        <FocusInput
-          icon="mail-outline"
-          placeholder="Email address"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          returnKeyType="next"
-          onSubmitEditing={() => passwordRef.current?.focus()}
-        />
+        <ReAnimated.View style={field0Style}>
+          <FocusInput
+            icon="mail-outline"
+            placeholder="Email address"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+          />
+        </ReAnimated.View>
 
         {/* Password */}
-        <FocusInput
-          icon="lock-closed-outline"
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPw}
-          inputRef={passwordRef}
-          returnKeyType="done"
-          onSubmitEditing={handleLogin}
-          rightElement={
-            <TouchableOpacity onPress={() => setShowPw(v => !v)} style={styles.eyeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
-          }
-        />
+        <ReAnimated.View style={field1Style}>
+          <FocusInput
+            icon="lock-closed-outline"
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPw}
+            inputRef={passwordRef}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+            rightElement={
+              <TouchableOpacity onPress={() => setShowPw(v => !v)} style={styles.eyeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+            }
+          />
 
-        <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.7}>
-          <Text style={styles.forgotText}>Forgot password?</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.7}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+        </ReAnimated.View>
 
         {/* Sign in */}
-        <TouchableOpacity
-          style={[styles.signInBtn, loading && { opacity: 0.75 }]}
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading
-            ? <ActivityIndicator color={Colors.bg} size="small" />
-            : <>
-                <Text style={styles.signInText}>Sign In</Text>
-                <Ionicons name="arrow-forward-circle" size={20} color={Colors.bg} />
-              </>}
-        </TouchableOpacity>
-      </View>
+        <ReAnimated.View style={btnStyle}>
+          <TouchableOpacity
+            style={[styles.signInBtn, loading && { opacity: 0.75 }]}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading
+              ? <ActivityIndicator color={Colors.bg} size="small" />
+              : <>
+                  <Text style={styles.signInText}>Sign In</Text>
+                  <Ionicons name="arrow-forward-circle" size={20} color={Colors.bg} />
+                </>}
+          </TouchableOpacity>
+        </ReAnimated.View>
+      </ReAnimated.View>
 
       {/* ── Footer ── */}
       <View style={styles.footer}>
