@@ -1,15 +1,23 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
   Animated, TouchableWithoutFeedback, Keyboard,
 } from 'react-native';
+import ReAnimated, {
+  useSharedValue, useAnimatedStyle,
+  withSpring, withTiming,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Radius } from '../constants/theme';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import { useStaggerEntrance, useFieldShake, useSuccessBurst } from '../hooks/useAnimations';
+import { useSound } from '../context/SoundContext';
+import { Springs } from '../constants/motion';
 
 function FocusInput({
   icon, placeholder, value, onChangeText, keyboardType,
@@ -89,11 +97,48 @@ export default function RegisterScreen() {
 
   const { promptAsync, loading: googleLoading, disabled: googleDisabled } = useGoogleAuth();
 
+  // Animations
+  const { play } = useSound();
+
+  // Card slide-up on mount
+  const cardTranslateY = useSharedValue(60);
+  const cardOpacity    = useSharedValue(0);
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: cardTranslateY.value }],
+    opacity: cardOpacity.value,
+  }));
+
+  useEffect(() => {
+    cardTranslateY.value = withSpring(0, Springs.bouncy);
+    cardOpacity.value    = withTiming(1, { duration: 300 });
+  }, []);
+
+  // Field stagger entrance
+  const field0Style = useStaggerEntrance(0, 200); // username
+  const field1Style = useStaggerEntrance(1, 200); // email
+  const field2Style = useStaggerEntrance(2, 200); // password
+  const btnStyle    = useStaggerEntrance(3, 200); // button
+
+  // Shake on validation error
+  const { animatedStyle: shakeStyle, shake } = useFieldShake();
+
+  // Success burst before navigating
+  const { trigger: triggerBurst, dotStyles } = useSuccessBurst();
+
   const handleRegister = async () => {
-    if (!username.trim())     return Alert.alert('Required', 'Please enter a username.');
-    if (!email.trim())        return Alert.alert('Required', 'Please enter your email.');
-    if (!password)            return Alert.alert('Required', 'Please enter a password.');
-    if (password.length < 6) return Alert.alert('Too short', 'Password must be at least 6 characters.');
+    if (!username.trim() || !email.trim() || !password) {
+      shake();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      if (!username.trim())     { Alert.alert('Required', 'Please enter a username.'); return; }
+      if (!email.trim())        { Alert.alert('Required', 'Please enter your email.'); return; }
+      if (!password)            { Alert.alert('Required', 'Please enter a password.'); return; }
+    }
+    if (password.length < 6) {
+      shake();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert('Too short', 'Password must be at least 6 characters.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -102,9 +147,16 @@ export default function RegisterScreen() {
         body: JSON.stringify({ username: username.trim(), email: email.trim(), password }),
       });
       const data = await res.json();
-      if (!data.success) return Alert.alert('Registration failed', data.message);
+      if (!data.success) {
+        Alert.alert('Registration failed', data.message);
+        return;
+      }
       await login(data.token, data.user);
-      router.replace('/onboarding');
+      play('success');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      triggerBurst(() => {
+        router.replace('/onboarding');
+      });
     } catch {
       Alert.alert('Error', 'Could not connect to server.');
     } finally {
@@ -135,7 +187,7 @@ export default function RegisterScreen() {
         </View>
 
         {/* Card */}
-        <View style={styles.card}>
+        <ReAnimated.View style={[styles.card, cardStyle]}>
           <Text style={styles.cardTitle}>Create Account</Text>
           <Text style={styles.cardSub}>Join thousands of players near you</Text>
 
@@ -162,55 +214,82 @@ export default function RegisterScreen() {
           </View>
 
           {/* Fields */}
-          <FocusInput
-            icon="person-outline"
-            placeholder="Username"
-            value={username}
-            onChangeText={setUsername}
-            returnKeyType="next"
-            onSubmitEditing={() => emailRef.current?.focus()}
-          />
-          <FocusInput
-            icon="mail-outline"
-            placeholder="Email address"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            inputRef={emailRef}
-            returnKeyType="next"
-            onSubmitEditing={() => passwordRef.current?.focus()}
-          />
-          <FocusInput
-            icon="lock-closed-outline"
-            placeholder="Password (min 6 characters)"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPw}
-            inputRef={passwordRef}
-            returnKeyType="done"
-            onSubmitEditing={handleRegister}
-            rightElement={
-              <TouchableOpacity onPress={() => setShowPw(v => !v)} style={styles.eyeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
-              </TouchableOpacity>
-            }
-          />
+          <ReAnimated.View style={field0Style}>
+            <FocusInput
+              icon="person-outline"
+              placeholder="Username"
+              value={username}
+              onChangeText={setUsername}
+              returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
+            />
+          </ReAnimated.View>
+          <ReAnimated.View style={field1Style}>
+            <FocusInput
+              icon="mail-outline"
+              placeholder="Email address"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              inputRef={emailRef}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+            />
+          </ReAnimated.View>
+          <ReAnimated.View style={field2Style}>
+            <FocusInput
+              icon="lock-closed-outline"
+              placeholder="Password (min 6 characters)"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPw}
+              inputRef={passwordRef}
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
+              rightElement={
+                <TouchableOpacity onPress={() => setShowPw(v => !v)} style={styles.eyeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.textMuted} />
+                </TouchableOpacity>
+              }
+            />
+          </ReAnimated.View>
 
           {/* CTA */}
-          <TouchableOpacity
-            style={[styles.primaryBtn, loading && { opacity: 0.75 }]}
-            onPress={handleRegister}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading
-              ? <ActivityIndicator color={Colors.bg} size="small" />
-              : <>
-                  <Text style={styles.primaryBtnText}>Create Account</Text>
-                  <Ionicons name="arrow-forward-circle" size={20} color={Colors.bg} />
-                </>}
-          </TouchableOpacity>
-        </View>
+          <ReAnimated.View style={[btnStyle, shakeStyle]}>
+            <TouchableOpacity
+              style={[styles.primaryBtn, loading && { opacity: 0.75 }]}
+              onPress={handleRegister}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading
+                ? <ActivityIndicator color={Colors.bg} size="small" />
+                : <>
+                    <Text style={styles.primaryBtnText}>Create Account</Text>
+                    <Ionicons name="arrow-forward-circle" size={20} color={Colors.bg} />
+                  </>}
+            </TouchableOpacity>
+          </ReAnimated.View>
+
+          {/* Success burst dots */}
+          {dotStyles.map((dotStyle, i) => (
+            <ReAnimated.View
+              key={i}
+              pointerEvents="none"
+              style={[
+                {
+                  position: 'absolute',
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: Colors.accent,
+                  alignSelf: 'center',
+                },
+                dotStyle,
+              ]}
+            />
+          ))}
+        </ReAnimated.View>
 
         {/* Footer */}
         <View style={styles.footer}>
