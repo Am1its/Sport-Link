@@ -2,10 +2,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, FlatList, TextInput,
   TouchableOpacity, ActivityIndicator, Image, Alert,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Pressable,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import ReAnimated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
@@ -13,6 +17,7 @@ import { API_BASE } from '../constants/api';
 import AvatarCircle from '../components/AvatarCircle';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { Springs } from '../constants/motion';
 import { BackButton } from '../components/BackButton';
 
 type PlacesData = {
@@ -55,6 +60,52 @@ function StarRow({ rating, size = 16, color = Colors.yellow, onPress }: {
             color={n <= rating ? color : Colors.border}
           />
         </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const s0 = useSharedValue(1);
+  const s1 = useSharedValue(1);
+  const s2 = useSharedValue(1);
+  const s3 = useSharedValue(1);
+  const s4 = useSharedValue(1);
+  const scales = [s0, s1, s2, s3, s4];
+
+  const a0 = useAnimatedStyle(() => ({ transform: [{ scale: s0.value }] }));
+  const a1 = useAnimatedStyle(() => ({ transform: [{ scale: s1.value }] }));
+  const a2 = useAnimatedStyle(() => ({ transform: [{ scale: s2.value }] }));
+  const a3 = useAnimatedStyle(() => ({ transform: [{ scale: s3.value }] }));
+  const a4 = useAnimatedStyle(() => ({ transform: [{ scale: s4.value }] }));
+  const styles5 = [a0, a1, a2, a3, a4];
+
+  const handlePress = (rating: number) => {
+    scales.forEach((sv, i) => {
+      if (i < rating) {
+        sv.value = withDelay(i * 40, withSpring(1.25, Springs.bouncy, () => {
+          sv.value = withSpring(1, Springs.snappy);
+        }));
+      } else {
+        sv.value = withSpring(1, Springs.snappy);
+      }
+    });
+    Haptics.selectionAsync();
+    onChange(rating);
+  };
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      {[1, 2, 3, 4, 5].map((n, i) => (
+        <ReAnimated.View key={n} style={styles5[i]}>
+          <Pressable onPress={() => handlePress(n)}>
+            <Ionicons
+              name={value >= n ? 'star' : 'star-outline'}
+              size={28}
+              color={value >= n ? Colors.yellow : Colors.textMuted}
+            />
+          </Pressable>
+        </ReAnimated.View>
       ))}
     </View>
   );
@@ -207,6 +258,24 @@ export default function CourtDetailScreen() {
   const sportColor = sport && SPORT_COLORS[sport] ? SPORT_COLORS[sport] : Colors.accent;
   const sportIcon  = sport && SPORT_ICONS[sport]  ? SPORT_ICONS[sport]  : 'trophy';
 
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const confirmOpacity    = useSharedValue(0);
+  const confirmTranslateY = useSharedValue(10);
+  const confirmStyle = useAnimatedStyle(() => ({
+    opacity: confirmOpacity.value,
+    transform: [{ translateY: confirmTranslateY.value }],
+  }));
+
+  useEffect(() => {
+    if (submitSuccess) {
+      confirmOpacity.value    = withTiming(1, { duration: 300 });
+      confirmTranslateY.value = withSpring(0, Springs.bouncy);
+    } else {
+      confirmOpacity.value    = 0;
+      confirmTranslateY.value = 10;
+    }
+  }, [submitSuccess]);
+
   const myReview = reviews.find(r => r.user_id === user?.id);
 
   useEffect(() => {
@@ -242,6 +311,7 @@ export default function CourtDetailScreen() {
   const handleSubmitReview = async () => {
     if (myRating === 0) return Alert.alert('Rating required', 'Please select a star rating.');
     setSubmitting(true);
+    setSubmitSuccess(false);
     try {
       await apiFetch(`/api/courts/${placeId}/reviews`, {
         method: 'POST',
@@ -249,6 +319,8 @@ export default function CourtDetailScreen() {
         body: JSON.stringify({ rating: myRating, comment: myComment.trim() || null }),
       });
       await load();
+      setSubmitSuccess(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
       if (err?.name !== 'UnauthorizedError') Alert.alert('Error', 'Could not submit review.');
     } finally {
@@ -518,7 +590,7 @@ export default function CourtDetailScreen() {
           {/* Write / edit review */}
           <View style={styles.writeCard}>
             <Text style={styles.writeTitle}>{myReview ? 'Your Review' : 'Leave a Review'}</Text>
-            <StarRow rating={myRating} size={28} onPress={setMyRating} />
+            <StarRating value={myRating} onChange={(v) => { setMyRating(v); setSubmitSuccess(false); }} />
             <TextInput
               style={styles.commentInput}
               placeholder="Add a comment (optional)"
@@ -538,6 +610,14 @@ export default function CourtDetailScreen() {
                 : <Text style={styles.submitBtnText}>{myReview ? 'Update Review' : 'Submit Review'}</Text>
               }
             </TouchableOpacity>
+            <ReAnimated.View style={confirmStyle}>
+              <View style={styles.confirmRow}>
+                <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
+                <Text style={styles.confirmText}>
+                  {myReview ? 'Review updated!' : 'Review submitted!'}
+                </Text>
+              </View>
+            </ReAnimated.View>
           </View>
 
           {/* Reviews list */}
@@ -602,6 +682,8 @@ const styles = StyleSheet.create({
   submitBtn:        { backgroundColor: Colors.accent, borderRadius: Radius.pill, height: 50, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
   submitBtnDisabled: { opacity: 0.4 },
   submitBtnText:    { color: Colors.bg, fontWeight: '900', fontSize: 15 },
+  confirmRow:       { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 2 },
+  confirmText:      { fontSize: 13, fontWeight: '700', color: Colors.accent },
 
   noReviews: { textAlign: 'center', color: Colors.textHint, fontStyle: 'italic', marginTop: 10, marginBottom: 20 },
 
