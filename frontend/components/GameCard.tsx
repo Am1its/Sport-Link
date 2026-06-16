@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, Image, Share, Pressable,
@@ -39,6 +39,13 @@ export function GameCard({
   const [joining, setJoining] = useState(false);
   const [isJoined, setIsJoined] = useState(!!game.is_joined);
   const [isWaitlisted, setIsWaitlisted] = useState(false);
+
+  // Reset derived state and animations when FlatList recycles this cell for a different game
+  useEffect(() => {
+    setIsJoined(!!game.is_joined);
+    setIsWaitlisted(false);
+    fillWidth.value = 0;
+  }, [game.id]);
   const { animatedStyle: joinPressStyle, onPressIn: joinPressIn, onPressOut: joinPressOut } = usePressAnimation({
     scaleDown: 0.94,
     scaleUp: 1.08,
