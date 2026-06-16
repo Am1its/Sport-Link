@@ -1,6 +1,15 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import ReAnimated, {
+  useSharedValue as useRSharedValue,
+  useAnimatedStyle as useRAnimatedStyle,
+  withSpring,
+  withRepeat,
+  withSequence,
+  withDelay,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -11,6 +20,7 @@ import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { GamesSkeleton } from '../../components/SkeletonLoader';
 import { isOutdoorSport, fetchWeatherForGame, WeatherResult } from '../../utils/weather';
+import { Springs } from '../../constants/motion';
 import type { Game } from '../../types';
 
 function isWithinCheckinWindow(scheduledTime: string | null): boolean {
@@ -19,6 +29,63 @@ function isWithinCheckinWindow(scheduledTime: string | null): boolean {
   const now = new Date();
   const diffMin = (now.getTime() - scheduled.getTime()) / 60000;
   return diffMin >= -30 && diffMin <= 30;
+}
+
+function AnimatedSectionHeader({ title, style }: { title: string; style?: any }) {
+  const translateX = useRSharedValue(-20);
+  const opacity    = useRSharedValue(0);
+
+  useEffect(() => {
+    translateX.value = withSpring(0, Springs.bouncy);
+    opacity.value    = withTiming(1, { duration: 250 });
+  }, []);
+
+  const animStyle = useRAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <ReAnimated.View style={[animStyle, style]}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+    </ReAnimated.View>
+  );
+}
+
+function PulsingBadge({ children, style }: { children: React.ReactNode; style?: any }) {
+  const opacity = useRSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.5, { duration: 1500 }),
+        withTiming(1.0, { duration: 1500 }),
+      ),
+      -1,
+    );
+  }, []);
+
+  const animStyle = useRAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return <ReAnimated.View style={[style, animStyle]}>{children}</ReAnimated.View>;
+}
+
+function StaggeredCard({ index, children }: { index: number; children: React.ReactNode }) {
+  const translateY = useRSharedValue(20);
+  const opacity    = useRSharedValue(0);
+
+  useEffect(() => {
+    const delay = Math.min(index * 60, 400);
+    translateY.value = withDelay(delay, withSpring(0, Springs.bouncy));
+    opacity.value    = withDelay(delay, withTiming(1, { duration: 250 }));
+  }, []);
+
+  const animStyle = useRAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return <ReAnimated.View style={animStyle}>{children}</ReAnimated.View>;
 }
 
 function MyGameCard({
@@ -160,10 +227,17 @@ function MyGameCard({
           {/* Meta */}
           <View style={styles.metaRow}>
             {game.scheduled_time ? (
-              <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
-                <Text style={styles.metaText}>{game.scheduled_time}</Text>
-              </View>
+              !past ? (
+                <PulsingBadge style={styles.metaItem}>
+                  <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                  <Text style={styles.metaText}>{game.scheduled_time}</Text>
+                </PulsingBadge>
+              ) : (
+                <View style={styles.metaItem}>
+                  <Ionicons name="time-outline" size={13} color={Colors.textMuted} />
+                  <Text style={styles.metaText}>{game.scheduled_time}</Text>
+                </View>
+              )
             ) : null}
             <View style={styles.metaItem}>
               <Ionicons name="people-outline" size={13} color={Colors.textMuted} />
@@ -362,6 +436,7 @@ export default function GamesScreen() {
         {
           text: 'Delete', style: 'destructive',
           onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             try {
               const res  = await apiFetch(`/api/games/${game.id}`, { method: 'DELETE', token });
               const data = await res.json();
@@ -386,6 +461,7 @@ export default function GamesScreen() {
         {
           text: 'Leave', style: 'destructive',
           onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             try {
               const res  = await apiFetch(`/api/games/${game.id}/leave`, { method: 'DELETE', token });
               const data = await res.json();
@@ -498,14 +574,22 @@ export default function GamesScreen() {
         >
           {upcoming.length > 0 && (
             <>
-              <Text style={styles.sectionHeader}>Upcoming</Text>
-              {upcoming.map(item => <MyGameCard key={String(item.id)} {...makeCardProps(item)} />)}
+              <AnimatedSectionHeader title="Upcoming" />
+              {upcoming.map((item, index) => (
+                <StaggeredCard key={String(item.id)} index={index}>
+                  <MyGameCard {...makeCardProps(item)} />
+                </StaggeredCard>
+              ))}
             </>
           )}
           {history.length > 0 && (
             <>
-              <Text style={[styles.sectionHeader, upcoming.length > 0 && { marginTop: Spacing.lg }]}>History</Text>
-              {history.map(item => <MyGameCard key={String(item.id)} {...makeCardProps(item)} />)}
+              <AnimatedSectionHeader title="History" style={upcoming.length > 0 ? { marginTop: Spacing.lg } : undefined} />
+              {history.map((item, index) => (
+                <StaggeredCard key={String(item.id)} index={upcoming.length + index}>
+                  <MyGameCard {...makeCardProps(item)} />
+                </StaggeredCard>
+              ))}
             </>
           )}
         </ScrollView>
