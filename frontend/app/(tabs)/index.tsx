@@ -3,8 +3,9 @@ import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity, Dim
 import * as Haptics from 'expo-haptics';
 import ReAnimated, {
   useSharedValue, useAnimatedStyle,
-  withSpring, withTiming, runOnJS,
+  withSpring, withTiming, withDelay, runOnJS,
 } from 'react-native-reanimated';
+import { Springs } from '../../constants/motion';
 import { usePressAnimation } from '../../hooks/useAnimations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -243,7 +244,7 @@ function BottomCard({ court, userId, token, onJoined }: {
 }
 
 function FilterChip({
-  label, isActive, onPress, chipStyle, textStyle, activeChipStyle, activeTextStyle,
+  label, isActive, onPress, chipStyle, textStyle, activeChipStyle, activeTextStyle, index,
 }: {
   label: string;
   isActive: boolean;
@@ -252,12 +253,28 @@ function FilterChip({
   textStyle: any;
   activeChipStyle: any;
   activeTextStyle: any;
+  index: number;
 }) {
   const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({
     scaleDown: 0.94, scaleUp: 1.0, stiffness: 400, damping: 18,
   });
+  const translateX = useSharedValue(-30);
+  const chipOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    const delay = Math.min(index * 60, 300);
+    translateX.value = withDelay(delay, withSpring(0, Springs.bouncy));
+    chipOpacity.value = withDelay(delay, withTiming(1, { duration: 200 }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const staggerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+    opacity: chipOpacity.value,
+  }));
+
   return (
-    <ReAnimated.View style={animatedStyle}>
+    <ReAnimated.View style={[staggerStyle, animatedStyle]}>
       <Pressable
         onPressIn={onPressIn}
         onPressOut={onPressOut}
@@ -308,6 +325,12 @@ export default function HomeScreen() {
   const tabOpacity = useSharedValue(0);
   const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
 
+  // FAB rotation: 0 = + icon, 1 = rotated 45° (× icon)
+  const fabRotate = useSharedValue(0);
+  const fabRotateStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${fabRotate.value * 45}deg` }],
+  }));
+
   useFocusEffect(
     useCallback(() => {
       tabOpacity.value = 0;
@@ -327,14 +350,14 @@ export default function HomeScreen() {
     if (selectedCourt) {
       lastCourtRef.current = selectedCourt;
       setIsCardVisible(true);
-      cardY.value = 30;
+      cardY.value = 200;
       cardOpacity.value = 0;
-      cardY.value = withSpring(0, { damping: 16, stiffness: 220 });
+      cardY.value = withSpring(0, Springs.bouncy);
       cardOpacity.value = withTiming(1, { duration: 200 });
     } else if (isCardVisible) {
       // Animate out, then unmount. lastCourtRef keeps the data alive during exit.
-      cardY.value = withTiming(30, { duration: 200 });
-      cardOpacity.value = withTiming(0, { duration: 200 }, (finished) => {
+      cardY.value = withSpring(200, Springs.snappy);
+      cardOpacity.value = withTiming(0, { duration: 150 }, (finished) => {
         if (finished) runOnJS(setIsCardVisible)(false);
       });
     }
@@ -709,7 +732,7 @@ export default function HomeScreen() {
                   { key: 'all', label: 'All' },
                   { key: 'games', label: 'Community Games' },
                   { key: 'courts', label: 'Courts' },
-                ].map(f => (
+                ].map((f, i) => (
                   <FilterChip
                     key={f.key}
                     label={f.label}
@@ -719,6 +742,7 @@ export default function HomeScreen() {
                     textStyle={styles.filterText}
                     activeChipStyle={styles.filterChipActive}
                     activeTextStyle={styles.filterTextActive}
+                    index={i}
                   />
                 ))}
               </ScrollView>
@@ -794,14 +818,14 @@ export default function HomeScreen() {
               <View style={styles.addMenu}>
                 <TouchableOpacity
                   style={styles.addMenuItem}
-                  onPress={() => { setShowAddMenu(false); setIsSelectingLocation(true); }}
+                  onPress={() => { setShowAddMenu(false); setIsSelectingLocation(true); fabRotate.value = withSpring(0, Springs.snappy); }}
                 >
                   <Ionicons name="location-outline" size={20} color="#FFFFFF" />
                   <Text style={styles.addMenuText}>Drop Pin</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.addMenuItem}
-                  onPress={() => setShowCourtPicker(true)}
+                  onPress={() => { setShowCourtPicker(true); }}
                 >
                   <Ionicons name="business-outline" size={20} color="#0FEA95" />
                   <Text style={[styles.addMenuText, { color: '#0FEA95' }]}>Choose Court</Text>
@@ -810,9 +834,16 @@ export default function HomeScreen() {
             )}
             <TouchableOpacity
               style={[styles.fab, showAddMenu && { backgroundColor: '#FF453A' }]}
-              onPress={() => { setShowAddMenu(v => !v); setShowCourtPicker(false); }}
+              onPress={() => {
+                const opening = !showAddMenu;
+                setShowAddMenu(v => !v);
+                setShowCourtPicker(false);
+                fabRotate.value = withSpring(opening ? 1 : 0, Springs.snappy);
+              }}
             >
-              <Ionicons name={showAddMenu ? 'close' : 'add'} size={32} color="white" />
+              <ReAnimated.View style={fabRotateStyle}>
+                <Ionicons name="add" size={32} color="white" />
+              </ReAnimated.View>
             </TouchableOpacity>
           </>
         )
@@ -822,7 +853,7 @@ export default function HomeScreen() {
         <View style={styles.courtPickerSheet}>
           <View style={styles.courtPickerHeader}>
             <Text style={styles.courtPickerTitle}>Choose a Court</Text>
-            <TouchableOpacity onPress={() => { setShowCourtPicker(false); setShowAddMenu(false); }}>
+            <TouchableOpacity onPress={() => { setShowCourtPicker(false); setShowAddMenu(false); fabRotate.value = withSpring(0, Springs.snappy); }}>
               <Ionicons name="close" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
