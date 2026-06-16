@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Sentry from '@sentry/react-native';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { SoundProvider } from '../context/SoundContext';
 import { registerPushToken } from '../utils/registerPushToken';
 import { setUnauthorizedHandler } from '../utils/api';
 
@@ -62,33 +63,35 @@ function AppServices() {
 
 function RootLayout() {
   return (
-    <AuthProvider>
-      <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" translucent={false} />
-      <AppServices />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="login" options={{ animation: 'fade' }} />
-        <Stack.Screen name="register" options={{ animation: 'fade' }} />
-        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="game-chat" />
-        <Stack.Screen name="friends" />
-        <Stack.Screen name="court-detail" options={{ animationDuration: 380 }} />
-        <Stack.Screen name="player-matching" />
-        <Stack.Screen name="direct-chat" />
-        <Stack.Screen name="game/[id]" />
-        <Stack.Screen name="activity" />
-        <Stack.Screen name="invite/[id]" />
-        <Stack.Screen name="blocked-users" />
-        <Stack.Screen name="player-profile" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="game-participants" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="notification-inbox" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="game-results" options={{ animationDuration: 380 }} />
-        <Stack.Screen name="leaderboard" options={{ animationDuration: 380 }} />
-        <Stack.Screen name="rate-players" options={{ animationDuration: 380 }} />
-      </Stack>
-    </AuthProvider>
+    <SoundProvider>
+      <AuthProvider>
+        <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" translucent={false} />
+        <AppServices />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" options={{ animation: 'fade' }} />
+          <Stack.Screen name="register" options={{ animation: 'fade' }} />
+          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="game-chat" />
+          <Stack.Screen name="friends" />
+          <Stack.Screen name="court-detail" options={{ animationDuration: 380 }} />
+          <Stack.Screen name="player-matching" />
+          <Stack.Screen name="direct-chat" />
+          <Stack.Screen name="game/[id]" />
+          <Stack.Screen name="activity" />
+          <Stack.Screen name="invite/[id]" />
+          <Stack.Screen name="blocked-users" />
+          <Stack.Screen name="player-profile" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="game-participants" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="notification-inbox" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="game-results" options={{ animationDuration: 380 }} />
+          <Stack.Screen name="leaderboard" options={{ animationDuration: 380 }} />
+          <Stack.Screen name="rate-players" options={{ animationDuration: 380 }} />
+        </Stack>
+      </AuthProvider>
+    </SoundProvider>
   );
 }
 
