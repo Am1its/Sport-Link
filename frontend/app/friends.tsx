@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   TextInput, ActivityIndicator, Alert, RefreshControl, Share,
@@ -11,6 +11,12 @@ import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
 import { API_BASE } from '../constants/api';
+import ReAnimated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, withSequence,
+} from 'react-native-reanimated';
+import { useSound } from '../context/SoundContext';
+import { Springs } from '../constants/motion';
+import * as Haptics from 'expo-haptics';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null; karma: number };
 type Request = { friendship_id: number; id: number; username: string; avatar: string | null };
@@ -18,9 +24,91 @@ type SearchUser = { id: number; username: string; avatar: string | null };
 
 type Tab = 'friends' | 'requests' | 'search';
 
+// ── StaggeredCard: stagger-in entrance animation ─────────────────────────────
+function StaggeredCard({ index, children }: { index: number; children: React.ReactNode }) {
+  const translateY = useSharedValue(16);
+  const opacity    = useSharedValue(0);
+
+  useEffect(() => {
+    const delay = Math.min(index * 50, 400);
+    translateY.value = withDelay(delay, withSpring(0, Springs.bouncy));
+    opacity.value    = withDelay(delay, withTiming(1, { duration: 200 }));
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return <ReAnimated.View style={style}>{children}</ReAnimated.View>;
+}
+
+// ── RequestCard: accept flash overlay + sound + haptic ───────────────────────
+function RequestCard({
+  request,
+  index,
+  onAccept,
+  onDecline,
+}: {
+  request: Request;
+  index: number;
+  onAccept: (friendshipId: number) => void;
+  onDecline: (friendshipId: number, username: string) => void;
+}) {
+  const flashOpacity = useSharedValue(0);
+  const flashStyle   = useAnimatedStyle(() => ({ opacity: flashOpacity.value }));
+
+  const handleAccept = () => {
+    // Flash fires immediately on press
+    flashOpacity.value = withSequence(
+      withTiming(0.4, { duration: 100 }),
+      withTiming(0, { duration: 300 }),
+    );
+    onAccept(request.friendship_id);
+  };
+
+  return (
+    <StaggeredCard index={index}>
+      <View style={{ position: 'relative' }}>
+        <View style={styles.row}>
+          <AvatarCircle username={request.username} avatar={request.avatar} />
+          <View style={styles.rowBody}>
+            <Text style={styles.rowName}>{request.username}</Text>
+            <Text style={styles.rowSub}>Wants to be your friend</Text>
+          </View>
+          <View style={styles.requestBtns}>
+            <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
+              <Ionicons name="checkmark" size={18} color={Colors.bg} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.declineBtn}
+              onPress={() => onDecline(request.friendship_id, request.username)}
+            >
+              <Ionicons name="close" size={18} color={Colors.error} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <ReAnimated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: Colors.accent,
+              borderRadius: Radius.lg,
+            },
+            flashStyle,
+          ]}
+        />
+      </View>
+    </StaggeredCard>
+  );
+}
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 export default function FriendsScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
+  const { play } = useSound();
 
   const [activeTab, setActiveTab] = useState<Tab>('friends');
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -94,6 +182,9 @@ export default function FriendsScreen() {
       const res = await apiFetch(`/api/friends/${friendshipId}/accept`, { method: 'PUT', token });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
+      // Sound + haptic fire on API success
+      play('chime');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await fetchAll(true);
     } catch {
       Alert.alert('Error', 'Could not connect to server');
@@ -182,23 +273,25 @@ export default function FriendsScreen() {
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchAll(true)} tintColor={Colors.accent} />}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.row}
-                    onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
-                    activeOpacity={0.75}
-                  >
-                    <AvatarCircle username={item.username} avatar={item.avatar} />
-                    <View style={styles.rowBody}>
-                      <Text style={styles.rowName}>{item.username}</Text>
-                      <Text style={[styles.rowKarma, { color: karmaColor(item.karma) }]}>
-                        ⚡ {karmaStr(item.karma)} karma
-                      </Text>
-                    </View>
-                    <TouchableOpacity style={styles.removeBtn} onPress={() => removeFriend(item.friendship_id, item.username)}>
-                      <Ionicons name="person-remove-outline" size={18} color={Colors.error} />
+                renderItem={({ item, index }) => (
+                  <StaggeredCard index={index}>
+                    <TouchableOpacity
+                      style={styles.row}
+                      onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
+                      activeOpacity={0.75}
+                    >
+                      <AvatarCircle username={item.username} avatar={item.avatar} />
+                      <View style={styles.rowBody}>
+                        <Text style={styles.rowName}>{item.username}</Text>
+                        <Text style={[styles.rowKarma, { color: karmaColor(item.karma) }]}>
+                          ⚡ {karmaStr(item.karma)} karma
+                        </Text>
+                      </View>
+                      <TouchableOpacity style={styles.removeBtn} onPress={() => removeFriend(item.friendship_id, item.username)}>
+                        <Ionicons name="person-remove-outline" size={18} color={Colors.error} />
+                      </TouchableOpacity>
                     </TouchableOpacity>
-                  </TouchableOpacity>
+                  </StaggeredCard>
                 )}
               />
             )
@@ -218,22 +311,13 @@ export default function FriendsScreen() {
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchAll(true)} tintColor={Colors.accent} />}
-                renderItem={({ item }) => (
-                  <View style={styles.row}>
-                    <AvatarCircle username={item.username} avatar={item.avatar} />
-                    <View style={styles.rowBody}>
-                      <Text style={styles.rowName}>{item.username}</Text>
-                      <Text style={styles.rowSub}>Wants to be your friend</Text>
-                    </View>
-                    <View style={styles.requestBtns}>
-                      <TouchableOpacity style={styles.acceptBtn} onPress={() => acceptRequest(item.friendship_id)}>
-                        <Ionicons name="checkmark" size={18} color={Colors.bg} />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.declineBtn} onPress={() => removeFriend(item.friendship_id, item.username)}>
-                        <Ionicons name="close" size={18} color={Colors.error} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                renderItem={({ item, index }) => (
+                  <RequestCard
+                    request={item}
+                    index={index}
+                    onAccept={acceptRequest}
+                    onDecline={removeFriend}
+                  />
                 )}
               />
             )
@@ -272,26 +356,28 @@ export default function FriendsScreen() {
                 keyExtractor={item => String(item.id)}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
-                renderItem={({ item }) => {
+                renderItem={({ item, index }) => {
                   const alreadyConnected = isFriendOrPending(item.id);
                   return (
-                    <View style={styles.row}>
-                      <AvatarCircle username={item.username} avatar={item.avatar} />
-                      <View style={styles.rowBody}>
-                        <Text style={styles.rowName}>{item.username}</Text>
-                      </View>
-                      {alreadyConnected ? (
-                        <View style={styles.sentBadge}>
-                          <Text style={styles.sentBadgeText}>
-                            {friends.some(f => f.id === item.id) ? 'Friends' : 'Sent'}
-                          </Text>
+                    <StaggeredCard index={index}>
+                      <View style={styles.row}>
+                        <AvatarCircle username={item.username} avatar={item.avatar} />
+                        <View style={styles.rowBody}>
+                          <Text style={styles.rowName}>{item.username}</Text>
                         </View>
-                      ) : (
-                        <TouchableOpacity style={styles.addBtn} onPress={() => sendRequest(item.id)}>
-                          <Ionicons name="person-add" size={16} color={Colors.bg} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
+                        {alreadyConnected ? (
+                          <View style={styles.sentBadge}>
+                            <Text style={styles.sentBadgeText}>
+                              {friends.some(f => f.id === item.id) ? 'Friends' : 'Sent'}
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity style={styles.addBtn} onPress={() => sendRequest(item.id)}>
+                            <Ionicons name="person-add" size={16} color={Colors.bg} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </StaggeredCard>
                   );
                 }}
               />
