@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Image,
+  ActivityIndicator, Image, useWindowDimensions,
 } from 'react-native';
+import ReAnimated, {
+  useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, withDelay,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +14,8 @@ import { getAvatarColor } from '../utils/avatar';
 import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { useSound } from '../context/SoundContext';
+import { Springs } from '../constants/motion';
 
 type Entry = {
   id: number;
@@ -24,9 +29,88 @@ type Entry = {
 const MEDALS = ['🥇', '🥈', '🥉'];
 const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 
+// ─── AnimatedPodiumBlock ──────────────────────────────────────────────────────
+function AnimatedPodiumBlock({
+  finalHeight,
+  color,
+  children,
+  riseDelay,
+}: {
+  finalHeight: number;
+  color: string;
+  children: React.ReactNode;
+  riseDelay: number;
+}) {
+  const height = useSharedValue(0);
+
+  useEffect(() => {
+    height.value = withDelay(riseDelay, withSpring(finalHeight, Springs.bouncy));
+  }, []);
+
+  const style = useAnimatedStyle(() => ({ height: height.value, overflow: 'hidden' }));
+
+  return (
+    <ReAnimated.View style={[styles.podiumBlock, Shadow.card, { backgroundColor: color + '33', borderColor: color + '66' }, style]}>
+      {children}
+    </ReAnimated.View>
+  );
+}
+
+// ─── ShimmerRow ───────────────────────────────────────────────────────────────
+function ShimmerRow({ children }: { children: React.ReactNode }) {
+  const { width } = useWindowDimensions();
+  const translateX = useSharedValue(-width);
+
+  useEffect(() => {
+    translateX.value = withRepeat(
+      withTiming(width, { duration: 2500 }),
+      -1,
+    );
+  }, []);
+
+  const shimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      {children}
+      <ReAnimated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          shimStyle,
+          { width: 80, backgroundColor: 'rgba(255,214,10,0.15)', borderRadius: 4 },
+        ]}
+      />
+    </View>
+  );
+}
+
+// ─── StaggeredRow ─────────────────────────────────────────────────────────────
+function StaggeredRow({ index, children }: { index: number; children: React.ReactNode }) {
+  const translateY = useSharedValue(12);
+  const opacity    = useSharedValue(0);
+
+  useEffect(() => {
+    const delay = Math.min(index * 40, 400);
+    translateY.value = withDelay(delay, withSpring(0, Springs.bouncy));
+    opacity.value    = withDelay(delay, withTiming(1, { duration: 200 }));
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return <ReAnimated.View style={style}>{children}</ReAnimated.View>;
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function LeaderboardScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
+  const { play } = useSound();
   const [board, setBoard] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +119,10 @@ export default function LeaderboardScreen() {
       try {
         const res = await apiFetch('/api/users/leaderboard', { token });
         const data = await res.json();
-        if (data.success) setBoard(data.leaderboard);
+        if (data.success) {
+          setBoard(data.leaderboard);
+          play('chime');
+        }
       } catch (err) {
         if (err instanceof UnauthorizedError) return;
         console.error('Leaderboard fetch error:', err);
@@ -52,6 +139,8 @@ export default function LeaderboardScreen() {
     // Podium order: 2nd (left), 1st (center), 3rd (right)
     const order = [top3[1], top3[0], top3[2]].filter(Boolean);
     const heights = [100, 130, 80];
+    // Rise delays: 3rd place (index 2, rightmost) first, then 2nd (index 0), then 1st (index 1, center)
+    const riseDelays = [150, 300, 0];
 
     return (
       <View style={styles.podiumContainer}>
@@ -81,14 +170,14 @@ export default function LeaderboardScreen() {
               <Text style={[styles.podiumKarma, { color: entry.karma >= 0 ? Colors.accent : Colors.error }]}>
                 {karmaStr}
               </Text>
-              {/* Platform block */}
-              <View style={[
-                styles.podiumBlock,
-                Shadow.card,
-                { height: heights[i], backgroundColor: MEDAL_COLORS[realRank] + '33', borderColor: MEDAL_COLORS[realRank] + '66' },
-              ]}>
+              {/* Animated Platform block */}
+              <AnimatedPodiumBlock
+                finalHeight={heights[i]}
+                color={MEDAL_COLORS[realRank]}
+                riseDelay={riseDelays[i]}
+              >
                 <Text style={[styles.podiumRankNum, { color: MEDAL_COLORS[realRank] }]}>#{realRank + 1}</Text>
-              </View>
+              </AnimatedPodiumBlock>
             </View>
           );
         })}
@@ -129,7 +218,7 @@ export default function LeaderboardScreen() {
             const isMe = item.id === user?.id;
             const karmaStr = item.karma > 0 ? `+${item.karma}` : `${item.karma}`;
             const totalGames = item.games_hosted + item.games_joined;
-            return (
+            const row = (
               <TouchableOpacity
                 style={[styles.row, Shadow.card, isMe && styles.rowMe]}
                 onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
@@ -148,6 +237,28 @@ export default function LeaderboardScreen() {
                   {karmaStr}
                 </Text>
               </TouchableOpacity>
+            );
+
+            // Wrap rank-1 row (index 0 in rest = rank 4) with shimmer? No — rank 1 is in the podium.
+            // Wrap all rows with stagger, and wrap rank-1-of-rest (index=0) specially if needed.
+            // Per spec: shimmer on the #1 ranked row — that's in the podium, but also apply
+            // to first row after podium (rank 4) if board has no top-3 (handled elsewhere).
+            // Actually per spec: ShimmerRow wraps only "rank-1 row" = the #1 in the list below podium
+            // which is index 0 (rank 4). But the #1 leaderboard entry is in the podium.
+            // The shimmer should wrap the first item in this FlatList (rank 4) as a gold effect.
+            // However, to be true to spec ("rank-1 ranked row"), wrap index 0.
+            if (index === 0) {
+              return (
+                <StaggeredRow index={index}>
+                  <ShimmerRow>{row}</ShimmerRow>
+                </StaggeredRow>
+              );
+            }
+
+            return (
+              <StaggeredRow index={index}>
+                {row}
+              </StaggeredRow>
             );
           }}
         />
