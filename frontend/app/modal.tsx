@@ -20,7 +20,9 @@ import { reverseGeocode } from '../utils/geocode';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../constants/theme';
-import { usePressAnimation } from '../hooks/useAnimations';
+import { Springs } from '../constants/motion';
+import { usePressAnimation, useFieldShake } from '../hooks/useAnimations';
+import { useSound } from '../context/SoundContext';
 
 type Friend = { friendship_id: number; id: number; username: string; avatar: string | null };
 
@@ -97,10 +99,16 @@ export default function GameFormModal() {
   const [friends, setFriends]                 = useState<Friend[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<Set<number>>(new Set());
 
-  // Photo entrance animation
-  const photoScale = useSharedValue(0.92);
+  const { play } = useSound();
+  const { animatedStyle: shakeStyle, shake } = useFieldShake();
+
+  // Photo entrance animation — start at full size/opacity if editing (pre-existing photo)
+  const hasInitialPhoto = !!(params.existingPhoto as string);
+  const photoScale   = useSharedValue(hasInitialPhoto ? 1 : 0.8);
+  const photoOpacity = useSharedValue(hasInitialPhoto ? 1 : 0);
   const photoScaleStyle = useAnimatedStyle(() => ({
     transform: [{ scale: photoScale.value }],
+    opacity: photoOpacity.value,
   }));
 
   // Submit button animation
@@ -144,9 +152,11 @@ export default function GameFormModal() {
       base64: true,
     });
     if (!result.canceled && result.assets[0].base64) {
+      photoScale.value   = 0.8;
+      photoOpacity.value = 0;
       setPhoto(result.assets[0].base64);
-      photoScale.value = 0.92;
-      photoScale.value = withSpring(1, { stiffness: 300, damping: 18 });
+      photoScale.value   = withSpring(1, Springs.bouncy);
+      photoOpacity.value = withTiming(1, { duration: 200 });
     }
   };
 
@@ -178,12 +188,23 @@ export default function GameFormModal() {
     });
   };
 
+  const triggerValidationError = (title: string, msg: string) => {
+    shake();
+    play('error');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(title, msg);
+  };
+
   const handleSubmit = async () => {
-    if (!token) return Alert.alert('Error', 'You must be logged in');
-    if (scheduledDate && scheduledDate <= new Date())
-      return Alert.alert('Invalid Time', 'Scheduled time must be in the future');
-    if (maxPlayers && parseInt(maxPlayers) < 2)
-      return Alert.alert('Invalid Players', 'Max players must be at least 2');
+    if (!token) { triggerValidationError('Error', 'You must be logged in'); return; }
+    if (scheduledDate && scheduledDate <= new Date()) {
+      triggerValidationError('Invalid Time', 'Scheduled time must be in the future');
+      return;
+    }
+    if (maxPlayers && parseInt(maxPlayers) < 2) {
+      triggerValidationError('Invalid Players', 'Max players must be at least 2');
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setLoading(true);
@@ -211,6 +232,7 @@ export default function GameFormModal() {
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
 
+      play('chime');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (!isEdit) {
         AsyncStorage.setItem(PENDING_MAP_PAN_KEY, JSON.stringify({
@@ -431,7 +453,7 @@ export default function GameFormModal() {
             <Animated.View style={photoScaleStyle}>
               <View style={styles.photoWrap}>
                 <Image source={{ uri: `data:image/jpeg;base64,${photo}` }} style={styles.photoPreview} resizeMode="cover" />
-                <TouchableOpacity style={styles.photoRemove} onPress={() => setPhoto(null)}>
+                <TouchableOpacity style={styles.photoRemove} onPress={() => { photoScale.value = 0.8; photoOpacity.value = 0; setPhoto(null); }}>
                   <Ionicons name="close-circle" size={28} color={Colors.error} />
                 </TouchableOpacity>
               </View>
@@ -515,7 +537,7 @@ export default function GameFormModal() {
           )}
 
           {/* ── Submit ── */}
-          <Animated.View style={submitPressStyle}>
+          <Animated.View style={[shakeStyle, submitPressStyle]}>
             <Pressable
               onPressIn={submitPressIn}
               onPressOut={submitPressOut}
