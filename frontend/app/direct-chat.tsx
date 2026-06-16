@@ -19,7 +19,8 @@ import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
 import { SOCKET_EVENTS } from '../constants/events';
-import { usePressAnimation } from '../hooks/useAnimations';
+import { usePressAnimation, useTypingIndicator } from '../hooks/useAnimations';
+import { useSound } from '../context/SoundContext';
 import { ChatBubble } from '../components/ChatBubble';
 
 type DmMessage = {
@@ -76,13 +77,14 @@ export default function DirectChatScreen() {
   const [showPicker, setShowPicker]   = useState(false);
   const [myGames, setMyGames]         = useState<MyGame[]>([]);
   const [loadingGames, setLoadingGames] = useState(false);
-  const [isTyping, setIsTyping]       = useState(false);
-
   const scrollRef        = useRef<ScrollView>(null);
   const socketRef        = useRef<Socket | null>(null);
   const seenIds          = useRef<Set<number>>(new Set());
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingEmit   = useRef<number>(0);
+
+  const { play } = useSound();
+  const { dot0Style, dot1Style, dot2Style, visible: typingVisible, show: showTyping, hide: hideTyping } = useTypingIndicator();
 
   const { animatedStyle: sendPressStyle, onPressIn: sendPressIn, onPressOut: sendPressOut } = usePressAnimation({
     scaleDown: 0.88,
@@ -141,14 +143,16 @@ export default function DirectChatScreen() {
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
       fetchAvatars([msg.sender_id]);
       apiFetch(`/api/dm/${userId}/read`, { method: 'PUT', token }).catch(() => {});
-      setIsTyping(false);
+      hideTyping();
+      play('ding');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     });
 
     socket.on(SOCKET_EVENTS.DM_TYPING, ({ from }: { from: number }) => {
       if (from !== otherId) return;
-      setIsTyping(true);
+      showTyping();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
+      typingTimeoutRef.current = setTimeout(() => hideTyping(), 3000);
     });
 
     socket.on(SOCKET_EVENTS.DM_READ, ({ readBy }: { readBy: number }) => {
@@ -164,13 +168,14 @@ export default function DirectChatScreen() {
   }, [userId]);
 
   useEffect(() => {
-    if (messages.length > 0 || isTyping) {
+    if (messages.length > 0 || typingVisible) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  }, [messages.length, isTyping]);
+  }, [messages.length, typingVisible]);
 
   const sendText = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    play('pop');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const content = input.trim();
     if (!content || sending) return;
     setInput('');
@@ -349,22 +354,11 @@ export default function DirectChatScreen() {
             </View>
           )}
           {messages.map(renderMessage)}
-          {isTyping && (
-            <View style={styles.bubbleRowOther}>
-              <View style={[styles.avatarSmall, { backgroundColor: getAvatarColor(username) + '22', borderColor: getAvatarColor(username) }]}>
-                {avatarCache[otherId] ? (
-                  <Image source={{ uri: `data:image/jpeg;base64,${avatarCache[otherId]}` }} style={styles.avatarSmallImage} />
-                ) : (
-                  <Text style={[styles.avatarSmallLetter, { color: getAvatarColor(username) }]}>
-                    {username.charAt(0).toUpperCase()}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.bubbleOtherContent}>
-                <View style={[styles.bubble, styles.bubbleOther, styles.typingBubble]}>
-                  <Text style={styles.typingDots}>• • •</Text>
-                </View>
-              </View>
+          {typingVisible && (
+            <View style={styles.typingContainer}>
+              {([dot0Style, dot1Style, dot2Style] as const).map((dotStyle, i) => (
+                <Animated.View key={i} style={[styles.typingDot, dotStyle]} />
+              ))}
             </View>
           )}
         </ScrollView>
@@ -530,8 +524,8 @@ const styles = StyleSheet.create({
   bubbleTextOwn: { color: Colors.bg },
   timestamp:       { color: Colors.textMuted, fontSize: 11, marginTop: 3, marginHorizontal: 4 },
   readReceiptRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
-  typingBubble:    { paddingHorizontal: 16, paddingVertical: 12 },
-  typingDots:      { color: Colors.textMuted, fontSize: 18, letterSpacing: 2 },
+  typingContainer: { flexDirection: 'row', gap: 4, padding: 8, paddingLeft: 16 },
+  typingDot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.textMuted },
 
   // Event card
   eventCard:       { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, borderWidth: 1.5, gap: 6, minWidth: 200, ...Shadow.card },

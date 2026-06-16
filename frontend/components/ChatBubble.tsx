@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { getAvatarColor } from '../utils/avatar';
 import { Colors } from '../constants/theme';
+import { Springs } from '../constants/motion';
 
 type ChatBubbleProps = {
   messageId: number;
@@ -22,14 +23,20 @@ export function ChatBubble({
 }: ChatBubbleProps) {
   const translateY = useSharedValue(8);
   const translateX = useSharedValue(isMine ? 0 : -6);
+  const rotate = useSharedValue(isMine ? 0 : -2);
 
   useEffect(() => {
     translateY.value = withSpring(0, { stiffness: 220, damping: 22 });
     translateX.value = withSpring(0, { stiffness: 260, damping: 24 });
+    rotate.value = withSpring(0, Springs.snappy);
   }, []);
 
   const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }, { translateX: translateX.value }],
+    transform: [
+      { translateY: translateY.value },
+      { translateX: translateX.value },
+      { rotate: `${rotate.value}deg` },
+    ],
   }));
 
   const avatarColor = getAvatarColor(username);

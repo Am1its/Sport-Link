@@ -18,7 +18,8 @@ import { API_BASE } from '../constants/api';
 import { Colors } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
 import { SOCKET_EVENTS } from '../constants/events';
-import { usePressAnimation } from '../hooks/useAnimations';
+import { usePressAnimation, useTypingIndicator } from '../hooks/useAnimations';
+import { useSound } from '../context/SoundContext';
 import { ChatBubble } from '../components/ChatBubble';
 
 const MAX_MESSAGE_LENGTH = 1000;
@@ -49,6 +50,9 @@ export default function GameChatScreen() {
   const [avatarCache, setAvatarCache] = useState<Record<number, string | null>>({});
   const seenUserIds = useRef<Set<number>>(new Set());
   const socketRef   = useRef<Socket | null>(null);
+
+  const { play } = useSound();
+  const { dot0Style, dot1Style, dot2Style, visible: typingVisible, show: showTyping, hide: hideTyping } = useTypingIndicator();
 
   const { animatedStyle: sendPressStyle, onPressIn: sendPressIn, onPressOut: sendPressOut } = usePressAnimation({
     scaleDown: 0.88,
@@ -142,6 +146,8 @@ export default function GameChatScreen() {
       });
       AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
       fetchAvatars([msg.user_id]);
+      play('ding');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     });
 
     return () => {
@@ -152,7 +158,8 @@ export default function GameChatScreen() {
 
   const sendMessage = () => {
     if (!input.trim() || sending) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    play('pop');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const content = input.trim();
     setInput('');
     if (socketRef.current?.connected) {
@@ -239,6 +246,14 @@ export default function GameChatScreen() {
         />
       )}
 
+      {typingVisible && (
+        <View style={styles.typingContainer}>
+          {([dot0Style, dot1Style, dot2Style] as const).map((dotStyle, i) => (
+            <Animated.View key={i} style={[styles.typingDot, dotStyle]} />
+          ))}
+        </View>
+      )}
+
       <View style={styles.inputRow}>
         <View style={[styles.inputWrap, inputFocused && styles.inputWrapFocused]}>
           <TextInput
@@ -289,6 +304,9 @@ const styles = StyleSheet.create({
   emptyChatText: { color: Colors.textMuted, fontSize: 15 },
   retryBtn: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: 100, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   retryBtnText: { color: Colors.text, fontSize: 15, fontWeight: '700' },
+
+  typingContainer: { flexDirection: 'row', gap: 4, padding: 8, paddingLeft: 16 },
+  typingDot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.textMuted },
 
   inputRow:   { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.bg },
   inputWrap:  { flex: 1, borderWidth: 1.5, borderColor: Colors.border, borderRadius: 22, backgroundColor: Colors.surface, marginRight: 8 },
