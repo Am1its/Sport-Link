@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, TextInput, FlatList, Modal,
   TouchableOpacity, RefreshControl, ScrollView,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, withDelay } from 'react-native-reanimated';
+import { Springs } from '../../constants/motion';
 import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -24,6 +25,24 @@ const RADIUS_OPTIONS = [
   { label: '20 km', km: 20 },
 ];
 
+function StaggeredCard({ index, children }: { index: number; children: React.ReactNode }) {
+  const translateY = useSharedValue(20);
+  const opacity    = useSharedValue(0);
+
+  useEffect(() => {
+    const delay = Math.min(index * 60, 400);
+    translateY.value = withDelay(delay, withSpring(0, Springs.bouncy));
+    opacity.value    = withDelay(delay, withTiming(1, { duration: 250 }));
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
 export default function DiscoverScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
@@ -43,6 +62,40 @@ export default function DiscoverScreen() {
 
   const tabOpacity = useSharedValue(0);
   const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
+
+  const sportModalScale   = useSharedValue(0.88);
+  const sportModalOpacity = useSharedValue(0);
+  const sportModalStyle   = useAnimatedStyle(() => ({
+    transform: [{ scale: sportModalScale.value }],
+    opacity: sportModalOpacity.value,
+  }));
+
+  const radiusModalScale   = useSharedValue(0.88);
+  const radiusModalOpacity = useSharedValue(0);
+  const radiusModalStyle   = useAnimatedStyle(() => ({
+    transform: [{ scale: radiusModalScale.value }],
+    opacity: radiusModalOpacity.value,
+  }));
+
+  useEffect(() => {
+    if (showSportModal) {
+      sportModalScale.value   = withSpring(1, Springs.bouncy);
+      sportModalOpacity.value = withTiming(1, { duration: 200 });
+    } else {
+      sportModalScale.value   = withSpring(0.88, Springs.snappy);
+      sportModalOpacity.value = withTiming(0, { duration: 150 });
+    }
+  }, [showSportModal]);
+
+  useEffect(() => {
+    if (showRadiusModal) {
+      radiusModalScale.value   = withSpring(1, Springs.bouncy);
+      radiusModalOpacity.value = withTiming(1, { duration: 200 });
+    } else {
+      radiusModalScale.value   = withSpring(0.88, Springs.snappy);
+      radiusModalOpacity.value = withTiming(0, { duration: 150 });
+    }
+  }, [showRadiusModal]);
 
   useFocusEffect(
     useCallback(() => {
@@ -263,23 +316,25 @@ export default function DiscoverScreen() {
           <FlatList
             data={filtered}
             keyExtractor={item => String(item.id)}
-            renderItem={({ item }) => (
-              <GameCard
-                game={item}
-                userId={user?.id}
-                token={token}
-                onJoined={handleJoined}
-                onNeighborhoodPress={handleNeighborhoodPress}
-                onViewParticipants={() =>
-                  router.push({
-                    pathname: '/game-participants',
-                    params: {
-                      gameId: String(item.id),
-                      title: item.title ?? `${sportLabel(item.sport_type)} Game`,
-                    },
-                  } as any)
-                }
-              />
+            renderItem={({ item, index }) => (
+              <StaggeredCard index={index}>
+                <GameCard
+                  game={item}
+                  userId={user?.id}
+                  token={token}
+                  onJoined={handleJoined}
+                  onNeighborhoodPress={handleNeighborhoodPress}
+                  onViewParticipants={() =>
+                    router.push({
+                      pathname: '/game-participants',
+                      params: {
+                        gameId: String(item.id),
+                        title: item.title ?? `${sportLabel(item.sport_type)} Game`,
+                      },
+                    } as any)
+                  }
+                />
+              </StaggeredCard>
             )}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
@@ -296,9 +351,9 @@ export default function DiscoverScreen() {
       </View>
 
       {/* Sport picker modal */}
-      <Modal visible={showSportModal} transparent animationType="fade" onRequestClose={() => setShowSportModal(false)}>
+      <Modal visible={showSportModal} transparent animationType="none" onRequestClose={() => setShowSportModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowSportModal(false)}>
-          <View style={styles.modalSheet}>
+          <Animated.View style={[styles.modalSheet, sportModalStyle]}>
             <Text style={styles.modalTitle}>Sport</Text>
             {SPORT_FILTER_ITEMS.map(({ key, label }) => (
               <TouchableOpacity
@@ -320,14 +375,14 @@ export default function DiscoverScreen() {
                 {sportFilter === key && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
               </TouchableOpacity>
             ))}
-          </View>
+          </Animated.View>
         </TouchableOpacity>
       </Modal>
 
       {/* Distance picker modal */}
-      <Modal visible={showRadiusModal} transparent animationType="fade" onRequestClose={() => setShowRadiusModal(false)}>
+      <Modal visible={showRadiusModal} transparent animationType="none" onRequestClose={() => setShowRadiusModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRadiusModal(false)}>
-          <View style={styles.modalSheet}>
+          <Animated.View style={[styles.modalSheet, radiusModalStyle]}>
             <Text style={styles.modalTitle}>Distance</Text>
             {RADIUS_OPTIONS.map(({ label, km }) => (
               <TouchableOpacity
@@ -343,7 +398,7 @@ export default function DiscoverScreen() {
                 {radiusKm === km && <Ionicons name="checkmark" size={18} color={Colors.blue} />}
               </TouchableOpacity>
             ))}
-          </View>
+          </Animated.View>
         </TouchableOpacity>
       </Modal>
     </Animated.View>

@@ -3,9 +3,11 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   Alert, Image, Share, Pressable,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { usePressAnimation, useSuccessBurst } from '../hooks/useAnimations';
 import * as Haptics from 'expo-haptics';
+import { useSound } from '../context/SoundContext';
+import { Springs } from '../constants/motion';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { API_BASE } from '../constants/api';
@@ -44,6 +46,11 @@ export function GameCard({
     damping: 20,
   });
   const { trigger: triggerBurst, dotStyles } = useSuccessBurst();
+  const { play } = useSound();
+  const fillWidth = useSharedValue(0);
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${fillWidth.value * 100}%` as any,
+  }));
   const color  = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
   const icon   = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
   const isOwn  = game.host_id === userId;
@@ -70,6 +77,8 @@ export function GameCard({
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsJoined(true);
+      fillWidth.value = withSpring(1, Springs.bouncy);
+      play('chime');
       triggerBurst();
       if (data.waitlisted) {
         setIsWaitlisted(true);
@@ -236,7 +245,15 @@ export function GameCard({
             </Animated.View>
           ) : (
             <Animated.View style={[joinPressStyle, { flex: 1 }]}>
-              <Pressable style={styles.joinBtn} onPress={handleJoin} onPressIn={joinPressIn} onPressOut={joinPressOut} disabled={joining}>
+              <Pressable style={[styles.joinBtn, styles.joinBtnOverflow]} onPress={handleJoin} onPressIn={joinPressIn} onPressOut={joinPressOut} disabled={joining}>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor: Colors.accent, borderRadius: Radius.pill },
+                    fillStyle,
+                  ]}
+                />
                 {joining
                   ? <ActivityIndicator color={Colors.bg} size="small" />
                   : <>
@@ -296,6 +313,7 @@ const styles = StyleSheet.create({
   joinBtnWrap: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border, overflow: 'hidden' },
   joinRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   joinBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 44, borderRadius: Radius.pill },
+  joinBtnOverflow: { overflow: 'hidden' },
   joinBtnMuted:    { backgroundColor: Colors.surface2 },
   joinBtnWaitlist: { backgroundColor: Colors.warning + '22', borderWidth: 1, borderColor: Colors.warningBorder },
   joinBtnText: { color: Colors.bg, ...Type.btnPrimary },
