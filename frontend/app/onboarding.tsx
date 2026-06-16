@@ -143,13 +143,19 @@ export default function OnboardingScreen() {
     const outX = direction === 'forward' ? -SCREEN_WIDTH : SCREEN_WIDTH;
     const inX  = direction === 'forward' ?  SCREEN_WIDTH : -SCREEN_WIDTH;
     stepTranslateX.value = withTiming(outX, { duration: 200 }, () => {
+      // Position and hide before React re-renders with new step content
       stepTranslateX.value = inX;
       stepOpacity.value = 0;
       runOnJS(setStep)(next);
-      stepTranslateX.value = withSpring(0, Springs.bouncy);
-      stepOpacity.value = withTiming(1, { duration: 150 });
+      // Slide-in spring runs in useEffect([step]) after re-render
     });
-  }, [SCREEN_WIDTH]);
+  }, [SCREEN_WIDTH, setStep]);
+
+  // Start slide-in after React renders the new step content
+  useEffect(() => {
+    stepTranslateX.value = withSpring(0, Springs.bouncy);
+    stepOpacity.value = withTiming(1, { duration: 150 });
+  }, [step]);
 
   const pickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -390,11 +396,11 @@ export default function OnboardingScreen() {
                   <Ionicons name="arrow-back" size={18} color={Colors.text} />
                   <Text style={styles.backBtnText}>Back</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
+                <TouchableOpacity style={styles.nextBtn} onPress={handleFinish} disabled={saving}>
                   {saving
                     ? <ActivityIndicator color={Colors.bg} size="small" />
                     : <>
-                        <Text style={styles.finishBtnText}>Let's Play!</Text>
+                        <Text style={styles.nextBtnText}>Let's Play!</Text>
                         <Ionicons name="rocket" size={18} color={Colors.bg} />
                       </>}
                 </TouchableOpacity>
@@ -457,6 +463,4 @@ const styles = StyleSheet.create({
   backBtnText: { color: Colors.text, fontWeight: '700', fontSize: 15 },
   nextBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: Colors.accent, borderRadius: Radius.pill },
   nextBtnText: { color: Colors.bg, fontWeight: '900', fontSize: 16 },
-  finishBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, backgroundColor: Colors.accent, borderRadius: Radius.pill },
-  finishBtnText: { color: Colors.bg, fontWeight: '900', fontSize: 16 },
 });
