@@ -15,6 +15,8 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { usePressAnimation, useEntranceAnimation, useStaggerEntrance } from '../hooks/useAnimations';
+import { Springs } from '../constants/motion';
+import { useSound } from '../context/SoundContext';
 
 type Player = { id: number; username: string; avatar: string | null };
 
@@ -92,7 +94,10 @@ function ThumbButton({
   isUp, isSelected, onPress,
 }: { isUp: boolean; isSelected: boolean; onPress: () => void }) {
   const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({
-    scaleDown: 0.88, scaleUp: 1.12, stiffness: 500, damping: 18,
+    scaleDown: 0.88,
+    scaleUp: 1.1,
+    stiffness: Springs.bouncy.stiffness,
+    damping: Springs.bouncy.damping,
   });
   const nudgeY = useSharedValue(0);
 
@@ -124,34 +129,51 @@ function ThumbButton({
   );
 }
 
-function AnimatedStar({
-  index, filled, onPress,
-}: { index: number; filled: boolean; onPress: () => void }) {
-  const scale = useSharedValue(1);
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  // 5 explicit shared values — never call useSharedValue inside .map()
+  const s0 = useSharedValue(1);
+  const s1 = useSharedValue(1);
+  const s2 = useSharedValue(1);
+  const s3 = useSharedValue(1);
+  const s4 = useSharedValue(1);
+  const scales = [s0, s1, s2, s3, s4];
 
-  useEffect(() => {
-    if (filled) {
-      scale.value = withDelay(
-        index * 60,
-        withSequence(withSpring(1.3, { stiffness: 500 }), withSpring(1, { stiffness: 300 })),
-      );
-    }
-  }, [filled, index, scale]);
+  // 5 explicit animated styles — never call useAnimatedStyle inside .map()
+  const a0 = useAnimatedStyle(() => ({ transform: [{ scale: s0.value }] }));
+  const a1 = useAnimatedStyle(() => ({ transform: [{ scale: s1.value }] }));
+  const a2 = useAnimatedStyle(() => ({ transform: [{ scale: s2.value }] }));
+  const a3 = useAnimatedStyle(() => ({ transform: [{ scale: s3.value }] }));
+  const a4 = useAnimatedStyle(() => ({ transform: [{ scale: s4.value }] }));
+  const styles5 = [a0, a1, a2, a3, a4];
 
-  const starStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const handlePress = (rating: number) => {
+    scales.forEach((sv, i) => {
+      if (i < rating) {
+        sv.value = withDelay(i * 40, withSpring(1.25, Springs.bouncy, () => {
+          sv.value = withSpring(1, Springs.snappy);
+        }));
+      } else {
+        sv.value = withSpring(1, Springs.snappy);
+      }
+    });
+    Haptics.selectionAsync();
+    onChange(rating);
+  };
 
   return (
-    <Pressable onPress={() => { Haptics.selectionAsync(); onPress(); }}>
-      <Animated.View style={starStyle}>
-        <Ionicons
-          name={filled ? 'star' : 'star-outline'}
-          size={28}
-          color={filled ? Colors.yellow : Colors.textMuted}
-        />
-      </Animated.View>
-    </Pressable>
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      {[1, 2, 3, 4, 5].map((n, i) => (
+        <Animated.View key={n} style={styles5[i]}>
+          <Pressable onPress={() => handlePress(n)}>
+            <Ionicons
+              name={value >= n ? 'star' : 'star-outline'}
+              size={28}
+              color={value >= n ? Colors.yellow : Colors.textMuted}
+            />
+          </Pressable>
+        </Animated.View>
+      ))}
+    </View>
   );
 }
 
@@ -159,6 +181,7 @@ export default function RatePlayersScreen() {
   const router = useRouter();
   const { gameId, sport, scheduledTime } = useLocalSearchParams();
   const { token } = useAuth();
+  const { play } = useSound();
 
   const [players, setPlayers]       = useState<Player[]>([]);
   const [isHost, setIsHost]         = useState(false);
@@ -178,6 +201,7 @@ export default function RatePlayersScreen() {
   useEffect(() => {
     if (done) {
       circleScale.value = withSpring(1, { stiffness: 200, damping: 14 });
+      play('success');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [done]);
@@ -426,16 +450,10 @@ export default function RatePlayersScreen() {
                       <Ionicons name="flash-outline" size={14} color={Colors.textSub} />
                       <Text style={styles.categoryLabel}>Skill Level</Text>
                     </View>
-                    <View style={styles.starsRow}>
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <AnimatedStar
-                          key={star}
-                          index={star - 1}
-                          filled={star <= ratings.skill}
-                          onPress={() => setPeer(item.id, { skill: star })}
-                        />
-                      ))}
-                    </View>
+                    <StarRating
+                      value={ratings.skill}
+                      onChange={(v) => setPeer(item.id, { skill: v })}
+                    />
                   </View>
                 </View>
               );
