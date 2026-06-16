@@ -1,8 +1,8 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import {
   useSharedValue, useAnimatedStyle,
-  withSpring, withTiming, withSequence, withDelay,
-  runOnJS,
+  withSpring, withTiming, withSequence, withDelay, withRepeat,
+  runOnJS, Easing,
 } from 'react-native-reanimated';
 
 export function usePressAnimation(config?: {
@@ -82,4 +82,109 @@ export function useSuccessBurst() {
   }, [progress]);
 
   return { trigger, dotStyles: [dot0, dot1, dot2, dot3, dot4, dot5] };
+}
+
+export function useFloatingOrb(phase = 0) {
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withDelay(
+      Math.round(phase * 2000),
+      withRepeat(
+        withSequence(
+          withTiming(-8, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
+          withTiming(8,  { duration: 2000, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+      ),
+    );
+  }, []);
+
+  return useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+}
+
+export function useCountUp(target: number, duration = 800) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (target === 0) { setDisplay(0); return; }
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(eased * target));
+      if (progress >= 1) clearInterval(timer);
+    }, 16);
+    return () => clearInterval(timer);
+  }, [target, duration]);
+
+  return display;
+}
+
+export function useFieldShake() {
+  const translateX = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const shake = useCallback(() => {
+    translateX.value = withSequence(
+      withTiming(-8, { duration: 50 }),
+      withTiming(8,  { duration: 50 }),
+      withTiming(-6, { duration: 50 }),
+      withTiming(6,  { duration: 50 }),
+      withTiming(-4, { duration: 50 }),
+      withTiming(0,  { duration: 50 }),
+    );
+  }, [translateX]);
+
+  return { animatedStyle, shake };
+}
+
+export function useTypingIndicator() {
+  const dot0 = useSharedValue(0);
+  const dot1 = useSharedValue(0);
+  const dot2 = useSharedValue(0);
+  const [visible, setVisible] = useState(false);
+
+  const dot0Style = useAnimatedStyle(() => ({ transform: [{ translateY: dot0.value }] }));
+  const dot1Style = useAnimatedStyle(() => ({ transform: [{ translateY: dot1.value }] }));
+  const dot2Style = useAnimatedStyle(() => ({ transform: [{ translateY: dot2.value }] }));
+
+  const startLoop = useCallback(() => {
+    const bounce = (sv: { value: number }, delay: number) => {
+      sv.value = withDelay(delay, withRepeat(
+        withSequence(
+          withTiming(-6, { duration: 300 }),
+          withTiming(0,  { duration: 300 }),
+        ),
+        -1,
+      ));
+    };
+    bounce(dot0, 0);
+    bounce(dot1, 120);
+    bounce(dot2, 240);
+  }, [dot0, dot1, dot2]);
+
+  const stopLoop = useCallback(() => {
+    dot0.value = withTiming(0, { duration: 200 });
+    dot1.value = withTiming(0, { duration: 200 });
+    dot2.value = withTiming(0, { duration: 200 });
+  }, [dot0, dot1, dot2]);
+
+  const show = useCallback(() => {
+    setVisible(true);
+    startLoop();
+  }, [startLoop]);
+
+  const hide = useCallback(() => {
+    stopLoop();
+    setTimeout(() => setVisible(false), 200);
+  }, [stopLoop]);
+
+  return { dot0Style, dot1Style, dot2Style, visible, show, hide };
 }
