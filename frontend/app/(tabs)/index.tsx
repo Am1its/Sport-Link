@@ -869,6 +869,7 @@ export default function HomeScreen() {
                   onPress={() => {
                     setShowCourtPicker(false);
                     setShowAddMenu(false);
+                    fabRotate.value = withSpring(0, Springs.snappy);
                     router.push({
                       pathname: '/modal',
                       params: {
