@@ -1,16 +1,20 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
 } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming, withSpring, withDelay,
+} from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { formatChatTimestamp } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { getAvatarColor } from '../../utils/avatar';
 import { Colors, Spacing, Radius, Type } from '../../constants/theme';
+import { Springs } from '../../constants/motion';
 import { ChatSkeleton } from '../../components/SkeletonLoader';
 
 type GameChat = {
@@ -35,6 +39,52 @@ type DMConversation = {
   unread_count: number;
 };
 
+// ─── StaggeredRow ──────────────────────────────────────────────────────────────
+function StaggeredRow({ index, children }: { index: number; children: React.ReactNode }) {
+  const translateY = useSharedValue(12);
+  const opacity    = useSharedValue(0);
+
+  useEffect(() => {
+    const delay = Math.min(index * 50, 400);
+    translateY.value = withDelay(delay, withSpring(0, Springs.bouncy));
+    opacity.value    = withDelay(delay, withTiming(1, { duration: 200 }));
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={style}>{children}</Animated.View>;
+}
+
+// ─── UnreadBar ─────────────────────────────────────────────────────────────────
+function UnreadBar() {
+  const width = useSharedValue(0);
+  const barStyle = useAnimatedStyle(() => ({ width: width.value }));
+
+  useEffect(() => {
+    width.value = withSpring(3, Springs.bouncy);
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          backgroundColor: Colors.accent,
+          borderRadius: 2,
+        },
+        barStyle,
+      ]}
+    />
+  );
+}
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function ChatScreen() {
   const { token, user } = useAuth();
   const router = useRouter();
@@ -46,6 +96,7 @@ export default function ChatScreen() {
 
   const totalUnread = dms.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
+  // ── Tab fade-in ──────────────────────────────────────────────────────────────
   const tabOpacity = useSharedValue(0);
   const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
 
@@ -56,6 +107,7 @@ export default function ChatScreen() {
     }, [])
   );
 
+  // ── Data fetch ───────────────────────────────────────────────────────────────
   useFocusEffect(
     useCallback(() => {
       const fetchAll = async () => {
@@ -78,39 +130,67 @@ export default function ChatScreen() {
     }, [token])
   );
 
-  const renderGameChat = ({ item }: { item: GameChat }) => {
+  // ── Badge bounce ─────────────────────────────────────────────────────────────
+  const badgeScale = useSharedValue(0);
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: badgeScale.value }],
+  }));
+
+  const prevUnreadRef = React.useRef(0);
+
+  useEffect(() => {
+    if (totalUnread > 0) {
+      // If count increased, re-bounce and fire haptic
+      if (totalUnread > prevUnreadRef.current) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        badgeScale.value = withSpring(0.8, Springs.snappy, () => {
+          badgeScale.value = withSpring(1, Springs.bouncy);
+        });
+      } else {
+        badgeScale.value = withSpring(1, Springs.bouncy);
+      }
+    } else {
+      badgeScale.value = withSpring(0, Springs.snappy);
+    }
+    prevUnreadRef.current = totalUnread;
+  }, [totalUnread]);
+
+  // ── Render helpers ───────────────────────────────────────────────────────────
+  const renderGameChat = ({ item, index }: { item: GameChat; index: number }) => {
     const color    = SPORT_COLORS[item.sport_type] ?? Colors.accent;
     const icon     = SPORT_ICONS[item.sport_type]  ?? 'map-marker';
     const gameName = `${sportLabel(item.sport_type)} Game`;
     return (
-      <TouchableOpacity
-        style={styles.row}
-        onPress={() => router.push({ pathname: '/game-chat', params: { id: item.id, name: gameName } })}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.iconCircle, { backgroundColor: color + '18', borderColor: color + '55' }]}>
-          <MaterialCommunityIcons name={icon as any} size={24} color={color} />
-        </View>
-        <View style={styles.rowBody}>
-          <View style={styles.rowTop}>
-            <Text style={styles.rowTitle}>{gameName}</Text>
-            <Text style={styles.rowTime}>{formatChatTimestamp(item.last_message_at)}</Text>
+      <StaggeredRow index={index}>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => router.push({ pathname: '/game-chat', params: { id: item.id, name: gameName } })}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: color + '18', borderColor: color + '55' }]}>
+            <MaterialCommunityIcons name={icon as any} size={24} color={color} />
           </View>
-          {item.location_desc ? (
-            <Text style={styles.rowSub} numberOfLines={1}>{item.location_desc}</Text>
-          ) : null}
-          <Text style={styles.rowPreview} numberOfLines={1}>
-            {item.last_message
-              ? `${item.last_sender}: ${item.last_message}`
-              : 'No messages yet — say hi!'}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
-      </TouchableOpacity>
+          <View style={styles.rowBody}>
+            <View style={styles.rowTop}>
+              <Text style={styles.rowTitle}>{gameName}</Text>
+              <Text style={styles.rowTime}>{formatChatTimestamp(item.last_message_at)}</Text>
+            </View>
+            {item.location_desc ? (
+              <Text style={styles.rowSub} numberOfLines={1}>{item.location_desc}</Text>
+            ) : null}
+            <Text style={styles.rowPreview} numberOfLines={1}>
+              {item.last_message
+                ? `${item.last_sender}: ${item.last_message}`
+                : 'No messages yet — say hi!'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
+        </TouchableOpacity>
+      </StaggeredRow>
     );
   };
 
-  const renderDM = ({ item }: { item: DMConversation }) => {
+  const renderDM = ({ item, index }: { item: DMConversation; index: number }) => {
     const color     = getAvatarColor(item.username);
     const hasUnread = item.unread_count > 0;
     const isMine    = item.last_sender_id === user?.id;
@@ -121,46 +201,51 @@ export default function ChatScreen() {
           : 'Say hi!');
 
     return (
-      <TouchableOpacity
-        style={styles.row}
-        onPress={() => router.push({
-          pathname: '/direct-chat',
-          params: { userId: String(item.id), username: item.username },
-        })}
-        activeOpacity={0.7}
-      >
-        <View style={styles.avatarWrap}>
-          <View style={[styles.avatarCircle, { backgroundColor: color + '18', borderColor: color + '55' }]}>
-            {item.avatar ? (
-              <Image source={{ uri: `data:image/jpeg;base64,${item.avatar}` }} style={styles.avatarImage} />
-            ) : (
-              <Text style={[styles.avatarLetter, { color }]}>
-                {item.username.charAt(0).toUpperCase()}
+      <StaggeredRow index={index}>
+        <TouchableOpacity
+          style={styles.rowOuter}
+          onPress={() => router.push({
+            pathname: '/direct-chat',
+            params: { userId: String(item.id), username: item.username },
+          })}
+          activeOpacity={0.7}
+        >
+          {hasUnread && <UnreadBar />}
+          <View style={styles.row}>
+            <View style={styles.avatarWrap}>
+              <View style={[styles.avatarCircle, { backgroundColor: color + '18', borderColor: color + '55' }]}>
+                {item.avatar ? (
+                  <Image source={{ uri: `data:image/jpeg;base64,${item.avatar}` }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={[styles.avatarLetter, { color }]}>
+                    {item.username.charAt(0).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              {hasUnread && <View style={styles.onlineDot} />}
+            </View>
+            <View style={styles.rowBody}>
+              <View style={styles.rowTop}>
+                <Text style={[styles.rowTitle, hasUnread && { color: Colors.text, fontWeight: '800' }]}>
+                  {item.username}
+                </Text>
+                <Text style={styles.rowTime}>{formatChatTimestamp(item.last_time)}</Text>
+              </View>
+              <Text
+                style={[styles.rowPreview, hasUnread && { color: Colors.textSub, fontWeight: '600' }]}
+                numberOfLines={1}
+              >
+                {preview}
               </Text>
+            </View>
+            {hasUnread && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{item.unread_count > 9 ? '9+' : item.unread_count}</Text>
+              </View>
             )}
           </View>
-          {hasUnread && <View style={styles.onlineDot} />}
-        </View>
-        <View style={styles.rowBody}>
-          <View style={styles.rowTop}>
-            <Text style={[styles.rowTitle, hasUnread && { color: Colors.text, fontWeight: '800' }]}>
-              {item.username}
-            </Text>
-            <Text style={styles.rowTime}>{formatChatTimestamp(item.last_time)}</Text>
-          </View>
-          <Text
-            style={[styles.rowPreview, hasUnread && { color: Colors.textSub, fontWeight: '600' }]}
-            numberOfLines={1}
-          >
-            {preview}
-          </Text>
-        </View>
-        {hasUnread && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>{item.unread_count > 9 ? '9+' : item.unread_count}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </StaggeredRow>
     );
   };
 
@@ -186,9 +271,9 @@ export default function ChatScreen() {
           <Ionicons name="people-outline" size={15} color={tab === 'friends' ? Colors.bg : Colors.textMuted} />
           <Text style={[styles.tabText, tab === 'friends' && styles.tabTextActive]}>Friends</Text>
           {totalUnread > 0 && (
-            <View style={styles.tabBadge}>
+            <Animated.View style={[styles.tabBadge, badgeStyle]}>
               <Text style={styles.tabBadgeText}>{totalUnread > 9 ? '9+' : totalUnread}</Text>
-            </View>
+            </Animated.View>
           )}
         </TouchableOpacity>
       </View>
@@ -262,9 +347,10 @@ const styles = StyleSheet.create({
   tabBadgeText:  { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
 
   // Rows
-  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
-  rowBody: { flex: 1, marginRight: 8 },
-  rowTop:  { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
+  rowOuter: { position: 'relative', overflow: 'hidden' },
+  row:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  rowBody:  { flex: 1, marginRight: 8 },
+  rowTop:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
   rowTitle:   { fontSize: 15, fontWeight: '700', color: Colors.textSub },
   rowTime:    { fontSize: 12, color: Colors.textMuted },
   rowSub:     { fontSize: 12, color: Colors.textMuted, marginBottom: 2 },
