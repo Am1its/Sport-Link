@@ -1,9 +1,9 @@
 import React, { createContext, useContext } from 'react';
 import { useSounds, SoundName } from '../hooks/useSounds';
 
-type SoundContextValue = { play: (name: SoundName) => void };
+type SoundContextValue = { play: (name: SoundName) => Promise<void> };
 
-const SoundContext = createContext<SoundContextValue>({ play: () => {} });
+const SoundContext = createContext<SoundContextValue>({ play: async () => {} });
 
 export function SoundProvider({ children }: { children: React.ReactNode }) {
   const { play } = useSounds();
