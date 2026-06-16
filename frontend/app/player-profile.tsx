@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Alert, Modal,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +11,8 @@ import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { useFloatingOrb, useCountUp } from '../hooks/useAnimations';
+import { Springs } from '../constants/motion';
 
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
@@ -47,6 +50,11 @@ type PublicUser = {
 
 const SKILL_LABELS = ['', 'Beginner', 'Casual', 'Intermediate', 'Advanced', 'Pro'];
 
+function FloatingBlob({ style, color, phase }: { style: any; color: string; phase: number }) {
+  const floatStyle = useFloatingOrb(phase);
+  return <Animated.View style={[style, { backgroundColor: color }, floatStyle]} />;
+}
+
 export default function PlayerProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
@@ -57,6 +65,18 @@ export default function PlayerProfileScreen() {
   const [friendLoading, setFriendLoading] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState<string | null>(null);
+
+  // Avatar spring scale-in
+  const avatarScale = useSharedValue(0);
+  const avatarAnimStyle = useAnimatedStyle(() => ({ transform: [{ scale: avatarScale.value }] }));
+  useEffect(() => {
+    avatarScale.value = withSpring(1, Springs.bouncy);
+  }, []);
+
+  // Count-up stats
+  const hostedCount = useCountUp(profile?.games_hosted ?? 0);
+  const joinedCount = useCountUp(profile?.games_joined ?? 0);
+  const karmaCount  = useCountUp(Math.abs(profile?.karma ?? 0));
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -184,7 +204,7 @@ export default function PlayerProfileScreen() {
 
   const isMe         = me?.id === profile.id;
   const color        = (profile.top_sport ? SPORT_COLORS[profile.top_sport] : null) ?? getAvatarColor(profile.username);
-  const karmaStr     = profile.karma > 0 ? `+${profile.karma}` : `${profile.karma}`;
+  const karmaSign    = profile.karma > 0 ? '+' : profile.karma < 0 ? '-' : '';
   const karmaColor   = profile.karma > 0 ? Colors.accent : profile.karma < 0 ? Colors.error : Colors.textMuted;
   const totalGames   = profile.games_hosted + profile.games_joined;
   const prefs        = profile.sport_preferences ?? [];
@@ -196,9 +216,9 @@ export default function PlayerProfileScreen() {
 
       {/* ── Hero band ── */}
       <View style={[styles.heroBand, { backgroundColor: color + '28' }]}>
-        <View style={[styles.heroBlob1, { backgroundColor: color + '40' }]} />
-        <View style={[styles.heroBlob2, { backgroundColor: color + '28' }]} />
-        <View style={[styles.heroBlob3, { backgroundColor: color + '18' }]} />
+        <FloatingBlob style={styles.heroBlob1} color={color + '40'} phase={0}    />
+        <FloatingBlob style={styles.heroBlob2} color={color + '28'} phase={0.43} />
+        <FloatingBlob style={styles.heroBlob3} color={color + '18'} phase={0.87} />
         {/* Back button inside hero */}
         <BackButton bgColor="rgba(0,0,0,0.35)" style={styles.backBtn} />
         {isMe && (
@@ -215,7 +235,7 @@ export default function PlayerProfileScreen() {
 
       {/* ── Avatar section ── */}
       <View style={styles.avatarSection}>
-        <View style={styles.avatarWrapper}>
+        <Animated.View style={[styles.avatarWrapper, avatarAnimStyle]}>
           <View style={[styles.avatarRing, { borderColor: color, ...Shadow.medium }]}>
             <View style={styles.avatarInner}>
               {profile.avatar ? (
@@ -232,7 +252,7 @@ export default function PlayerProfileScreen() {
               <MaterialCommunityIcons name={SPORT_ICONS[profile.top_sport] as any} size={14} color={color} />
             </View>
           )}
-        </View>
+        </Animated.View>
 
         <Text style={styles.username}>{profile.username}</Text>
         {profile.bio ? (
@@ -245,22 +265,22 @@ export default function PlayerProfileScreen() {
       {/* ── Stats bar ── */}
       <View style={[styles.statsBar, Shadow.card]}>
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: Colors.text }]}>{totalGames}</Text>
+          <Text style={[styles.statValue, { color: Colors.text }]}>{hostedCount + joinedCount}</Text>
           <Text style={styles.statLabel}>Games</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: Colors.accent }]}>{profile.games_hosted}</Text>
+          <Text style={[styles.statValue, { color: Colors.accent }]}>{hostedCount}</Text>
           <Text style={styles.statLabel}>Hosted</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: Colors.blue }]}>{profile.games_joined}</Text>
+          <Text style={[styles.statValue, { color: Colors.blue }]}>{joinedCount}</Text>
           <Text style={styles.statLabel}>Joined</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: karmaColor }]}>{karmaStr}</Text>
+          <Text style={[styles.statValue, { color: karmaColor }]}>{karmaSign}{karmaCount}</Text>
           <Text style={styles.statLabel}>Karma</Text>
         </View>
       </View>
