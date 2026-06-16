@@ -129,9 +129,10 @@ export default function RegisterScreen() {
     if (!username.trim() || !email.trim() || !password) {
       shake();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      if (!username.trim())     { Alert.alert('Required', 'Please enter a username.'); return; }
-      if (!email.trim())        { Alert.alert('Required', 'Please enter your email.'); return; }
-      if (!password)            { Alert.alert('Required', 'Please enter a password.'); return; }
+      if (!username.trim())     { Alert.alert('Required', 'Please enter a username.'); }
+      else if (!email.trim())   { Alert.alert('Required', 'Please enter your email.'); }
+      else                      { Alert.alert('Required', 'Please enter a password.'); }
+      return;
     }
     if (password.length < 6) {
       shake();
