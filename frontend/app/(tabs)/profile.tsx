@@ -13,6 +13,7 @@ import { getAvatarColor } from '../../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { ProfileStatsSkeleton } from '../../components/SkeletonLoader';
+import { useFloatingOrb, useCountUp, useStaggerEntrance } from '../../hooks/useAnimations';
 
 type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
 type Badge = { badge_key: string; earned_at: string };
@@ -46,6 +47,34 @@ type Stats = {
 };
 
 const SKILL_LABELS = ['', 'Beginner', 'Casual', 'Intermediate', 'Advanced', 'Pro'];
+
+function FloatingBlob({ style, color, phase }: { style: any; color: string; phase: number }) {
+  const floatStyle = useFloatingOrb(phase);
+  return <Animated.View style={[style, { backgroundColor: color }, floatStyle]} />;
+}
+
+function SportChip({ pref, index }: { pref: SportPref; index: number }) {
+  const animStyle = useStaggerEntrance(index, 100);
+  const c   = SPORT_COLORS[pref.sport_type] ?? Colors.textMuted;
+  const ic  = SPORT_ICONS[pref.sport_type]  ?? 'help-circle';
+  const lvl = SKILL_LABELS[pref.skill_level] ?? '';
+  return (
+    <Animated.View style={animStyle}>
+      <View style={[styles.sportChip, { borderColor: c + '55', backgroundColor: c + '14' }]}>
+        <MaterialCommunityIcons name={ic as any} size={17} color={c} />
+        <View>
+          <View style={styles.chipNameRow}>
+            <Text style={[styles.chipName, { color: c }]}>
+              {sportLabel(pref.sport_type)}
+            </Text>
+            {!!pref.is_favorite && <Ionicons name="heart" size={10} color={Colors.error} />}
+          </View>
+          <Text style={[styles.chipLevel, { color: c + 'AA' }]}>{lvl}</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -156,11 +185,15 @@ export default function ProfileScreen() {
 
   const totalGames    = (stats?.games_hosted ?? 0) + (stats?.games_joined ?? 0);
   const karma         = stats?.karma ?? 0;
-  const karmaStr      = karma > 0 ? `+${karma}` : `${karma}`;
   const karmaColor    = karma > 0 ? Colors.accent : karma < 0 ? Colors.error : Colors.textMuted;
   const prefs         = stats?.sport_preferences ?? [];
   const badges        = stats?.badges ?? [];
   const currentStreak = stats?.current_streak ?? 0;
+
+  const hostedCount = useCountUp(stats?.games_hosted ?? 0);
+  const joinedCount = useCountUp(stats?.games_joined ?? 0);
+  const karmaCount  = useCountUp(Math.abs(stats?.karma ?? 0));
+  const gamesCount  = useCountUp(totalGames);
 
   return (
     <Animated.View style={[{ flex: 1, backgroundColor: Colors.bg }, tabFadeStyle]}>
@@ -168,9 +201,9 @@ export default function ProfileScreen() {
 
       {/* ── Hero band — layered for depth ── */}
       <View style={[styles.heroBand, { backgroundColor: avatarColor + '22' }]}>
-        <View style={[styles.heroBlob1, { backgroundColor: avatarColor + '40' }]} />
-        <View style={[styles.heroBlob2, { backgroundColor: avatarColor + '28' }]} />
-        <View style={[styles.heroBlob3, { backgroundColor: avatarColor + '18' }]} />
+        <FloatingBlob style={styles.heroBlob1} color={avatarColor + '40'} phase={0}    />
+        <FloatingBlob style={styles.heroBlob2} color={avatarColor + '28'} phase={0.43} />
+        <FloatingBlob style={styles.heroBlob3} color={avatarColor + '18'} phase={0.87} />
         {/* Grid lines for sporty feel */}
         <View style={styles.heroGrid} />
       </View>
@@ -250,20 +283,25 @@ export default function ProfileScreen() {
         <ProfileStatsSkeleton />
       ) : (
         <View style={[styles.statsBar, Shadow.card]}>
-          {[
-            { value: String(totalGames), label: 'Games', color: Colors.text },
-            { value: String(stats.games_hosted), label: 'Hosted', color: Colors.accent },
-            { value: String(stats.games_joined), label: 'Joined', color: Colors.blue },
-            { value: karmaStr, label: 'Karma', color: karmaColor },
-          ].map((s, i, arr) => (
-            <React.Fragment key={s.label}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-              {i < arr.length - 1 && <View style={styles.statDivider} />}
-            </React.Fragment>
-          ))}
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: Colors.text }]}>{gamesCount}</Text>
+            <Text style={styles.statLabel}>Games</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: Colors.accent }]}>{hostedCount}</Text>
+            <Text style={styles.statLabel}>Hosted</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: Colors.blue }]}>{joinedCount}</Text>
+            <Text style={styles.statLabel}>Joined</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: karmaColor }]}>{karma < 0 ? '-' : karma > 0 ? '+' : ''}{karmaCount}</Text>
+            <Text style={styles.statLabel}>Karma</Text>
+          </View>
         </View>
       )}
 
@@ -300,25 +338,9 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportsScroll}>
-            {prefs.map(pref => {
-              const c   = SPORT_COLORS[pref.sport_type] ?? Colors.textMuted;
-              const ic  = SPORT_ICONS[pref.sport_type]  ?? 'help-circle';
-              const lvl = SKILL_LABELS[pref.skill_level] ?? '';
-              return (
-                <View key={pref.sport_type} style={[styles.sportChip, { borderColor: c + '55', backgroundColor: c + '14' }]}>
-                  <MaterialCommunityIcons name={ic as any} size={17} color={c} />
-                  <View>
-                    <View style={styles.chipNameRow}>
-                      <Text style={[styles.chipName, { color: c }]}>
-                        {sportLabel(pref.sport_type)}
-                      </Text>
-                      {!!pref.is_favorite && <Ionicons name="heart" size={10} color={Colors.error} />}
-                    </View>
-                    <Text style={[styles.chipLevel, { color: c + 'AA' }]}>{lvl}</Text>
-                  </View>
-                </View>
-              );
-            })}
+            {prefs.map((pref, i) => (
+              <SportChip key={pref.sport_type} pref={pref} index={i} />
+            ))}
           </ScrollView>
         </View>
       )}
