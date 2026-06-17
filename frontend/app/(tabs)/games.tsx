@@ -1,9 +1,9 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import ReAnimated, {
-  useSharedValue as useRSharedValue,
-  useAnimatedStyle as useRAnimatedStyle,
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
   withSpring,
   withRepeat,
   withSequence,
@@ -32,28 +32,28 @@ function isWithinCheckinWindow(scheduledTime: string | null): boolean {
 }
 
 function AnimatedSectionHeader({ title, style }: { title: string; style?: any }) {
-  const translateX = useRSharedValue(-20);
-  const opacity    = useRSharedValue(0);
+  const translateX = useSharedValue(-20);
+  const opacity    = useSharedValue(0);
 
   useEffect(() => {
     translateX.value = withSpring(0, Springs.bouncy);
     opacity.value    = withTiming(1, { duration: 250 });
   }, []);
 
-  const animStyle = useRAnimatedStyle(() => ({
+  const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
     opacity: opacity.value,
   }));
 
   return (
-    <ReAnimated.View style={[animStyle, style]}>
+    <Animated.View style={[animStyle, style]}>
       <Text style={styles.sectionHeader}>{title}</Text>
-    </ReAnimated.View>
+    </Animated.View>
   );
 }
 
 function PulsingBadge({ children, style }: { children: React.ReactNode; style?: any }) {
-  const opacity = useRSharedValue(1);
+  const opacity = useSharedValue(1);
 
   useEffect(() => {
     opacity.value = withRepeat(
@@ -65,14 +65,14 @@ function PulsingBadge({ children, style }: { children: React.ReactNode; style?: 
     );
   }, []);
 
-  const animStyle = useRAnimatedStyle(() => ({ opacity: opacity.value }));
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
-  return <ReAnimated.View style={[style, animStyle]}>{children}</ReAnimated.View>;
+  return <Animated.View style={[style, animStyle]}>{children}</Animated.View>;
 }
 
 function StaggeredCard({ index, children }: { index: number; children: React.ReactNode }) {
-  const translateY = useRSharedValue(20);
-  const opacity    = useRSharedValue(0);
+  const translateY = useSharedValue(20);
+  const opacity    = useSharedValue(0);
 
   useEffect(() => {
     const delay = Math.min(index * 60, 400);
@@ -80,12 +80,12 @@ function StaggeredCard({ index, children }: { index: number; children: React.Rea
     opacity.value    = withDelay(delay, withTiming(1, { duration: 250 }));
   }, []);
 
-  const animStyle = useRAnimatedStyle(() => ({
+  const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
     opacity: opacity.value,
   }));
 
-  return <ReAnimated.View style={animStyle}>{children}</ReAnimated.View>;
+  return <Animated.View style={animStyle}>{children}</Animated.View>;
 }
 
 function MyGameCard({
