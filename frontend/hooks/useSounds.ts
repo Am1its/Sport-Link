@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 const SOUND_FILES = {
   chime:   require('../assets/sounds/chime.wav'),
@@ -20,6 +21,9 @@ export function useSounds() {
     let mounted = true;
 
     async function preload() {
+      // Skip on simulator — native audio hardware unavailable, causes log spam
+      if (!Constants.isDevice) return;
+
       const stored = await AsyncStorage.getItem('sounds_enabled');
       enabledRef.current = stored !== 'false';
       if (!enabledRef.current) return;
