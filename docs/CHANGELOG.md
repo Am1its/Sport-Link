@@ -19,6 +19,113 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Sprint 16] — June 2026 — Full Animation + Sound Makeover
+
+**Goal:** Make every screen feel premium and kinetic — purposeful motion on every interaction, coordinated sound effects, expo-av audio system, react-native-reanimated v4 applied app-wide.
+
+### Motion System
+**`frontend/constants/motion.ts`** — new file
+- `Springs` constants: `snappy` (stiffness:400/damping:28), `bouncy` (280/18), `gentle` (160/22).
+- Rule: never hardcode `{ stiffness, damping }` inline anywhere — always import from here.
+
+**`frontend/hooks/useAnimations.ts`** — 4 new hooks added
+- `useFloatingOrb(phase)` — slow Y drift + opacity pulse loop for hero band orbs.
+- `useCountUp(target, duration?)` — ticks a shared value from 0 to target on mount; used for profile/player stats.
+- `useFieldShake()` — horizontal ±8px spring shake for validation errors on form fields.
+- `useTypingIndicator()` — returns `{ visible, show, hide }`; used by both chat screens for the ••• bubble.
+
+### Sound System
+**`frontend/hooks/useSounds.ts`** — new file
+- Preloads all 5 WAV files via `expo-av Audio.Sound.createAsync` on mount. Returns `play(name)` async function.
+
+**`frontend/context/SoundContext.tsx`** — new file
+- `SoundProvider` wraps app root in `_layout.tsx`. `useSound()` hook consumed in screens.
+- Context type: `{ play: (name: SoundName) => Promise<void> }`. Default value: `async () => {}`.
+
+**`frontend/assets/sounds/`** — 5 WAV files
+- `chime.wav` (join/accept/success moments), `pop.wav` (send message), `success.wav` (register/form complete), `error.wav` (validation fail), `ding.wav` (receive message).
+
+### Per-Screen Animations
+
+**Auth (`register.tsx`, `login.tsx`)**
+- Card slide-up (translateY 60→0, Springs.bouncy) + opacity on mount.
+- 4-field stagger entrance (60ms per field, `useStaggerEntrance`).
+- `useFieldShake()` + Warning haptic on validation error.
+- `useSuccessBurst()` particle burst + `play('success')` + Success haptic on registration.
+
+**Onboarding (`onboarding.tsx`)**
+- Step slide transitions: old step slides out, new step slides in from the opposite side (Springs.bouncy). In-animation runs in `useEffect([step])` after re-render — not in the worklet callback.
+- `SportTile` sub-component: scale bounce on select (Springs.bouncy).
+- 4-segment `ProgressBar` sub-component: width transitions with `withTiming`.
+- `play('chime')` + Success haptic on finish.
+
+**Map Tab (`(tabs)/index.tsx`)**
+- FAB rotates 0°→45° on open (Springs.snappy); resets to 0° on close or navigation.
+- `FilterChip` sub-component: scale spring + `selectionAsync` haptic per chip.
+- Bottom card: slides up from 30px + fades in (Springs.bouncy); slides down on dismiss (Springs.snappy).
+
+**GameCard (`components/GameCard.tsx`)**
+- Join button: accent-color flood fill overlay (`fillWidth` 0→1, Springs.bouncy) instead of instant background swap.
+- `useEffect([game.id])` resets `fillWidth.value`, `isJoined`, `isWaitlisted` — handles FlatList cell recycling.
+- `play('chime')` + Success haptic on successful join.
+
+**Discover Tab (`(tabs)/discover.tsx`)**
+- `StaggeredCard` sub-component: translateY 20→0 + opacity, 60ms stagger, capped at 400ms.
+- Sport and radius modals: scale + opacity entrance (Springs.bouncy), `animationType="none"`.
+
+**Games Tab (`(tabs)/games.tsx`)**
+- `AnimatedSectionHeader`: translateX -20→0 on mount.
+- `PulsingBadge`: infinite opacity 1→0.5→1 loop (3s cycle) for status badges.
+- `StaggeredCard` (60ms stagger); history index offsets continue from upcoming count.
+- Heavy haptic on Leave/Delete.
+
+**Chat Tab (`(tabs)/chat.tsx`)**
+- `StaggeredRow` (50ms stagger).
+- `UnreadBar`: width 0→3 spring (Springs.bouncy) for unread indicator bar.
+- `badgeScale` bounces on unread count increase (detected via `prevUnreadRef`).
+
+**Profile Tab / Player Profile (`(tabs)/profile.tsx`, `player-profile.tsx`)**
+- `FloatingBlob` sub-component: `useFloatingOrb` at phases 0/0.43/0.87 for 3-orb hero band.
+- `SportChip` sub-component: `useStaggerEntrance(index, 100)` entrance.
+- `useCountUp` for all 4 stat values (karma uses `Math.abs` with sign prefix).
+- Avatar: spring scale 0→1 (Springs.bouncy) on mount.
+
+**Chat Screens (`game-chat.tsx`, `direct-chat.tsx`)**
+- `ChatBubble`: bubble rotates from ±2° to 0° on entrance (Springs.snappy).
+- Typing indicator: 3 animated dots driven by `useTypingIndicator()` hook; wired to `dm_typing` socket event in direct-chat.
+- Send: `play('pop')` + Medium haptic. Receive: `play('ding')` + Light haptic.
+
+**Rate Players (`rate-players.tsx`)**
+- `ThumbButton` sub-component: press bounce (Springs.bouncy).
+- `StarRating` sub-component: 5 explicit `useSharedValue` (s0–s4) + 5 explicit `useAnimatedStyle` (a0–a4); cascade fill via `withDelay(i * 40, withSpring(1.25, bouncy, () => withSpring(1, snappy)))`.
+- `play('success')` before Submit haptic.
+
+**Leaderboard (`leaderboard.tsx`)**
+- `AnimatedPodiumBlock` sub-component: height 0→finalHeight rise; delays `[150ms, 300ms, 0ms]` for `[2nd, 1st, 3rd]`.
+- `ShimmerRow`: gold shimmer strip `withRepeat(withTiming(width, 2500ms), -1)` on top-3 rows.
+- `StaggeredRow` (40ms stagger); `play('chime')` after data loads.
+
+**Court Detail (`court-detail.tsx`)**
+- `StarRating` sub-component (same 5-hook pattern as rate-players).
+- Submit confirmation: `confirmOpacity`/`confirmTranslateY` driven by `useEffect([submitSuccess])`.
+
+**Create/Edit Game Modal (`modal.tsx`)**
+- `useFieldShake()` composed on submit button; `play('error')` + Warning haptic on validation.
+- Photo preview: scale 0.8→1 + opacity 0→1 after picker (initialized to 1 in edit mode).
+- `play('chime')` before Success haptic on game create.
+
+**Friends (`friends.tsx`)**
+- `StaggeredCard` (50ms stagger).
+- `RequestCard` sub-component: `flashOpacity` green overlay `withSequence(withTiming(0.4), withTiming(0))` on accept.
+- `play('chime')` + Success haptic on API success.
+
+### Key Bug Fixes in Sprint 16
+- **Onboarding slide-in timing:** In-animation must run in `useEffect([step])` after re-render, not inside the `withTiming` completion worklet (step content not mounted yet when worklet fires).
+- **Map FAB not resetting:** `fabRotate.value = withSpring(0, Springs.snappy)` added to court-picker item `onPress` (was left at 45° after navigation).
+- **FlatList cell recycling (GameCard):** `useEffect([game.id])` resets all shared values and local state to prevent stale animation state on recycled cells.
+
+---
+
 ## [Sprint 15] — June 2026 — Animations, Haptics & UX Polish
 
 **Goal:** Elevate SportLink to a premium sports-brand feel — purposeful motion, haptic feedback at every high-stakes moment, smooth screen transitions. No audio; haptics-only.
