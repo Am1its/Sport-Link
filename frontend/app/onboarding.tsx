@@ -17,6 +17,7 @@ import { Colors, Spacing, Radius, Type } from '../constants/theme';
 import { Springs } from '../constants/motion';
 import { usePressAnimation } from '../hooks/useAnimations';
 import { useSound } from '../context/SoundContext';
+import { AuthBackground } from '../components/AuthBackground';
 
 const SPORTS = [
   { key: 'basketball', label: 'Basketball' },
@@ -130,6 +131,20 @@ export default function OnboardingScreen() {
 
   const stepIndex = STEPS.indexOf(step);
 
+  // Screen entrance animation
+  const contentY  = useSharedValue(30);
+  const contentOp = useSharedValue(0);
+  const contentStyle = useAnimatedStyle(() => ({
+    flex: 1,
+    transform: [{ translateY: contentY.value }],
+    opacity: contentOp.value,
+  }));
+
+  useEffect(() => {
+    contentY.value  = withSpring(0, Springs.gentle);
+    contentOp.value = withTiming(1, { duration: 350 });
+  }, []);
+
   // Step slide transition
   const stepTranslateX = useSharedValue(0);
   const stepOpacity    = useSharedValue(1);
@@ -143,15 +158,12 @@ export default function OnboardingScreen() {
     const outX = direction === 'forward' ? -SCREEN_WIDTH : SCREEN_WIDTH;
     const inX  = direction === 'forward' ?  SCREEN_WIDTH : -SCREEN_WIDTH;
     stepTranslateX.value = withTiming(outX, { duration: 200 }, () => {
-      // Position and hide before React re-renders with new step content
       stepTranslateX.value = inX;
       stepOpacity.value = 0;
       runOnJS(setStep)(next);
-      // Slide-in spring runs in useEffect([step]) after re-render
     });
   }, [SCREEN_WIDTH, setStep]);
 
-  // Start slide-in after React renders the new step content
   useEffect(() => {
     stepTranslateX.value = withSpring(0, Springs.bouncy);
     stepOpacity.value = withTiming(1, { duration: 150 });
@@ -234,183 +246,186 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.brand}>SportLink</Text>
-        <Text style={styles.subtitle}>Let's set up your profile</Text>
+      <AuthBackground showLogo={false} />
 
-        {/* Animated segmented progress bar */}
-        <ProgressBar currentStep={stepIndex + 1} />
-      </View>
+      <ReAnimated.View style={contentStyle}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.logoRing}>
+            <Image source={require('../assets/Logo4.png')} style={styles.logo} resizeMode="contain" />
+          </View>
+          <Text style={styles.subtitle}>Let's set up your profile</Text>
+          <ProgressBar currentStep={stepIndex + 1} />
+        </View>
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <ReAnimated.View style={stepStyle}>
 
-        <ReAnimated.View style={stepStyle}>
+            {/* ── Step 1: Photo ── */}
+            {step === 'avatar' && (
+              <View style={styles.stepContainer}>
+                <Text style={styles.stepTitle}>Add a profile photo</Text>
+                <Text style={styles.stepHint}>You can always change this later</Text>
 
-          {/* ── Step 1: Photo ── */}
-          {step === 'avatar' && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Add a profile photo</Text>
-              <Text style={styles.stepHint}>You can always change this later</Text>
-
-              <TouchableOpacity style={styles.avatarWrap} onPress={pickAvatar} activeOpacity={0.8}>
-                {avatar ? (
-                  <Image source={{ uri: `data:image/jpeg;base64,${avatar}` }} style={styles.avatarImage} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Ionicons name="camera" size={40} color={Colors.textMuted} />
-                    <Text style={styles.avatarPlaceholderText}>Tap to upload</Text>
-                  </View>
-                )}
-                <View style={styles.avatarEditBadge}>
-                  <Ionicons name="pencil" size={14} color={Colors.bg} />
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.navRow}>
-                <TouchableOpacity style={styles.skipBtn} onPress={() => goToStep('bio', 'forward')}>
-                  <Text style={styles.skipText}>Skip for now</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.nextBtn} onPress={() => goToStep('bio', 'forward')}>
-                  <Text style={styles.nextBtnText}>Next</Text>
-                  <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ── Step 2: Bio ── */}
-          {step === 'bio' && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Tell us about yourself</Text>
-              <Text style={styles.stepHint}>A short bio helps others know who you are</Text>
-
-              <TextInput
-                style={[styles.bioInput, bioFocused && styles.bioInputFocused]}
-                placeholder="e.g. Basketball fanatic, always up for a game 🏀"
-                placeholderTextColor={Colors.textHint}
-                value={bio}
-                onChangeText={setBio}
-                onFocus={() => setBioFocused(true)}
-                onBlur={() => setBioFocused(false)}
-                multiline
-                maxLength={120}
-                autoFocus
-              />
-              <Text style={styles.charCount}>{bio.length}/120</Text>
-
-              <View style={styles.navRow}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => goToStep('avatar', 'back')}>
-                  <Ionicons name="arrow-back" size={18} color={Colors.text} />
-                  <Text style={styles.backBtnText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.nextBtn} onPress={() => goToStep('sports', 'forward')}>
-                  <Text style={styles.nextBtnText}>Next</Text>
-                  <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ── Step 3: Sports ── */}
-          {step === 'sports' && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>What do you play?</Text>
-              <Text style={styles.stepHint}>Select all sports you're into</Text>
-
-              <View style={styles.sportsGrid}>
-                {SPORTS.map(({ key, label }) => (
-                  <SportTile
-                    key={key}
-                    sportKey={key}
-                    label={label}
-                    selected={selectedSports.includes(key)}
-                    onToggle={() => toggleSport(key)}
-                  />
-                ))}
-              </View>
-
-              <View style={styles.navRow}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => goToStep('bio', 'back')}>
-                  <Ionicons name="arrow-back" size={18} color={Colors.text} />
-                  <Text style={styles.backBtnText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.nextBtn}
-                  onPress={() => {
-                    if (selectedSports.length === 0) return Alert.alert('Pick at least one', 'Select the sports you play.');
-                    goToStep('levels', 'forward');
-                  }}
-                >
-                  <Text style={styles.nextBtnText}>Next</Text>
-                  <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* ── Step 4: Levels ── */}
-          {step === 'levels' && (
-            <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>Your skill levels</Text>
-              <Text style={styles.stepHint}>Tap dots to set level · ♥ to mark favorites</Text>
-
-              <View style={styles.levelsContainer}>
-                {selectedSports.map(key => {
-                  const sportDef = SPORTS.find(s => s.key === key)!;
-                  const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? Colors.accent;
-                  const icon     = SPORT_ICONS[key  as keyof typeof SPORT_ICONS]  ?? 'trophy';
-                  const pref     = sportPrefs[key] ?? { level: 3, favorite: false };
-                  return (
-                    <View key={key} style={styles.levelRow}>
-                      <MaterialCommunityIcons name={icon as any} size={20} color={color} />
-                      <Text style={styles.levelSportLabel}>{sportDef.label}</Text>
-                      <View style={{ flex: 1 }} />
-                      <View style={styles.levelControl}>
-                        <View style={styles.levelDots}>
-                          {[1, 2, 3, 4, 5].map(n => (
-                            <TouchableOpacity
-                              key={n}
-                              onPress={() => setLevel(key, n)}
-                              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                            >
-                              <View style={[styles.levelDot, n <= pref.level && { backgroundColor: color }]} />
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                        <Text style={styles.levelName}>{LEVEL_NAMES[(pref.level || 1) - 1]}</Text>
-                      </View>
-                      <TouchableOpacity onPress={() => toggleFavorite(key)} style={styles.favoriteBtn}>
-                        <Ionicons
-                          name={pref.favorite ? 'heart' : 'heart-outline'}
-                          size={20}
-                          color={pref.favorite ? '#FF6B6B' : Colors.textHint}
-                        />
-                      </TouchableOpacity>
+                <TouchableOpacity style={styles.avatarWrap} onPress={pickAvatar} activeOpacity={0.8}>
+                  {avatar ? (
+                    <Image source={{ uri: `data:image/jpeg;base64,${avatar}` }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Ionicons name="camera" size={40} color={Colors.textMuted} />
+                      <Text style={styles.avatarPlaceholderText}>Tap to upload</Text>
                     </View>
-                  );
-                })}
-              </View>
-
-              <View style={styles.navRow}>
-                <TouchableOpacity style={styles.backBtn} onPress={() => goToStep('sports', 'back')}>
-                  <Ionicons name="arrow-back" size={18} color={Colors.text} />
-                  <Text style={styles.backBtnText}>Back</Text>
+                  )}
+                  <View style={styles.avatarEditBadge}>
+                    <Ionicons name="pencil" size={14} color={Colors.bg} />
+                  </View>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.nextBtn} onPress={handleFinish} disabled={saving}>
-                  {saving
-                    ? <ActivityIndicator color={Colors.bg} size="small" />
-                    : <>
-                        <Text style={styles.nextBtnText}>Let's Play!</Text>
-                        <Ionicons name="rocket" size={18} color={Colors.bg} />
-                      </>}
-                </TouchableOpacity>
+
+                <View style={styles.navRow}>
+                  <TouchableOpacity style={styles.skipBtn} onPress={() => goToStep('bio', 'forward')}>
+                    <Text style={styles.skipText}>Skip for now</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.nextBtn} onPress={() => goToStep('bio', 'forward')}>
+                    <Text style={styles.nextBtnText}>Next</Text>
+                    <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
+            )}
 
-        </ReAnimated.View>
+            {/* ── Step 2: Bio ── */}
+            {step === 'bio' && (
+              <View style={styles.stepContainer}>
+                <Text style={styles.stepTitle}>Tell us about yourself</Text>
+                <Text style={styles.stepHint}>A short bio helps others know who you are</Text>
 
-      </ScrollView>
+                <TextInput
+                  style={[styles.bioInput, bioFocused && styles.bioInputFocused]}
+                  placeholder="e.g. Basketball fanatic, always up for a game 🏀"
+                  placeholderTextColor={Colors.textHint}
+                  value={bio}
+                  onChangeText={setBio}
+                  onFocus={() => setBioFocused(true)}
+                  onBlur={() => setBioFocused(false)}
+                  multiline
+                  maxLength={120}
+                  autoFocus
+                />
+                <Text style={styles.charCount}>{bio.length}/120</Text>
+
+                <View style={styles.navRow}>
+                  <TouchableOpacity style={styles.backBtn} onPress={() => goToStep('avatar', 'back')}>
+                    <Ionicons name="arrow-back" size={18} color={Colors.text} />
+                    <Text style={styles.backBtnText}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.nextBtn} onPress={() => goToStep('sports', 'forward')}>
+                    <Text style={styles.nextBtnText}>Next</Text>
+                    <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* ── Step 3: Sports ── */}
+            {step === 'sports' && (
+              <View style={styles.stepContainer}>
+                <Text style={styles.stepTitle}>What do you play?</Text>
+                <Text style={styles.stepHint}>Select all sports you're into</Text>
+
+                <View style={styles.sportsGrid}>
+                  {SPORTS.map(({ key, label }) => (
+                    <SportTile
+                      key={key}
+                      sportKey={key}
+                      label={label}
+                      selected={selectedSports.includes(key)}
+                      onToggle={() => toggleSport(key)}
+                    />
+                  ))}
+                </View>
+
+                <View style={styles.navRow}>
+                  <TouchableOpacity style={styles.backBtn} onPress={() => goToStep('bio', 'back')}>
+                    <Ionicons name="arrow-back" size={18} color={Colors.text} />
+                    <Text style={styles.backBtnText}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.nextBtn}
+                    onPress={() => {
+                      if (selectedSports.length === 0) return Alert.alert('Pick at least one', 'Select the sports you play.');
+                      goToStep('levels', 'forward');
+                    }}
+                  >
+                    <Text style={styles.nextBtnText}>Next</Text>
+                    <Ionicons name="arrow-forward" size={18} color={Colors.bg} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* ── Step 4: Levels ── */}
+            {step === 'levels' && (
+              <View style={styles.stepContainer}>
+                <Text style={styles.stepTitle}>Your skill levels</Text>
+                <Text style={styles.stepHint}>Tap dots to set level · ♥ to mark favorites</Text>
+
+                <View style={styles.levelsContainer}>
+                  {selectedSports.map(key => {
+                    const sportDef = SPORTS.find(s => s.key === key)!;
+                    const color    = SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? Colors.accent;
+                    const icon     = SPORT_ICONS[key  as keyof typeof SPORT_ICONS]  ?? 'trophy';
+                    const pref     = sportPrefs[key] ?? { level: 3, favorite: false };
+                    return (
+                      <View key={key} style={styles.levelRow}>
+                        <MaterialCommunityIcons name={icon as any} size={20} color={color} />
+                        <Text style={styles.levelSportLabel}>{sportDef.label}</Text>
+                        <View style={{ flex: 1 }} />
+                        <View style={styles.levelControl}>
+                          <View style={styles.levelDots}>
+                            {[1, 2, 3, 4, 5].map(n => (
+                              <TouchableOpacity
+                                key={n}
+                                onPress={() => setLevel(key, n)}
+                                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                              >
+                                <View style={[styles.levelDot, n <= pref.level && { backgroundColor: color }]} />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                          <Text style={styles.levelName}>{LEVEL_NAMES[(pref.level || 1) - 1]}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => toggleFavorite(key)} style={styles.favoriteBtn}>
+                          <Ionicons
+                            name={pref.favorite ? 'heart' : 'heart-outline'}
+                            size={20}
+                            color={pref.favorite ? '#FF6B6B' : Colors.textHint}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.navRow}>
+                  <TouchableOpacity style={styles.backBtn} onPress={() => goToStep('sports', 'back')}>
+                    <Ionicons name="arrow-back" size={18} color={Colors.text} />
+                    <Text style={styles.backBtnText}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.nextBtn} onPress={handleFinish} disabled={saving}>
+                    {saving
+                      ? <ActivityIndicator color={Colors.bg} size="small" />
+                      : <>
+                          <Text style={styles.nextBtnText}>Let's Play!</Text>
+                          <Ionicons name="rocket" size={18} color={Colors.bg} />
+                        </>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+          </ReAnimated.View>
+        </ScrollView>
+      </ReAnimated.View>
     </View>
   );
 }
@@ -418,12 +433,25 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
 
-  header:   { alignItems: 'center', paddingTop: 70, paddingBottom: 30, borderBottomWidth: 1, borderBottomColor: Colors.surface },
-  brand:    { fontSize: 28, fontWeight: '900', color: Colors.accent, letterSpacing: 1, marginBottom: 4 },
-  subtitle: { fontSize: 15, color: Colors.textMuted, marginBottom: 20 },
+  header: {
+    alignItems: 'center',
+    paddingTop: 64,
+    paddingBottom: 24,
+  },
+  logoRing: {
+    width: 60, height: 60, borderRadius: Radius.xl,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1.5, borderColor: Colors.accent + '40',
+    shadowColor: Colors.accent, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25, shadowRadius: 10, elevation: 6,
+  },
+  logo:     { width: 40, height: 40 },
+  subtitle: { fontSize: 14, color: Colors.textMuted, marginBottom: 18, fontWeight: '600' },
 
   // Segmented progress bar
-  progressBar: { flexDirection: 'row', gap: 5, width: '60%' },
+  progressBar:     { flexDirection: 'row', gap: 5, width: '60%' },
   progressSegment: { flex: 1, height: 4, borderRadius: 3, backgroundColor: Colors.accent },
 
   body:          { padding: Spacing.xxl, paddingBottom: 48 },

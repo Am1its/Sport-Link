@@ -53,7 +53,7 @@ function FloatingIcon({ item, iconName, phase }: {
   );
 }
 
-export function AuthBackground() {
+export function AuthBackground({ showLogo = true }: { showLogo?: boolean }) {
   const logoScale   = useSharedValue(0);
   const logoOpacity = useSharedValue(0);
 
@@ -79,6 +79,7 @@ export function AuthBackground() {
           phase={(i % 5) * 0.2}
         />
       ))}
+      {showLogo && (
       <ReAnimated.View style={[styles.brand, logoStyle]}>
         <View style={styles.logoRing}>
           <Image
@@ -94,6 +95,7 @@ export function AuthBackground() {
           <View style={styles.taglineDot} />
         </View>
       </ReAnimated.View>
+      )}
     </View>
   );
 }
