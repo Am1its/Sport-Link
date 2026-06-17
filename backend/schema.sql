@@ -124,7 +124,7 @@ DROP TABLE IF EXISTS `Games`;
 CREATE TABLE `Games` (
   `id` int NOT NULL AUTO_INCREMENT,
   `host_id` int NOT NULL,
-  `sport_type` enum('basketball','tennis','volleyball','football','yoga','footvolley','studio','gym','swimming') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sport_type` enum('basketball','tennis','volleyball','football','yoga','footvolley','studio','gym','swimming','padel','hiking','walking') COLLATE utf8mb4_unicode_ci NOT NULL,
   `level` tinyint NOT NULL,
   `latitude` decimal(10,8) NOT NULL,
   `longitude` decimal(11,8) NOT NULL,

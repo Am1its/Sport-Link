@@ -5,6 +5,7 @@
 export const SPORT_TYPES = [
   'basketball', 'tennis', 'volleyball', 'football',
   'yoga', 'gym', 'studio', 'footvolley', 'swimming',
+  'padel', 'hiking', 'walking',
 ] as const;
 
 export type SportType = typeof SPORT_TYPES[number];
@@ -19,6 +20,9 @@ export const SPORT_COLORS: Record<string, string> = {
   studio:     '#F472B6',
   footvolley: '#22D3EE',
   swimming:   '#0288D1',
+  padel:      '#F43F5E',
+  hiking:     '#22C55E',
+  walking:    '#64748B',
 };
 
 export const SPORT_ICONS: Record<string, string> = {
@@ -31,6 +35,9 @@ export const SPORT_ICONS: Record<string, string> = {
   studio:     'dance-ballroom',
   footvolley: 'handball',
   swimming:   'swim',
+  padel:      'table-tennis',
+  hiking:     'hiking',
+  walking:    'walk',
 };
 
 export const SPORT_LABELS: Record<string, string> = {
@@ -43,6 +50,9 @@ export const SPORT_LABELS: Record<string, string> = {
   studio:     'Studio',
   footvolley: 'Footvolley',
   swimming:   'Swimming',
+  padel:      'Padel',
+  hiking:     'Hiking',
+  walking:    'Walking',
 };
 
 export function sportLabel(type: string): string {
@@ -61,4 +71,7 @@ export const SPORT_FILTER_ITEMS = [
   { key: 'studio',     label: 'Studio' },
   { key: 'footvolley', label: 'Footvolley' },
   { key: 'swimming',   label: 'Swimming' },
+  { key: 'padel',      label: 'Padel' },
+  { key: 'hiking',     label: 'Hiking' },
+  { key: 'walking',    label: 'Walking' },
 ] as const;

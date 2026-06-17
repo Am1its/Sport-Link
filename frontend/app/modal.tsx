@@ -36,6 +36,9 @@ const SPORTS = [
   { key: 'studio',     icon: 'dance-ballroom', label: 'Studio' },
   { key: 'footvolley', icon: 'handball',       label: 'Footvolley' },
   { key: 'swimming',   icon: 'swim',           label: 'Swimming' },
+  { key: 'padel',      icon: 'table-tennis',   label: 'Padel' },
+  { key: 'hiking',     icon: 'hiking',         label: 'Hiking' },
+  { key: 'walking',    icon: 'walk',           label: 'Walking' },
 ] as const;
 
 const LEVEL_META = [

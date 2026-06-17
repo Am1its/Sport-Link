@@ -4,6 +4,38 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Auth Screen Redesign] — June 2026
+
+**Goal:** Replace the split hero/card layout on login and register with a full-screen immersive background, and bring onboarding into visual parity.
+
+### New Component: `AuthBackground`
+**`frontend/components/AuthBackground.tsx`** — new shared component
+- Renders as `StyleSheet.absoluteFill` with `pointerEvents="none"` — zero layout impact on parent.
+- Contains: 2 glow orbs (top-right + mid-left), 16 `FloatingIcon` instances spread across full screen height (not capped at 240px), each driven by `useFloatingOrb(phase)` for slow independent Y drift.
+- `showLogo?: boolean` prop (default `true`). When `true`: centered logo block (100×100 ring, "SportLink" title, accent tagline dots) spring-scales in on mount via `withSpring(Springs.bouncy)`.
+- Used in `login.tsx`, `register.tsx`, `onboarding.tsx`.
+
+### Login (`login.tsx`)
+- Removed explicit hero section (240px), `SportsBg`, `FloatingIcon`, `MaterialCommunityIcons` imports.
+- Layout: `<View style={{ flex:1 }}>` → `<AuthBackground />` (absoluteFill behind) + `<ScrollView>` with flex spacer pushing panel to bottom.
+- Panel (`Colors.surface`, rounded top corners only) replaces the old card. Panel slides up +80→0 (`Springs.bouncy`) + fades in on mount. Footer lives inside the panel.
+- `KeyboardAvoidingView behavior="padding"` + `ScrollView` handles small-screen keyboard correctly (spacer compresses, panel scrolls if needed).
+
+### Register (`register.tsx`)
+- Same `AuthBackground` + flex-spacer + bottom panel layout as login.
+- Back button (`position: 'absolute'`, top-left, 36×36, `zIndex: 10`) rendered outside `ScrollView` — stays fixed while content scrolls.
+- Removed separate orb Views, header row, card title/subtitle.
+- All animations preserved: `useFieldShake` on empty submit, `useSuccessBurst` particle burst on success, `useStaggerEntrance` field entrance.
+- Google button style unified with login (white background, `#DB4437` icon).
+
+### Onboarding (`onboarding.tsx`)
+- Added `<AuthBackground showLogo={false} />` — same orbs + floating icons, no duplicate logo block.
+- Header redesigned: replaced flat "SportLink" accent text + `borderBottomWidth:1` separator with a 60×60 logo ring (same visual language as auth, proportionally smaller) + subtitle + 4-segment progress bar.
+- Entire header + ScrollView wrapped in `ReAnimated.View` with gentle fade+slide-up entrance (`Springs.gentle`, 30pt translateY, 350ms opacity).
+- All existing step transitions, sport tiles, level controls, and nav buttons unchanged.
+
+---
+
 ## [Bug Fixes] — June 2026
 
 **Game Chat 500 Error**

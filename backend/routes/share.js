@@ -6,6 +6,7 @@ const router = express.Router();
 const SPORT_EMOJIS = {
   basketball: '🏀', tennis: '🎾', volleyball: '🏐', football: '⚽',
   yoga: '🧘', gym: '💪', studio: '🎵', footvolley: '🤾', swimming: '🏊',
+  padel: '🏓', hiking: '🥾', walking: '🚶',
 };
 
 function renderPage({ title, description, image, url, deepLink, ctaText }) {

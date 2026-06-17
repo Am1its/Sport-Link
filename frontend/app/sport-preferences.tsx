@@ -19,6 +19,9 @@ const SPORTS = [
   { key: 'studio',     label: 'Studio' },
   { key: 'footvolley', label: 'Footvolley' },
   { key: 'swimming',   label: 'Swimming' },
+  { key: 'padel',      label: 'Padel' },
+  { key: 'hiking',     label: 'Hiking' },
+  { key: 'walking',    label: 'Walking' },
 ];
 
 const SKILL_LABELS = ['', 'Beginner', 'Casual', 'Intermediate', 'Advanced', 'Pro'];

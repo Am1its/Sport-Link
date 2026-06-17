@@ -29,6 +29,9 @@ const SPORTS = [
   { key: 'yoga',       label: 'Yoga'       },
   { key: 'studio',     label: 'Studio'     },
   { key: 'footvolley', label: 'Footvolley' },
+  { key: 'padel',      label: 'Padel'      },
+  { key: 'hiking',     label: 'Hiking'     },
+  { key: 'walking',    label: 'Walking'    },
 ];
 
 const LEVEL_NAMES = ['Beginner', 'Casual', 'Intermediate', 'Advanced', 'Elite'];

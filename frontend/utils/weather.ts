@@ -29,7 +29,7 @@ export type WeatherResult = {
   icon: string;
 };
 
-const OUTDOOR_SPORTS = new Set(['basketball', 'tennis', 'volleyball', 'football', 'footvolley']);
+const OUTDOOR_SPORTS = new Set(['basketball', 'tennis', 'volleyball', 'football', 'footvolley', 'padel', 'hiking', 'walking']);
 
 // Session cache keyed by gameId
 const cache = new Map<number | string, WeatherResult | null>();
