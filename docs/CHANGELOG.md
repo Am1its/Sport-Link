@@ -4,6 +4,23 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Add Padel, Hiking, Walking Sports] — June 2026
+
+**Goal:** Expand supported sports from 9 to 12 by adding padel, hiking, and walking across all layers.
+
+### Backend
+- `backend/migrations/025_add_sports_padel_hiking_walking.sql` — `ALTER TABLE Games MODIFY sport_type ENUM(...)` adding the 3 new values. Apply on Railway.
+- `backend/schema.sql` — reference ENUM updated.
+- `backend/server.js` — added padel/hiking/walking to `SPORT_LABELS` and `SPORT_EMOJI` (🏓/🥾/🚶).
+- `backend/routes/share.js` — added to `SPORT_EMOJIS`.
+
+### Frontend
+- `frontend/constants/sports.ts` — added to all 5 exports. Icons: `table-tennis` / `hiking` / `walk`. Colors: `#F43F5E` / `#22C55E` / `#64748B`.
+- `frontend/app/modal.tsx`, `onboarding.tsx`, `sport-preferences.tsx` — local SPORTS arrays updated.
+- `frontend/utils/weather.ts` — padel, hiking, walking added to `OUTDOOR_SPORTS` (weather chip will show for these).
+
+---
+
 ## [Auth Screen Redesign] — June 2026
 
 **Goal:** Replace the split hero/card layout on login and register with a full-screen immersive background, and bring onboarding into visual parity.
