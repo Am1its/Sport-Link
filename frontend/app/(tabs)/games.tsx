@@ -340,7 +340,7 @@ function MyGameCard({
             </View>
           )}
 
-          {/* Past game — rate / results */}
+          {/* Past game — rate / results (icon-only to fit all actions) */}
           {past && (!game.is_host || game.status === 'completed') && (
             <View style={styles.actionRow}>
               {game.status === 'completed' && game.is_host && (
@@ -349,23 +349,26 @@ function MyGameCard({
                   <Text style={styles.completedText}>Completed</Text>
                 </View>
               )}
-              <TouchableOpacity style={styles.btnPrimary} onPress={onRatePlayers}>
-                <Ionicons name="star-outline" size={15} color={Colors.bg} />
-                <Text style={styles.btnPrimaryText}>Rate Players</Text>
+              <TouchableOpacity
+                style={[styles.btnIcon, { borderColor: Colors.accentBorder, backgroundColor: Colors.accentFaint }]}
+                onPress={onRatePlayers}
+              >
+                <Ionicons name="star-outline" size={16} color={Colors.accent} />
               </TouchableOpacity>
               {game.status === 'completed' && (
-                <TouchableOpacity style={styles.btnResults} onPress={onViewResults}>
-                  <Ionicons name="bar-chart-outline" size={15} color={Colors.yellow} />
-                  <Text style={[styles.btnGhostText, { color: Colors.yellow }]}>Results</Text>
+                <TouchableOpacity
+                  style={[styles.btnIcon, { borderColor: Colors.yellow + '55', backgroundColor: Colors.yellow + '20' }]}
+                  onPress={onViewResults}
+                >
+                  <Ionicons name="bar-chart-outline" size={16} color={Colors.yellow} />
                 </TouchableOpacity>
               )}
               {game.status === 'completed' && game.is_host && !game.post_game_photo && (
                 <TouchableOpacity
-                  style={[styles.btnGhost, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]}
+                  style={[styles.btnIcon, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]}
                   onPress={handleAddPhoto}
                 >
-                  <Ionicons name="camera-outline" size={13} color={Colors.purple} />
-                  <Text style={[styles.btnGhostText, { color: Colors.purple }]}>Add Photo</Text>
+                  <Ionicons name="camera-outline" size={16} color={Colors.purple} />
                 </TouchableOpacity>
               )}
             </View>
