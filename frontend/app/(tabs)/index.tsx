@@ -11,8 +11,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 
-const isExpoGo = Constants.executionEnvironment === 'storeClient';
-
 type Region = {
   latitude: number;
   longitude: number;
@@ -20,15 +18,15 @@ type Region = {
   longitudeDelta: number;
 };
 
-// react-native-maps requires a native module unavailable in Expo Go
+// appOwnership === 'expo' in Expo Go; null in dev builds and production.
+// Only load react-native-maps when we know the native module is available.
+const isExpoGo = Constants.appOwnership === 'expo';
 let MapViewComponent: React.ComponentType<any> = View as any;
 let MarkerComponent: React.ComponentType<any> = View as any;
 if (!isExpoGo) {
-  try {
-    const maps = require('react-native-maps');
-    MapViewComponent = maps.default;
-    MarkerComponent = maps.Marker;
-  } catch {}
+  const maps = require('react-native-maps');
+  MapViewComponent = maps.default;
+  MarkerComponent = maps.Marker;
 }
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -40,6 +38,7 @@ import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/s
 import { Colors } from '../../constants/theme';
 import { getAvatarColor } from '../../utils/avatar';
 import AvatarCircle from '../../components/AvatarCircle';
+import LeafletMap, { LeafletMarker } from '../../components/LeafletMap';
 import type { MapItem, Participant } from '../../types';
 
 const RECENT_SEARCHES_KEY = 'map_recent_searches';
@@ -326,6 +325,7 @@ function HomeScreen() {
   const [sportFilter, setSportFilter] = useState('all');
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
   const [myUsername, setMyUsername] = useState<string>('');
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery]       = useState('');
@@ -441,6 +441,7 @@ function HomeScreen() {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         const { latitude, longitude } = loc.coords;
         setMapRegion({ latitude, longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 });
+        setUserLocation({ latitude, longitude });
         await fetchCourts(latitude, longitude);
       } catch (err) {
         console.warn('Location error:', err);
@@ -512,6 +513,19 @@ function HomeScreen() {
       panToNewGame();
     }, [token])
   );
+
+  const handleRecenter = async () => {
+    Haptics.selectionAsync();
+    let loc = userLocation;
+    if (!loc) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      setUserLocation(loc);
+    }
+    mapRef.current?.animateToRegion({ ...loc, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 500);
+  };
 
   if (loading) {
     return (
@@ -824,6 +838,12 @@ function HomeScreen() {
         </ReAnimated.View>
       )}
 
+      {!isSelectingLocation && !showAddMenu && !selectedCourt && (
+        <TouchableOpacity style={styles.recenterBtn} onPress={handleRecenter} activeOpacity={0.8}>
+          <Ionicons name="locate" size={22} color="#1C1C1E" />
+        </TouchableOpacity>
+      )}
+
       {!selectedCourt && (
         isSelectingLocation ? (
           <TouchableOpacity
@@ -999,24 +1019,63 @@ const styles = StyleSheet.create({
   courtPickerIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
   courtPickerName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   courtPickerAddress: { fontSize: 12, color: '#636366', marginTop: 2 },
+  recenterBtn: { position: 'absolute', bottom: 105, right: 30, backgroundColor: 'rgba(255,255,255,0.95)', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 },
 });
 
-// ─── Expo Go fallback (react-native-maps not available in Expo Go) ───────────
+// ─── Expo Go map (Leaflet WebView — react-native-maps not available in Expo Go) ─
 
-function MapFallbackScreen() {
+function ExpoGoMapScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
   const [games, setGames] = useState<MapItem[]>([]);
+  const [courts, setCourts] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sportFilter, setSportFilter] = useState('all');
-  const [joiningId, setJoiningId] = useState<number | null>(null);
+  const [selectedCourt, setSelectedCourt] = useState<MapItem | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [region, setRegion] = useState({ latitude: 32.0853, longitude: 34.7818 });
+  const [recenterTrigger, setRecenterTrigger] = useState(0);
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
   const [myUsername, setMyUsername] = useState<string>('');
 
+  const isPast = (t: string | null | undefined) => {
+    if (!t) return false;
+    const d = new Date(t);
+    return !isNaN(d.getTime()) && d < new Date();
+  };
+
+  const fetchCourts = async (lat: number, lng: number) => {
+    try {
+      const res = await apiFetch(`/api/courts/nearby?lat=${lat}&lng=${lng}`, { token });
+      const data = await res.json();
+      if (data.success) setCourts(data.courts);
+    } catch {}
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          const { latitude, longitude } = loc.coords;
+          setUserLocation({ latitude, longitude });
+          setRegion({ latitude, longitude });
+          await fetchCourts(latitude, longitude);
+        } else {
+          await fetchCourts(32.0853, 34.7818);
+        }
+      } catch {
+        await fetchCourts(32.0853, 34.7818);
+      }
+    };
+    init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      const fetchData = async () => {
-        setLoading(true);
+      const run = async () => {
         try {
           const [gamesRes, meRes] = await Promise.all([
             apiFetch('/api/games', { token }),
@@ -1025,12 +1084,7 @@ function MapFallbackScreen() {
           const gamesData = await gamesRes.json();
           const meData = await meRes.json();
           if (gamesData.success) {
-            const now = new Date();
-            setGames(gamesData.games.filter((g: any) => {
-              if (!g.scheduled_time) return true;
-              const d = new Date(g.scheduled_time);
-              return !isNaN(d.getTime()) && d >= now;
-            }).map((g: any) => { const { photo: _p, ...rest } = g; return rest; }));
+            setGames(gamesData.games.map((g: any) => { const { photo: _p, post_game_photo: _pp, ...rest } = g; return rest; }));
           }
           if (meData.success) {
             setMyAvatar(meData.user.avatar ?? null);
@@ -1039,169 +1093,159 @@ function MapFallbackScreen() {
         } catch {}
         setLoading(false);
       };
-      fetchData();
+      run();
     }, [token])
   );
 
-  const handleJoin = async (gameId: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setJoiningId(gameId);
-    try {
-      const res = await apiFetch(`/api/games/${gameId}/join`, { method: 'POST', token });
-      const data = await res.json();
-      if (!data.success) { Alert.alert('Error', data.message); return; }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setGames(prev => prev.map(g => g.id === gameId ? { ...g, participant_count: data.participant_count, is_joined: true } : g));
-      Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
-    } catch (err: any) {
-      if (err?.name === 'UnauthorizedError') return;
-      Alert.alert('Error', 'Could not connect to server');
-    } finally {
-      setJoiningId(null);
-    }
+  const activeGames = games.filter(g => !isPast(g.scheduled_time));
+  const filteredGames = sportFilter === 'all' ? activeGames : activeGames.filter(g => g.sport_type === sportFilter);
+  const filteredCourts = sportFilter === 'all' ? courts : courts.filter(c => c.sport_type === sportFilter);
+
+  const markers: LeafletMarker[] = [
+    ...filteredGames.map(g => ({
+      placeId: g.place_id,
+      lat: g.geometry.location.lat,
+      lng: g.geometry.location.lng,
+      color: SPORT_COLORS[g.sport_type] ?? Colors.accent,
+      icon: SPORT_ICONS[g.sport_type] ?? 'map-marker',
+      isGame: true,
+      isJoined: !!g.is_joined,
+    })),
+    ...filteredCourts.map(c => ({
+      placeId: c.place_id,
+      lat: c.geometry.location.lat,
+      lng: c.geometry.location.lng,
+      color: SPORT_COLORS[c.sport_type] ?? Colors.accent,
+      icon: SPORT_ICONS[c.sport_type] ?? 'map-marker',
+      isGame: false,
+      isJoined: false,
+    })),
+  ];
+
+  const handleMarkerPress = (placeId: string) => {
+    const item = [...games, ...courts].find(i => i.place_id === placeId);
+    if (item) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedCourt(item); }
   };
 
-  const filtered = sportFilter === 'all' ? games : games.filter(g => g.sport_type === sportFilter);
+  const handleMapPress = (lat: number, lng: number) => {
+    setSelectedCourt(null);
+    router.push({ pathname: '/modal', params: { lat: String(lat), lng: String(lng) } });
+  };
+
+  const handleRecenter = async () => {
+    Haptics.selectionAsync();
+    if (!userLocation) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+    }
+    setRecenterTrigger(v => v + 1);
+  };
 
   return (
-    <SafeAreaView style={fbStyles.safe}>
-      <View style={fbStyles.header}>
-        <Text style={fbStyles.title}>SportLink</Text>
+    <SafeAreaView style={emStyles.safe} edges={['top']}>
+      <View style={emStyles.header}>
+        <Text style={emStyles.title}>SportLink</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {filtered.length > 0 && (
-            <View style={fbStyles.badge}>
-              <Text style={fbStyles.badgeText}>{filtered.length} game{filtered.length !== 1 ? 's' : ''}</Text>
-            </View>
+          {filteredGames.length > 0 && (
+            <View style={emStyles.badge}><Text style={emStyles.badgeText}>{filteredGames.length} game{filteredGames.length !== 1 ? 's' : ''}</Text></View>
           )}
           <TouchableOpacity onPress={() => router.push('/(tabs)/profile' as any)}>
             {myAvatar ? (
-              <Image source={{ uri: `data:image/jpeg;base64,${myAvatar}` }} style={fbStyles.avatar} />
+              <Image source={{ uri: `data:image/jpeg;base64,${myAvatar}` }} style={emStyles.avatar} />
             ) : (
-              <View style={[fbStyles.avatar, { backgroundColor: getAvatarColor(myUsername || (user?.username ?? '')), justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 16 }}>
-                  {(myUsername || user?.username || '?').charAt(0).toUpperCase()}
-                </Text>
+              <View style={[emStyles.avatar, { backgroundColor: getAvatarColor(myUsername || (user?.username ?? '')), justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 16 }}>{(myUsername || user?.username || '?').charAt(0).toUpperCase()}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={fbStyles.filterRow}>
-        {[{ key: 'all', label: 'All' }, ...SPORT_FILTER_ITEMS].map(f => {
-          const active = sportFilter === f.key;
-          const color = f.key === 'all' ? Colors.accent : (SPORT_COLORS[f.key] ?? Colors.accent);
-          const iconName = f.key === 'all' ? undefined : (SPORT_ICONS[f.key] ?? 'help-circle');
-          return (
-            <TouchableOpacity
-              key={f.key}
-              style={[fbStyles.chip, active && { backgroundColor: color + '22', borderColor: color }]}
-              onPress={() => setSportFilter(f.key)}
-              activeOpacity={0.7}
-            >
-              {iconName && <MaterialCommunityIcons name={iconName as any} size={13} color={active ? color : Colors.textMuted} />}
-              <Text style={[fbStyles.chipText, active && { color }]}>{f.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {loading ? (
-        <View style={fbStyles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>
-      ) : filtered.length === 0 ? (
-        <View style={fbStyles.center}>
-          <MaterialCommunityIcons name="calendar-blank-outline" size={52} color={Colors.textMuted} />
-          <Text style={fbStyles.emptyTitle}>No upcoming games</Text>
-          <Text style={fbStyles.emptySub}>Be the first to create one!</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={item => item.place_id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const sportColor = SPORT_COLORS[item.sport_type] ?? Colors.accent;
-            const icon = (SPORT_ICONS[item.sport_type] ?? 'help-circle') as any;
-            const participantCount = item.participant_count ?? 0;
-            const isFull = item.max_players != null && participantCount >= item.max_players - 1;
-            const isJoined = !!item.is_joined;
-            const isOwn = item.host_id === user?.id;
-            const joining = joiningId === item.id;
+      <View style={emStyles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+          {SPORT_FILTER_ITEMS.map(f => {
+            const active = sportFilter === f.key;
+            const color = f.key === 'all' ? Colors.accent : (SPORT_COLORS[f.key] ?? Colors.accent);
+            const iconName = f.key === 'all' ? undefined : (SPORT_ICONS[f.key] ?? 'help-circle');
             return (
-              <View style={fbStyles.card}>
-                <View style={[fbStyles.cardBar, { backgroundColor: sportColor }]} />
-                <View style={fbStyles.cardBody}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <MaterialCommunityIcons name={icon} size={14} color={sportColor} />
-                    <Text style={[fbStyles.cardSport, { color: sportColor }]}>{item.sport_type?.toUpperCase()}</Text>
-                  </View>
-                  <Text style={fbStyles.cardName} numberOfLines={1}>{item.name}</Text>
-                  {item.vicinity ? <Text style={fbStyles.cardMeta} numberOfLines={1}>{item.vicinity}</Text> : null}
-                  {item.scheduled_time ? <Text style={fbStyles.cardMeta}>{item.scheduled_time}</Text> : null}
-                  {item.max_players != null && (
-                    <Text style={[fbStyles.cardMeta, isFull && { color: Colors.error }]}>
-                      {participantCount + 1}/{item.max_players} players
-                    </Text>
-                  )}
-                </View>
-                <View style={fbStyles.cardActions}>
-                  {isOwn ? (
-                    <View style={fbStyles.pill}><Text style={fbStyles.pillAccent}>Your Game</Text></View>
-                  ) : isJoined ? (
-                    <View style={fbStyles.pill}><Text style={fbStyles.pillAccent}>✓ Joined</Text></View>
-                  ) : isFull ? (
-                    <View style={fbStyles.pill}><Text style={[fbStyles.pillAccent, { color: Colors.error }]}>Full</Text></View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[fbStyles.pill, { backgroundColor: Colors.accent }]}
-                      onPress={() => handleJoin(item.id!)}
-                      disabled={joining}
-                      activeOpacity={0.8}
-                    >
-                      {joining
-                        ? <ActivityIndicator size="small" color={Colors.bg} />
-                        : <Text style={fbStyles.pillDark}>Join</Text>}
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
+              <TouchableOpacity
+                key={f.key}
+                style={[emStyles.chip, active && { backgroundColor: color + '22', borderColor: color }]}
+                onPress={() => { Haptics.selectionAsync(); setSportFilter(f.key); }}
+                activeOpacity={0.7}
+              >
+                {iconName && <MaterialCommunityIcons name={iconName as any} size={13} color={active ? color : Colors.textMuted} />}
+                <Text style={[emStyles.chipText, active && { color }]}>{f.label}</Text>
+              </TouchableOpacity>
             );
-          }}
-        />
-      )}
+          })}
+        </ScrollView>
+      </View>
 
-      <TouchableOpacity style={fbStyles.fab} onPress={() => router.push('/modal' as any)}>
-        <Ionicons name="add" size={32} color="white" />
-      </TouchableOpacity>
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <View style={emStyles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>
+        ) : (
+          <LeafletMap
+            region={region}
+            markers={markers}
+            userLocation={userLocation}
+            recenterTrigger={recenterTrigger}
+            onMarkerPress={handleMarkerPress}
+            onMapPress={handleMapPress}
+          />
+        )}
+
+        {!selectedCourt && (
+          <TouchableOpacity style={emStyles.recenterBtn} onPress={handleRecenter} activeOpacity={0.8}>
+            <Ionicons name="locate" size={22} color="#1C1C1E" />
+          </TouchableOpacity>
+        )}
+
+        {!selectedCourt && (
+          <TouchableOpacity style={emStyles.fab} onPress={() => router.push('/modal' as any)} activeOpacity={0.85}>
+            <Ionicons name="add" size={32} color="white" />
+          </TouchableOpacity>
+        )}
+
+        {selectedCourt && (
+          <View style={emStyles.cardWrap}>
+            <BottomCard
+              court={selectedCourt}
+              userId={user?.id}
+              token={token}
+              onJoined={(newCount) => {
+                setGames(prev => prev.map(g => g.id === selectedCourt.id ? { ...g, participant_count: newCount, is_joined: true } : g));
+                setSelectedCourt(prev => prev ? { ...prev, participant_count: newCount, is_joined: true } : prev);
+              }}
+            />
+            <TouchableOpacity style={emStyles.cardClose} onPress={() => setSelectedCourt(null)}>
+              <Ionicons name="close" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
-const fbStyles = StyleSheet.create({
+const emStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 },
   title: { fontSize: 24, fontWeight: '900', color: Colors.text },
   badge: { backgroundColor: Colors.accentFaint, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: Colors.accentBorder },
   badgeText: { color: Colors.accent, fontSize: 12, fontWeight: '800' },
   avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
-  filterRow: { paddingHorizontal: 16, paddingBottom: 12, gap: 8, flexDirection: 'row' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface, marginRight: 6 },
+  filterRow: { paddingBottom: 10 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
   chipText: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: Colors.textSub },
-  emptySub: { fontSize: 14, color: Colors.textMuted },
-  card: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: 16, marginBottom: 12, overflow: 'hidden' },
-  cardBar: { width: 4 },
-  cardBody: { flex: 1, padding: 14 },
-  cardSport: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  cardName: { fontSize: 16, fontWeight: '800', color: Colors.text, marginBottom: 4 },
-  cardMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  cardActions: { justifyContent: 'center', paddingRight: 14 },
-  pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.surface2, borderWidth: 1, borderColor: Colors.border },
-  pillAccent: { color: Colors.accent, fontSize: 13, fontWeight: '800' },
-  pillDark: { color: Colors.bg, fontSize: 13, fontWeight: '800' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   fab: { position: 'absolute', bottom: 30, right: 25, backgroundColor: '#1C1C1E', width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.accent, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
+  recenterBtn: { position: 'absolute', bottom: 105, right: 30, backgroundColor: 'rgba(255,255,255,0.95)', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 },
+  cardWrap: { position: 'absolute', bottom: 30, alignSelf: 'center', width: '90%' },
+  cardClose: { position: 'absolute', top: -10, right: -6, width: 32, height: 32, borderRadius: 16, backgroundColor: '#3A3A3C', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },
 });
 
-export default isExpoGo ? MapFallbackScreen : HomeScreen;
+export default isExpoGo ? ExpoGoMapScreen : HomeScreen;
