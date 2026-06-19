@@ -1031,12 +1031,23 @@ function ExpoGoMapScreen() {
   const [courts, setCourts] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sportFilter, setSportFilter] = useState('all');
+  const [filterType, setFilterType] = useState<'all' | 'games' | 'courts'>('all');
   const [selectedCourt, setSelectedCourt] = useState<MapItem | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [region, setRegion] = useState({ latitude: 32.0853, longitude: 34.7818 });
   const [recenterTrigger, setRecenterTrigger] = useState(0);
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
   const [myUsername, setMyUsername] = useState<string>('');
+  const [isSelectingLocation, setIsSelectingLocation] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showCourtPicker, setShowCourtPicker] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<GeoResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<GeoResult[]>([]);
+  const [panTarget, setPanTarget] = useState<{ latitude: number; longitude: number } | null>(null);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isPast = (t: string | null | undefined) => {
     if (!t) return false;
@@ -1050,6 +1061,39 @@ function ExpoGoMapScreen() {
       const data = await res.json();
       if (data.success) setCourts(data.courts);
     } catch {}
+  };
+
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_SEARCHES_KEY)
+      .then(raw => { if (raw) setRecentSearches(JSON.parse(raw)); })
+      .catch(() => {});
+  }, []);
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (text.trim().length < 2) { setSearchResults([]); setSearchLoading(false); return; }
+    setSearchLoading(true);
+    searchDebounce.current = setTimeout(async () => {
+      const results = await searchPlaces(text);
+      setSearchResults(results);
+      setSearchLoading(false);
+    }, 400);
+  };
+
+  const handleSelectPlace = (place: GeoResult) => {
+    Keyboard.dismiss();
+    setSearchExpanded(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    if (place.lat && place.lng && !isNaN(place.lat) && !isNaN(place.lng)) {
+      setPanTarget({ latitude: place.lat, longitude: place.lng });
+    }
+    setRecentSearches(prev => {
+      const next = [place, ...prev.filter(r => r.name !== place.name)].slice(0, 5);
+      AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -1101,8 +1145,11 @@ function ExpoGoMapScreen() {
   const filteredGames = sportFilter === 'all' ? activeGames : activeGames.filter(g => g.sport_type === sportFilter);
   const filteredCourts = sportFilter === 'all' ? courts : courts.filter(c => c.sport_type === sportFilter);
 
+  const visibleGames = filterType !== 'courts' ? filteredGames : [];
+  const visibleCourts = filterType !== 'games' ? filteredCourts : [];
+
   const markers: LeafletMarker[] = [
-    ...filteredGames.map(g => ({
+    ...visibleGames.map(g => ({
       placeId: g.place_id,
       lat: g.geometry.location.lat,
       lng: g.geometry.location.lng,
@@ -1111,7 +1158,7 @@ function ExpoGoMapScreen() {
       isGame: true,
       isJoined: !!g.is_joined,
     })),
-    ...filteredCourts.map(c => ({
+    ...visibleCourts.map(c => ({
       placeId: c.place_id,
       lat: c.geometry.location.lat,
       lng: c.geometry.location.lng,
@@ -1128,8 +1175,13 @@ function ExpoGoMapScreen() {
   };
 
   const handleMapPress = (lat: number, lng: number) => {
-    setSelectedCourt(null);
-    router.push({ pathname: '/modal', params: { lat: String(lat), lng: String(lng) } });
+    if (isSelectingLocation) {
+      setIsSelectingLocation(false);
+      setShowAddMenu(false);
+      router.push({ pathname: '/modal', params: { lat: String(lat), lng: String(lng) } });
+    } else {
+      setSelectedCourt(null);
+    }
   };
 
   const handleRecenter = async () => {
@@ -1145,44 +1197,131 @@ function ExpoGoMapScreen() {
 
   return (
     <SafeAreaView style={emStyles.safe} edges={['top']}>
+      {/* Header: search input OR title+search icon+avatar */}
       <View style={emStyles.header}>
-        <Text style={emStyles.title}>SportLink</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {filteredGames.length > 0 && (
-            <View style={emStyles.badge}><Text style={emStyles.badgeText}>{filteredGames.length} game{filteredGames.length !== 1 ? 's' : ''}</Text></View>
-          )}
-          <TouchableOpacity onPress={() => router.push('/(tabs)/profile' as any)}>
-            {myAvatar ? (
-              <Image source={{ uri: `data:image/jpeg;base64,${myAvatar}` }} style={emStyles.avatar} />
-            ) : (
-              <View style={[emStyles.avatar, { backgroundColor: getAvatarColor(myUsername || (user?.username ?? '')), justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 16 }}>{(myUsername || user?.username || '?').charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        {searchExpanded ? (
+          <>
+            <TextInput
+              style={emStyles.searchInput}
+              placeholder="Search location..."
+              placeholderTextColor={Colors.textHint}
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+              autoFocus
+              returnKeyType="search"
+            />
+            <TouchableOpacity
+              onPress={() => { setSearchExpanded(false); setSearchQuery(''); setSearchResults([]); Keyboard.dismiss(); }}
+              style={{ paddingLeft: 10 }}
+            >
+              <Text style={{ color: Colors.text, fontWeight: '700', fontSize: 14 }}>Cancel</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={emStyles.title}>SportLink</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {filteredGames.length > 0 && filterType !== 'courts' && (
+                <View style={emStyles.badge}><Text style={emStyles.badgeText}>{filteredGames.length} game{filteredGames.length !== 1 ? 's' : ''}</Text></View>
+              )}
+              <TouchableOpacity onPress={() => setSearchExpanded(true)}>
+                <Ionicons name="search-outline" size={22} color={Colors.textSub} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/profile' as any)}>
+                {myAvatar ? (
+                  <Image source={{ uri: `data:image/jpeg;base64,${myAvatar}` }} style={emStyles.avatar} />
+                ) : (
+                  <View style={[emStyles.avatar, { backgroundColor: getAvatarColor(myUsername || (user?.username ?? '')), justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 16 }}>{(myUsername || user?.username || '?').charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
 
-      <View style={emStyles.filterRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-          {SPORT_FILTER_ITEMS.map(f => {
-            const active = sportFilter === f.key;
-            const color = f.key === 'all' ? Colors.accent : (SPORT_COLORS[f.key] ?? Colors.accent);
-            const iconName = f.key === 'all' ? undefined : (SPORT_ICONS[f.key] ?? 'help-circle');
-            return (
-              <TouchableOpacity
-                key={f.key}
-                style={[emStyles.chip, active && { backgroundColor: color + '22', borderColor: color }]}
-                onPress={() => { Haptics.selectionAsync(); setSportFilter(f.key); }}
-                activeOpacity={0.7}
-              >
-                {iconName && <MaterialCommunityIcons name={iconName as any} size={13} color={active ? color : Colors.textMuted} />}
-                <Text style={[emStyles.chipText, active && { color }]}>{f.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      {/* Search dropdown */}
+      {searchExpanded && (searchQuery.length >= 2 || recentSearches.length > 0) && (
+        <View style={emStyles.searchDropdown}>
+          {searchQuery.length < 2 && recentSearches.length > 0 && (
+            <>
+              <Text style={emStyles.searchDropdownLabel}>Recent</Text>
+              {recentSearches.map(place => (
+                <TouchableOpacity key={place.name} style={emStyles.searchDropdownItem} onPress={() => handleSelectPlace(place)}>
+                  <Ionicons name="time-outline" size={15} color={Colors.textMuted} />
+                  <Text style={emStyles.searchDropdownText} numberOfLines={1}>{place.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+          {searchQuery.length >= 2 && searchLoading && (
+            <View style={emStyles.searchDropdownItem}>
+              <ActivityIndicator size="small" color={Colors.accent} />
+              <Text style={[emStyles.searchDropdownText, { color: Colors.textMuted }]}>Searching...</Text>
+            </View>
+          )}
+          {searchQuery.length >= 2 && !searchLoading && searchResults.length === 0 && (
+            <View style={emStyles.searchDropdownItem}>
+              <Ionicons name="search-outline" size={15} color={Colors.textMuted} />
+              <Text style={[emStyles.searchDropdownText, { color: Colors.textMuted }]}>No results found</Text>
+            </View>
+          )}
+          {searchResults.map(place => (
+            <TouchableOpacity key={place.name} style={emStyles.searchDropdownItem} onPress={() => handleSelectPlace(place)}>
+              <Ionicons name="location-outline" size={15} color={Colors.accent} />
+              <Text style={emStyles.searchDropdownText} numberOfLines={1}>{place.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Drop-pin mode banner */}
+      {isSelectingLocation && (
+        <View style={emStyles.pinBanner}>
+          <Text style={emStyles.pinBannerText}>📍 Tap on the map to place a pin</Text>
+        </View>
+      )}
+
+      {/* Type + sport filter chips (hidden during search) */}
+      {!searchExpanded && (
+        <View style={emStyles.filterRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 8 }}>
+            {(['all', 'games', 'courts'] as const).map(key => {
+              const label = key === 'all' ? 'All' : key === 'games' ? 'Community Games' : 'Courts';
+              const active = filterType === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[emStyles.typeChip, active && emStyles.typeChipActive]}
+                  onPress={() => { Haptics.selectionAsync(); setFilterType(key); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[emStyles.typeChipText, active && emStyles.typeChipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+            {SPORT_FILTER_ITEMS.map(f => {
+              const active = sportFilter === f.key;
+              const color = f.key === 'all' ? Colors.accent : (SPORT_COLORS[f.key] ?? Colors.accent);
+              const iconName = f.key === 'all' ? undefined : (SPORT_ICONS[f.key] ?? 'help-circle');
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[emStyles.chip, active && { backgroundColor: color + '22', borderColor: color }]}
+                  onPress={() => { Haptics.selectionAsync(); setSportFilter(f.key); }}
+                  activeOpacity={0.7}
+                >
+                  {iconName && <MaterialCommunityIcons name={iconName as any} size={13} color={active ? color : Colors.textMuted} />}
+                  <Text style={[emStyles.chipText, active && { color }]}>{f.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={{ flex: 1 }}>
         {loading ? (
@@ -1193,21 +1332,99 @@ function ExpoGoMapScreen() {
             markers={markers}
             userLocation={userLocation}
             recenterTrigger={recenterTrigger}
+            panTarget={panTarget}
             onMarkerPress={handleMarkerPress}
             onMapPress={handleMapPress}
           />
         )}
 
-        {!selectedCourt && (
+        {!selectedCourt && !isSelectingLocation && (
           <TouchableOpacity style={emStyles.recenterBtn} onPress={handleRecenter} activeOpacity={0.8}>
             <Ionicons name="locate" size={22} color="#1C1C1E" />
           </TouchableOpacity>
         )}
 
         {!selectedCourt && (
-          <TouchableOpacity style={emStyles.fab} onPress={() => router.push('/modal' as any)} activeOpacity={0.85}>
-            <Ionicons name="add" size={32} color="white" />
-          </TouchableOpacity>
+          isSelectingLocation ? (
+            <TouchableOpacity
+              style={[emStyles.fab, { backgroundColor: '#FF453A', width: 'auto', paddingHorizontal: 20, borderRadius: 20 }]}
+              onPress={() => { setIsSelectingLocation(false); setShowAddMenu(false); }}
+            >
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Cancel</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              {showAddMenu && (
+                <View style={emStyles.addMenu}>
+                  <TouchableOpacity
+                    style={emStyles.addMenuItem}
+                    onPress={() => { setShowAddMenu(false); setIsSelectingLocation(true); }}
+                  >
+                    <Ionicons name="location-outline" size={20} color="#FFFFFF" />
+                    <Text style={emStyles.addMenuText}>Drop Pin</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={emStyles.addMenuItem}
+                    onPress={() => { setShowCourtPicker(true); setShowAddMenu(false); }}
+                  >
+                    <Ionicons name="business-outline" size={20} color="#0FEA95" />
+                    <Text style={[emStyles.addMenuText, { color: '#0FEA95' }]}>Choose Court</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[emStyles.fab, showAddMenu && { backgroundColor: '#FF453A' }]}
+                onPress={() => setShowAddMenu(v => !v)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name={showAddMenu ? 'close' : 'add'} size={32} color="white" />
+              </TouchableOpacity>
+            </>
+          )
+        )}
+
+        {showCourtPicker && (
+          <View style={emStyles.courtPickerSheet}>
+            <View style={emStyles.courtPickerHeader}>
+              <Text style={emStyles.courtPickerTitle}>Choose a Court</Text>
+              <TouchableOpacity onPress={() => setShowCourtPicker(false)}>
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={courts}
+              keyExtractor={item => item.place_id}
+              style={{ maxHeight: 320 }}
+              renderItem={({ item }) => {
+                const { icon, color } = getSportStyle(item.sport_type);
+                return (
+                  <TouchableOpacity
+                    style={emStyles.courtPickerItem}
+                    onPress={() => {
+                      setShowCourtPicker(false);
+                      router.push({
+                        pathname: '/modal',
+                        params: {
+                          lat: item.geometry.location.lat,
+                          lng: item.geometry.location.lng,
+                          existingLocationDesc: item.name,
+                        },
+                      });
+                    }}
+                  >
+                    <View style={[emStyles.courtPickerIcon, { backgroundColor: color + '22', borderColor: color }]}>
+                      <MaterialCommunityIcons name={icon} size={20} color={color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={emStyles.courtPickerName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={emStyles.courtPickerAddress} numberOfLines={1}>{item.vicinity}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#48484A" />
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
         )}
 
         {selectedCourt && (
@@ -1238,11 +1455,32 @@ const emStyles = StyleSheet.create({
   badge: { backgroundColor: Colors.accentFaint, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: Colors.accentBorder },
   badgeText: { color: Colors.accent, fontSize: 12, fontWeight: '800' },
   avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden' },
+  searchInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 4 },
+  searchDropdown: { marginHorizontal: 16, marginBottom: 4, backgroundColor: Colors.surface, borderRadius: 16, paddingVertical: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  searchDropdownLabel: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, paddingHorizontal: 16, paddingVertical: 4, textTransform: 'uppercase' },
+  searchDropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  searchDropdownText: { flex: 1, fontSize: 14, color: Colors.text, fontWeight: '500' },
+  pinBanner: { backgroundColor: Colors.accent, paddingVertical: 10, alignItems: 'center' },
+  pinBannerText: { color: '#1C1C1E', fontWeight: '800', fontSize: 15 },
   filterRow: { paddingBottom: 10 },
+  typeChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
+  typeChipActive: { backgroundColor: Colors.accentFaint, borderColor: Colors.accent },
+  typeChipText: { fontSize: 13, fontWeight: '700', color: Colors.textMuted },
+  typeChipTextActive: { color: Colors.accent },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
   chipText: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   fab: { position: 'absolute', bottom: 30, right: 25, backgroundColor: '#1C1C1E', width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.accent, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
+  addMenu: { position: 'absolute', bottom: 105, right: 20, gap: 10 },
+  addMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1C1C1E', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  addMenuText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+  courtPickerSheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 30, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 12 },
+  courtPickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
+  courtPickerTitle: { fontSize: 18, fontWeight: '900', color: '#FFFFFF' },
+  courtPickerItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
+  courtPickerIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  courtPickerName: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  courtPickerAddress: { fontSize: 12, color: '#636366', marginTop: 2 },
   recenterBtn: { position: 'absolute', bottom: 105, right: 30, backgroundColor: 'rgba(255,255,255,0.95)', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 },
   cardWrap: { position: 'absolute', bottom: 30, alignSelf: 'center', width: '90%' },
   cardClose: { position: 'absolute', top: -10, right: -6, width: 32, height: 32, borderRadius: 16, backgroundColor: '#3A3A3C', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },

@@ -16,6 +16,7 @@ type Props = {
   markers: LeafletMarker[];
   userLocation: { latitude: number; longitude: number } | null;
   recenterTrigger: number;
+  panTarget: { latitude: number; longitude: number } | null;
   onMarkerPress: (placeId: string) => void;
   onMapPress: (lat: number, lng: number) => void;
 };
@@ -28,7 +29,7 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  html, body, #map { height: 100%; margin: 0; padding: 0; background: #1C1C1E; }
+  html, body, #map { height: 100%; margin: 0; padding: 0; background: #e8e0d8; }
   .pin { display:flex; align-items:center; justify-content:center; border-radius:50%; box-shadow:0 2px 6px rgba(0,0,0,0.5); }
   .pin-game { width:34px; height:34px; background:#1C1C1E; border:2.5px solid #fff; }
   .pin-court { width:26px; height:26px; background:rgba(255,255,255,0.92); border:1.5px solid #ccc; }
@@ -48,7 +49,7 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
     document.getElementById('offline').style.display = 'block';
   } else {
     var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([${lat}, ${lng}], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
     var markerLayer = L.layerGroup().addTo(map);
     var userLayer = L.layerGroup().addTo(map);
 
@@ -85,7 +86,7 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
 </html>`;
 
 export default function LeafletMap({
-  region, markers, userLocation, recenterTrigger, onMarkerPress, onMapPress,
+  region, markers, userLocation, recenterTrigger, panTarget, onMarkerPress, onMapPress,
 }: Props) {
   const webRef = useRef<WebView>(null);
   const readyRef = useRef(false);
@@ -107,6 +108,11 @@ export default function LeafletMap({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recenterTrigger]);
+  useEffect(() => {
+    if (readyRef.current && panTarget) {
+      webRef.current?.injectJavaScript(`window.setView && window.setView(${panTarget.latitude}, ${panTarget.longitude}); true;`);
+    }
+  }, [panTarget]);
 
   const onMessage = (e: WebViewMessageEvent) => {
     try {
@@ -122,7 +128,7 @@ export default function LeafletMap({
       ref={webRef}
       originWhitelist={['*']}
       source={{ html: buildHtml(region.latitude, region.longitude) }}
-      style={{ flex: 1, backgroundColor: '#1C1C1E' }}
+      style={{ flex: 1, backgroundColor: '#e8e0d8' }}
       onMessage={onMessage}
       javaScriptEnabled
       domStorageEnabled
