@@ -840,6 +840,8 @@ function ExpoGoMapScreen() {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showCourtPicker, setShowCourtPicker] = useState(false);
   const [panTarget, setPanTarget] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [latDelta, setLatDelta] = useState(0.1);
+  const [clusterZoomTarget, setClusterZoomTarget] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Keep region in sync when location arrives
   React.useEffect(() => {
@@ -875,18 +877,23 @@ function ExpoGoMapScreen() {
   const activeGames = games.filter(g => !isPast(g.scheduled_time));
   const filteredGames = sportFilter === 'all' ? activeGames : activeGames.filter(g => g.sport_type === sportFilter);
   const filteredCourts = sportFilter === 'all' ? courts : courts.filter(c => c.sport_type === sportFilter);
-  const visibleGames = filterType !== 'courts' ? filteredGames : [];
-  const visibleCourts = filterType !== 'games' ? filteredCourts : [];
+
+  const clusteredGames = filterType !== 'courts' ? clusterGames(filteredGames, latDelta) : [];
+  // Mirror native: hide courts when zoomed out past 0.035 (unless courts-only filter)
+  const visibleCourts = filterType !== 'games' && (filterType === 'courts' || latDelta <= 0.035)
+    ? filteredCourts
+    : [];
 
   const markers: LeafletMarker[] = [
-    ...visibleGames.map(g => ({
+    ...clusteredGames.map(g => ({
       placeId: g.place_id,
       lat: g.geometry.location.lat,
       lng: g.geometry.location.lng,
       color: SPORT_COLORS[g.sport_type] ?? Colors.accent,
-      icon: SPORT_ICONS[g.sport_type] ?? 'map-marker',
+      icon: g._isCluster ? 'layers' : (SPORT_ICONS[g.sport_type] ?? 'map-marker'),
       isGame: true,
-      isJoined: !!g.is_joined,
+      isJoined: !g._isCluster && !!g.is_joined,
+      clusterCount: g._clusterCount > 1 ? g._clusterCount : undefined,
     })),
     ...visibleCourts.map(c => ({
       placeId: c.place_id,
@@ -900,6 +907,14 @@ function ExpoGoMapScreen() {
   ];
 
   const handleMarkerPress = (placeId: string) => {
+    if (placeId.startsWith('cluster_')) {
+      const cluster = clusteredGames.find(g => g.place_id === placeId);
+      if (cluster) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setClusterZoomTarget({ latitude: cluster.geometry.location.lat, longitude: cluster.geometry.location.lng });
+      }
+      return;
+    }
     const item = [...games, ...courts].find(i => i.place_id === placeId);
     if (item) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedCourt(item); }
   };
@@ -1023,8 +1038,10 @@ function ExpoGoMapScreen() {
             userLocation={userLocation}
             recenterTrigger={recenterTrigger}
             panTarget={panTarget}
+            clusterZoomTarget={clusterZoomTarget}
             onMarkerPress={handleMarkerPress}
             onMapPress={handleMapPress}
+            onZoom={setLatDelta}
           />
         )}
 

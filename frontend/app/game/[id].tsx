@@ -232,5 +232,5 @@ const styles = StyleSheet.create({
   ctaBtn:        { borderRadius: Radius.pill, height: 52, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: Spacing.sm },
   ctaBtnMuted:   { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.accentBorder },
   ctaBtnText:    { ...Type.btnPrimary },
-  ctaBtnTextDark:{ ...Type.btnPrimary, color: '#000' },
+  ctaBtnTextDark:{ ...Type.btnPrimary, color: Colors.bg },
 });

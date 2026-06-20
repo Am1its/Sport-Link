@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
 
   googleBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderRadius: Radius.lg, height: 52, gap: 10, paddingHorizontal: 16 },
-  googleBtnText: { fontSize: 15, fontWeight: '700', color: '#1C1C1E', flex: 1 },
+  googleBtnText: { fontSize: 15, fontWeight: '700', color: Colors.bg, flex: 1 },
 
   divider:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
   dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },

@@ -9,6 +9,7 @@ export type LeafletMarker = {
   icon: string;
   isGame: boolean;
   isJoined: boolean;
+  clusterCount?: number;
 };
 
 type Props = {
@@ -17,8 +18,10 @@ type Props = {
   userLocation: { latitude: number; longitude: number } | null;
   recenterTrigger: number;
   panTarget: { latitude: number; longitude: number } | null;
+  clusterZoomTarget?: { latitude: number; longitude: number } | null;
   onMarkerPress: (placeId: string) => void;
   onMapPress: (lat: number, lng: number) => void;
+  onZoom?: (latDelta: number) => void;
 };
 
 const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
@@ -32,9 +35,11 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
   html, body, #map { height: 100%; margin: 0; padding: 0; background: #e8e0d8; }
   .pin { display:flex; align-items:center; justify-content:center; border-radius:50%; box-shadow:0 2px 6px rgba(0,0,0,0.5); }
   .pin-game { width:34px; height:34px; background:#1C1C1E; border:2.5px solid #fff; }
+  .pin-cluster { width:40px; height:40px; background:#1C1C1E; }
   .pin-court { width:26px; height:26px; background:rgba(255,255,255,0.92); border:1.5px solid #ccc; }
   .pin i { font-size:18px; line-height:1; }
   .pin-court i { font-size:15px; }
+  .cluster-count { color:#0FEA95; font-size:13px; font-weight:900; font-family:-apple-system,system-ui,sans-serif; line-height:1; }
   .userdot { width:16px; height:16px; border-radius:50%; background:#2C82FF; border:3px solid #fff; box-shadow:0 0 0 4px rgba(40,130,255,0.3); }
   .offline { position:absolute; top:50%; left:0; right:0; transform:translateY(-50%); text-align:center; color:#8E8E93; font-family:-apple-system,system-ui,sans-serif; font-size:15px; z-index:500; pointer-events:none; }
 </style>
@@ -55,15 +60,28 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
 
     map.on('click', function(e){ post({ type:'mapclick', lat:e.latlng.lat, lng:e.latlng.lng }); });
 
+    function reportZoom(){
+      var b = map.getBounds();
+      post({ type:'zoom', latDelta: b.getNorth()-b.getSouth() });
+    }
+    map.on('zoomend moveend', reportZoom);
+
     window.setMarkers = function(json){
       var data = JSON.parse(json);
       markerLayer.clearLayers();
       data.forEach(function(m){
         if(m.lat==null||m.lng==null||isNaN(m.lat)||isNaN(m.lng)) return;
-        var cls = m.isGame ? 'pin pin-game' : 'pin pin-court';
-        var accent = m.isGame && m.isJoined ? '#0FEA95' : m.color;
-        var html = '<div class="'+cls+'" style="border-color:'+accent+'"><i class="mdi mdi-'+m.icon+'" style="color:'+accent+'"></i></div>';
-        var size = m.isGame ? 34 : 26;
+        var html, size;
+        if(m.isGame && m.clusterCount && m.clusterCount > 1){
+          var accent = m.color;
+          html = '<div class="pin pin-cluster" style="border:2.5px solid '+accent+'"><span class="cluster-count">'+m.clusterCount+'</span></div>';
+          size = 40;
+        } else {
+          var cls = m.isGame ? 'pin pin-game' : 'pin pin-court';
+          var accent = m.isGame && m.isJoined ? '#0FEA95' : m.color;
+          html = '<div class="'+cls+'" style="border-color:'+accent+'"><i class="mdi mdi-'+m.icon+'" style="color:'+accent+'"></i></div>';
+          size = m.isGame ? 34 : 26;
+        }
         var icon = L.divIcon({ html: html, className: '', iconSize: [size,size], iconAnchor: [size/2,size/2] });
         var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(markerLayer);
         marker.on('click', function(ev){ L.DomEvent.stopPropagation(ev); post({ type:'marker', placeId: m.placeId }); });
@@ -71,6 +89,8 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
     };
 
     window.setView = function(la, ln){ map.setView([la, ln], 15, { animate: true }); };
+
+    window.zoomToCluster = function(la, ln){ map.setView([la, ln], map.getZoom()+2, { animate: true }); };
 
     window.setUser = function(la, ln){
       userLayer.clearLayers();
@@ -80,13 +100,15 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
     };
 
     post({ type:'ready' });
+    reportZoom();
   }
 </script>
 </body>
 </html>`;
 
 export default function LeafletMap({
-  region, markers, userLocation, recenterTrigger, panTarget, onMarkerPress, onMapPress,
+  region, markers, userLocation, recenterTrigger, panTarget, clusterZoomTarget,
+  onMarkerPress, onMapPress, onZoom,
 }: Props) {
   const webRef = useRef<WebView>(null);
   const readyRef = useRef(false);
@@ -113,6 +135,11 @@ export default function LeafletMap({
       webRef.current?.injectJavaScript(`window.setView && window.setView(${panTarget.latitude}, ${panTarget.longitude}); true;`);
     }
   }, [panTarget]);
+  useEffect(() => {
+    if (readyRef.current && clusterZoomTarget) {
+      webRef.current?.injectJavaScript(`window.zoomToCluster && window.zoomToCluster(${clusterZoomTarget.latitude}, ${clusterZoomTarget.longitude}); true;`);
+    }
+  }, [clusterZoomTarget]);
 
   const onMessage = (e: WebViewMessageEvent) => {
     try {
@@ -120,6 +147,7 @@ export default function LeafletMap({
       if (msg.type === 'ready') { readyRef.current = true; injectMarkers(); injectUser(); }
       else if (msg.type === 'marker') onMarkerPress(msg.placeId);
       else if (msg.type === 'mapclick') onMapPress(msg.lat, msg.lng);
+      else if (msg.type === 'zoom' && onZoom) onZoom(msg.latDelta);
     } catch {}
   };
 
