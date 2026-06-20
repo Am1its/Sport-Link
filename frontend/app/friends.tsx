@@ -10,6 +10,8 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { API_BASE } from '../constants/api';
 import ReAnimated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, withSequence,
@@ -126,8 +128,8 @@ export default function FriendsScreen() {
     else setLoading(true);
     try {
       const [fRes, rRes] = await Promise.all([
-        apiFetch('/api/friends', { token }),
-        apiFetch('/api/friends/requests', { token }),
+        apiFetch(API.FRIENDS, { token }),
+        apiFetch(API.FRIEND_REQUESTS, { token }),
       ]);
       const [fData, rData] = await Promise.all([fRes.json(), rRes.json()]);
       if (fData.success) setFriends(fData.friends);
@@ -150,7 +152,7 @@ export default function FriendsScreen() {
     setSearching(true);
     searchDebounce.current = setTimeout(async () => {
       try {
-        const res = await apiFetch(`/api/users/search?q=${encodeURIComponent(q.trim())}`, { token });
+        const res = await apiFetch(`${API.USERS_SEARCH}?q=${encodeURIComponent(q.trim())}`, { token });
         const data = await res.json();
         if (data.success) setSearchResults(data.users);
       } catch (err) {
@@ -164,7 +166,7 @@ export default function FriendsScreen() {
 
   const sendRequest = async (addresseeId: number) => {
     try {
-      const res = await apiFetch('/api/friends', {
+      const res = await apiFetch(API.FRIENDS, {
         method: 'POST',
         token,
         body: JSON.stringify({ addressee_id: addresseeId }),
@@ -179,7 +181,7 @@ export default function FriendsScreen() {
 
   const acceptRequest = async (friendshipId: number) => {
     try {
-      const res = await apiFetch(`/api/friends/${friendshipId}/accept`, { method: 'PUT', token });
+      const res = await apiFetch(API.friendAccept(friendshipId), { method: 'PUT', token });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       // Sound + haptic fire on API success
@@ -198,7 +200,7 @@ export default function FriendsScreen() {
         text: 'Remove', style: 'destructive',
         onPress: async () => {
           try {
-            await apiFetch(`/api/friends/${friendshipId}`, { method: 'DELETE', token });
+            await apiFetch(API.friend(friendshipId), { method: 'DELETE', token });
             fetchAll(true);
           } catch {
             Alert.alert('Error', 'Could not connect to server');
@@ -277,7 +279,7 @@ export default function FriendsScreen() {
                   <StaggeredCard index={index}>
                     <TouchableOpacity
                       style={styles.row}
-                      onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
+                      onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(item.id) } })}
                       activeOpacity={0.75}
                     >
                       <AvatarCircle username={item.username} avatar={item.avatar} />

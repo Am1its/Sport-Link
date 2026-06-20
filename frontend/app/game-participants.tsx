@@ -9,6 +9,8 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
 import { BackButton } from '../components/BackButton';
 import { Colors } from '../constants/theme';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import type { Participant } from '../types';
 
 export default function GameParticipantsScreen() {
@@ -21,7 +23,7 @@ export default function GameParticipantsScreen() {
   useEffect(() => {
     const fetchParticipants = async () => {
       try {
-        const res = await apiFetch(`/api/games/${gameId}/participants`, { token });
+        const res = await apiFetch(API.gameParticipants(gameId), { token });
         const data = await res.json();
         if (data.success) setParticipants(data.participants);
       } catch (err) {
@@ -55,7 +57,7 @@ export default function GameParticipantsScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.row}
-              onPress={() => router.push({ pathname: '/player-profile', params: { userId: item.id } } as any)}
+              onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE, params: { userId: item.id } } as any)}
               activeOpacity={0.75}
             >
               <AvatarCircle username={item.username} avatar={item.avatar} size={46} />

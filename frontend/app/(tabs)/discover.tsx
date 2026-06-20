@@ -14,6 +14,8 @@ import { isPastGame, getTodayRange, getThisWeekendRange, getThisWeekRange, DateR
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type } from '../../constants/theme';
 import { DiscoverSkeleton } from '../../components/SkeletonLoader';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 import { GameCard } from '../../components/GameCard';
 import type { Game } from '../../types';
 
@@ -138,7 +140,7 @@ export default function DiscoverScreen() {
       }
       if (neighborhoodFilter) parts.push(`neighborhood=${encodeURIComponent(neighborhoodFilter)}`);
 
-      const url = `/api/games${parts.length ? `?${parts.join('&')}` : ''}`;
+      const url = `${API.GAMES}${parts.length ? `?${parts.join('&')}` : ''}`;
       const res  = await apiFetch(url, { token });
       const data = await res.json();
       if (data.success) setGames(data.games);
@@ -326,7 +328,7 @@ export default function DiscoverScreen() {
                   onNeighborhoodPress={handleNeighborhoodPress}
                   onViewParticipants={() =>
                     router.push({
-                      pathname: '/game-participants',
+                      pathname: ROUTES.GAME_PARTICIPANTS,
                       params: {
                         gameId: String(item.id),
                         title: item.title ?? `${sportLabel(item.sport_type)} Game`,

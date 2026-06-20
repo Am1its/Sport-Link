@@ -12,6 +12,8 @@ import { API_BASE } from '../../constants/api';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../../constants/theme';
 import type { Game } from '../../types';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 
 type GameDetail = Game & { host_username: string; status: string };
 
@@ -29,7 +31,7 @@ export default function GameLandingScreen() {
     if (!id) return;
     (async () => {
       try {
-        const res  = await apiFetch(`/api/games/${id}`, { token });
+        const res  = await apiFetch(API.game(id), { token });
         const data = await res.json();
         if (data.success) {
           setGame(data.game);
@@ -44,11 +46,11 @@ export default function GameLandingScreen() {
   }, [id, token]);
 
   const handleJoin = async () => {
-    if (!token) return router.push({ pathname: '/login', params: { redirect: `/game/${id}` } } as any);
+    if (!token) return router.push({ pathname: ROUTES.LOGIN, params: { redirect: `/game/${id}` } } as any);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setJoining(true);
     try {
-      const res  = await apiFetch(`/api/games/${id}/join`, { method: 'POST', token });
+      const res  = await apiFetch(API.gameJoin(id), { method: 'POST', token });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -160,7 +162,7 @@ export default function GameLandingScreen() {
           {(isOwn || isJoined) ? (
             <TouchableOpacity
               style={[styles.ctaBtn, styles.ctaBtnMuted]}
-              onPress={() => router.push({ pathname: '/game-chat', params: { id: String(game.id), name: title } })}
+              onPress={() => router.push({ pathname: ROUTES.GAME_CHAT, params: { id: String(game.id), name: title } })}
             >
               <Ionicons name="chatbubble-outline" size={18} color={Colors.accent} />
               <Text style={[styles.ctaBtnText, { color: Colors.accent }]}>Open Chat</Text>

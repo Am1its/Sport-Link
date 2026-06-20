@@ -13,6 +13,8 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { BackButton } from '../components/BackButton';
 import { useSound } from '../context/SoundContext';
 import { Springs } from '../constants/motion';
@@ -117,7 +119,7 @@ export default function LeaderboardScreen() {
   useEffect(() => {
     const fetchBoard = async () => {
       try {
-        const res = await apiFetch('/api/users/leaderboard', { token });
+        const res = await apiFetch(API.USERS_LEADERBOARD, { token });
         const data = await res.json();
         if (data.success) {
           setBoard(data.leaderboard);
@@ -221,7 +223,7 @@ export default function LeaderboardScreen() {
             const row = (
               <TouchableOpacity
                 style={[styles.row, Shadow.card, isMe && styles.rowMe]}
-                onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
+                onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(item.id) } })}
                 activeOpacity={0.75}
               >
                 <Text style={styles.rankNum}>#{rank}</Text>

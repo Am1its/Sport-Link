@@ -15,6 +15,8 @@ import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { getAvatarColor } from '../../utils/avatar';
 import { Colors, Spacing, Radius, Type } from '../../constants/theme';
 import { Springs } from '../../constants/motion';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 import { ChatSkeleton } from '../../components/SkeletonLoader';
 
 type GameChat = {
@@ -114,8 +116,8 @@ export default function ChatScreen() {
         setLoading(true);
         try {
           const [gRes, dRes] = await Promise.all([
-            apiFetch('/api/chats', { token }),
-            apiFetch('/api/dm',    { token }),
+            apiFetch(API.CHATS, { token }),
+            apiFetch(API.DM,    { token }),
           ]);
           const [gData, dData] = await Promise.all([gRes.json(), dRes.json()]);
           if (gData.success) setGameChats(gData.chats);
@@ -164,7 +166,7 @@ export default function ChatScreen() {
       <StaggeredRow index={index}>
         <TouchableOpacity
           style={styles.row}
-          onPress={() => router.push({ pathname: '/game-chat', params: { id: item.id, name: gameName } })}
+          onPress={() => router.push({ pathname: ROUTES.GAME_CHAT, params: { id: item.id, name: gameName } })}
           activeOpacity={0.7}
         >
           <View style={[styles.iconCircle, { backgroundColor: color + '18', borderColor: color + '55' }]}>
@@ -205,7 +207,7 @@ export default function ChatScreen() {
         <TouchableOpacity
           style={styles.rowOuter}
           onPress={() => router.push({
-            pathname: '/direct-chat',
+            pathname: ROUTES.DIRECT_CHAT,
             params: { userId: String(item.id), username: item.username },
           })}
           activeOpacity={0.7}

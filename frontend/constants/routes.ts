@@ -15,6 +15,7 @@ export const ROUTES = {
 
   // Game flow
   MODAL:                  '/modal',
+  GAME_DETAIL:            '/game/[id]',
   GAME_CHAT:              '/game-chat',
   GAME_PARTICIPANTS:      '/game-participants',
   RATE_PLAYERS:           '/rate-players',

@@ -19,6 +19,8 @@ import { isPastGame } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { GamesSkeleton } from '../../components/SkeletonLoader';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 import { isOutdoorSport, fetchWeatherForGame, WeatherResult } from '../../utils/weather';
 import { Springs } from '../../constants/motion';
 import type { Game } from '../../types';
@@ -126,7 +128,7 @@ function MyGameCard({
   const handleCheckIn = async () => {
     setCheckingIn(true);
     try {
-      const res  = await apiFetch(`/api/games/${game.id}/checkin`, { method: 'POST', token });
+      const res  = await apiFetch(API.gameCheckin(game.id), { method: 'POST', token });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       setCheckedIn(true);
@@ -142,7 +144,7 @@ function MyGameCard({
   const handleBoost = async () => {
     setBoosting(true);
     try {
-      const res  = await apiFetch(`/api/games/${game.id}/boost`, { method: 'POST', token });
+      const res  = await apiFetch(API.gameBoost(game.id), { method: 'POST', token });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       setBoostedAt(new Date().toISOString());
@@ -160,7 +162,7 @@ function MyGameCard({
     if (result.canceled || !result.assets[0]?.base64) return;
     const base64 = result.assets[0].base64;
     try {
-      const res  = await apiFetch(`/api/games/${game.id}/post-photo`, {
+      const res  = await apiFetch(API.gamePostPhoto(game.id), {
         method: 'PUT', token, body: JSON.stringify({ photo: base64 }),
       });
       const data = await res.json();
@@ -412,12 +414,12 @@ export default function GamesScreen() {
           text: 'Close & Rate',
           onPress: async () => {
             try {
-              const res  = await apiFetch(`/api/games/${game.id}/complete`, { method: 'POST', token });
+              const res  = await apiFetch(API.gameComplete(game.id), { method: 'POST', token });
               const data = await res.json();
               if (!data.success) return Alert.alert('Error', data.message);
               markCompleted(game.id);
               router.push({
-                pathname: '/rate-players',
+                pathname: ROUTES.RATE_PLAYERS,
                 params: { gameId: game.id, sport: game.sport_type, scheduledTime: game.scheduled_time ?? '' },
               });
             } catch (err) {
@@ -441,7 +443,7 @@ export default function GamesScreen() {
           onPress: async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             try {
-              const res  = await apiFetch(`/api/games/${game.id}`, { method: 'DELETE', token });
+              const res  = await apiFetch(API.game(game.id), { method: 'DELETE', token });
               const data = await res.json();
               if (!data.success) return Alert.alert('Error', data.message);
               removeGame(game.id);
@@ -466,7 +468,7 @@ export default function GamesScreen() {
           onPress: async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             try {
-              const res  = await apiFetch(`/api/games/${game.id}/leave`, { method: 'DELETE', token });
+              const res  = await apiFetch(API.gameLeave(game.id), { method: 'DELETE', token });
               const data = await res.json();
               if (!data.success) return Alert.alert('Error', data.message);
               removeGame(game.id);
@@ -484,7 +486,7 @@ export default function GamesScreen() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res  = await apiFetch('/api/games/mine', { token });
+      const res  = await apiFetch(API.MY_GAMES, { token });
       const data = await res.json();
       if (data.success) setGames(data.games);
     } catch (err) {
@@ -508,20 +510,20 @@ export default function GamesScreen() {
     token,
     onPhotoAdded: handlePhotoAdded,
     onChat: () => router.push({
-      pathname: '/game-chat',
+      pathname: ROUTES.GAME_CHAT,
       params: { id: String(item.id), name: `${sportLabel(item.sport_type)} Game` },
     }),
     onRatePlayers: () => router.push({
-      pathname: '/rate-players',
+      pathname: ROUTES.RATE_PLAYERS,
       params: { gameId: item.id, sport: item.sport_type, scheduledTime: item.scheduled_time ?? '' },
     }),
     onViewResults: () => router.push({
-      pathname: '/game-results' as any,
+      pathname: ROUTES.GAME_RESULTS as any,
       params: { gameId: String(item.id), title: item.title ?? '', sport: item.sport_type, scheduledTime: item.scheduled_time ?? '' },
     }),
     onCloseGame:       () => handleClose(item),
     onEdit: () => router.push({
-      pathname: '/modal',
+      pathname: ROUTES.MODAL,
       params: {
         gameId:               String(item.id),
         existingSport:        item.sport_type,
@@ -537,7 +539,7 @@ export default function GamesScreen() {
     onDelete: () => handleDelete(item),
     onLeave:  () => handleLeave(item),
     onViewParticipants: () => router.push({
-      pathname: '/game-participants',
+      pathname: ROUTES.GAME_PARTICIPANTS,
       params: { gameId: String(item.id), title: item.title ?? `${sportLabel(item.sport_type)} Game` },
     } as any),
   });
@@ -557,7 +559,7 @@ export default function GamesScreen() {
           </View>
           <Text style={styles.emptyTitle}>No games yet</Text>
           <Text style={styles.emptySub}>Go to the map and find or create a game!</Text>
-          <TouchableOpacity style={styles.mapBtn} onPress={() => router.push('/(tabs)')}>
+          <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(ROUTES.TABS as any)}>
             <Ionicons name="map-outline" size={16} color={Colors.bg} />
             <Text style={styles.mapBtnText}>Open Map</Text>
           </TouchableOpacity>

@@ -11,6 +11,8 @@ import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 
 type ResultEntry = {
   id: number;
@@ -51,7 +53,7 @@ export default function GameResultsScreen() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await apiFetch(`/api/ratings/game/${gameId}/results`, { token });
+        const res = await apiFetch(API.gameRatingResults(gameId), { token });
         const data = await res.json();
         if (data.success) {
           setCanView(data.can_view);
@@ -110,7 +112,7 @@ export default function GameResultsScreen() {
           <TouchableOpacity
             style={styles.rateBtn}
             onPress={() => router.replace({
-              pathname: '/rate-players' as any,
+              pathname: ROUTES.RATE_PLAYERS as any,
               params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
             })}
           >

@@ -10,6 +10,8 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { getAvatarColor } from '../utils/avatar';
 import { Colors, Spacing, Radius, Shadow, Type } from '../constants/theme';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 
 type Activity = {
   type: 'joined' | 'created';
@@ -124,7 +126,7 @@ export default function ActivityScreen() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const res  = await apiFetch('/api/activity', { token });
+      const res  = await apiFetch(API.ACTIVITY, { token });
       const data = await res.json();
       if (data.success) setActivities(data.activities);
     } catch (err) {
@@ -159,8 +161,8 @@ export default function ActivityScreen() {
           renderItem={({ item }) => (
             <ActivityCard
               item={item}
-              onPress={() => router.push({ pathname: '/game/[id]' as any, params: { id: String(item.game_id) } })}
-              onPressActor={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.actor_id) } })}
+              onPress={() => router.push({ pathname: ROUTES.GAME_DETAIL as any, params: { id: String(item.game_id) } })}
+              onPressActor={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(item.actor_id) } })}
             />
           )}
           contentContainerStyle={styles.list}
@@ -179,7 +181,7 @@ export default function ActivityScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
-                onPress={() => router.push('/friends' as any)}
+                onPress={() => router.push(ROUTES.FRIENDS as any)}
                 activeOpacity={0.8}
               >
                 <Text style={styles.emptyBtnText}>Find Friends</Text>

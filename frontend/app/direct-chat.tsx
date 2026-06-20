@@ -18,6 +18,8 @@ import { API_BASE } from '../constants/api';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { SOCKET_EVENTS } from '../constants/events';
 import { usePressAnimation, useTypingIndicator } from '../hooks/useAnimations';
 import { useSound } from '../context/SoundContext';
@@ -104,7 +106,7 @@ export default function DirectChatScreen() {
     if (newIds.length === 0) return;
     newIds.forEach(id => seenIds.current.add(id));
     try {
-      const res = await apiFetch(`/api/users/avatars?ids=${newIds.join(',')}`, { token });
+      const res = await apiFetch(`${API.USERS_AVATARS}?ids=${newIds.join(',')}`, { token });
       const data = await res.json();
       if (data.success) {
         const map: Record<number, string | null> = {};
@@ -116,7 +118,7 @@ export default function DirectChatScreen() {
 
   const fetchMessages = async () => {
     try {
-      const res  = await apiFetch(`/api/dm/${userId}`, { token });
+      const res  = await apiFetch(API.dmConvo(userId), { token });
       const data = await res.json();
       if (data.success) {
         setMessages(data.messages);
@@ -142,7 +144,7 @@ export default function DirectChatScreen() {
       if (msg.sender_id !== otherId && msg.receiver_id !== otherId) return;
       setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
       fetchAvatars([msg.sender_id]);
-      apiFetch(`/api/dm/${userId}/read`, { method: 'PUT', token }).catch(() => {});
+      apiFetch(API.dmRead(userId), { method: 'PUT', token }).catch(() => {});
       hideTyping();
       play('ding');
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -181,7 +183,7 @@ export default function DirectChatScreen() {
     setInput('');
     setSending(true);
     try {
-      const res  = await apiFetch(`/api/dm/${userId}`, {
+      const res  = await apiFetch(API.dmConvo(userId), {
         method: 'POST', token,
         body: JSON.stringify({ content, type: 'text' }),
       });
@@ -196,7 +198,7 @@ export default function DirectChatScreen() {
     if (myGames.length > 0) return;
     setLoadingGames(true);
     try {
-      const res  = await apiFetch('/api/games/mine', { token });
+      const res  = await apiFetch(API.MY_GAMES, { token });
       const data = await res.json();
       if (data.success) {
         const now = new Date();
@@ -215,7 +217,7 @@ export default function DirectChatScreen() {
   const sendEvent = async (game: MyGame) => {
     setShowPicker(false);
     try {
-      const res  = await apiFetch(`/api/dm/${userId}`, {
+      const res  = await apiFetch(API.dmConvo(userId), {
         method: 'POST', token,
         body: JSON.stringify({ type: 'event', event_id: game.id }),
       });
@@ -228,7 +230,7 @@ export default function DirectChatScreen() {
 
   const handleJoinGame = async (gameId: number) => {
     try {
-      const res  = await apiFetch(`/api/games/${gameId}/join`, { method: 'POST', token });
+      const res  = await apiFetch(API.gameJoin(gameId), { method: 'POST', token });
       const data = await res.json();
       if (!data.success) return Alert.alert('Cannot join', data.message);
       setMessages(prev => prev.map(m =>
@@ -256,7 +258,7 @@ export default function DirectChatScreen() {
           createdAt={msg.created_at}
           isMine={isOwn}
           avatar={avatarBase64}
-          onAvatarPress={!isOwn ? () => router.push({ pathname: '/player-profile', params: { userId: String(msg.sender_id) } } as any) : undefined}
+          onAvatarPress={!isOwn ? () => router.push({ pathname: ROUTES.PLAYER_PROFILE, params: { userId: String(msg.sender_id) } } as any) : undefined}
           formatTime={formatTime}
         />
       );
@@ -265,7 +267,7 @@ export default function DirectChatScreen() {
     // Event messages: keep existing inline rendering
     const avatar = (
       <TouchableOpacity
-        onPress={() => !isOwn && router.push({ pathname: '/player-profile' as any, params: { userId: String(msg.sender_id) } })}
+        onPress={() => !isOwn && router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(msg.sender_id) } })}
         activeOpacity={isOwn ? 1 : 0.75}
       >
         <View style={[styles.avatarSmall, { backgroundColor: color + '22', borderColor: color }]}>
@@ -319,7 +321,7 @@ export default function DirectChatScreen() {
         <BackButton />
         <TouchableOpacity
           style={styles.headerCenter}
-          onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId } })}
+          onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId } })}
           activeOpacity={0.7}
         >
           <View style={[styles.headerAvatar, { backgroundColor: getAvatarColor(username) + '33', borderColor: getAvatarColor(username) }]}>

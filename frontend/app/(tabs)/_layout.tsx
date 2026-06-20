@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { Colors } from '../../constants/theme';
 import { API_BASE } from '../../constants/api';
+import { API } from '../../constants/endpoints';
 import { SOCKET_EVENTS } from '../../constants/events';
 
 function AnimatedTabIcon({ name, color, focused }: { name: React.ComponentProps<typeof Ionicons>['name']; color: string; focused: boolean }) {
@@ -36,8 +37,8 @@ export default function TabLayout() {
     if (!token) return;
     try {
       const [chatsRes, dmRes] = await Promise.all([
-        apiFetch('/api/chats', { token }),
-        apiFetch('/api/dm',    { token }),
+        apiFetch(API.CHATS, { token }),
+        apiFetch(API.DM,    { token }),
       ]);
       const [chatsData, dmData] = await Promise.all([chatsRes.json(), dmRes.json()]);
 

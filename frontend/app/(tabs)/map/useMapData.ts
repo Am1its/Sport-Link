@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
 import { apiFetch } from '../../../utils/api';
+import { API } from '../../../constants/endpoints';
 import type { MapItem } from '../../../types';
 
 export const PENDING_MAP_PAN_KEY = 'pending_map_pan';
@@ -28,7 +29,7 @@ export function useMapData(token: string | null) {
 
   const fetchCourts = async (lat: number, lng: number) => {
     try {
-      const res = await apiFetch(`/api/courts/nearby?lat=${lat}&lng=${lng}`, { token });
+      const res = await apiFetch(`${API.COURTS_NEARBY}?lat=${lat}&lng=${lng}`, { token });
       const data = await res.json();
       if (data.success) setCourts(data.courts);
     } catch (err) {
@@ -66,8 +67,8 @@ export function useMapData(token: string | null) {
       const run = async () => {
         try {
           const [gamesRes, meRes] = await Promise.all([
-            apiFetch('/api/games', { token }),
-            apiFetch('/api/users/me', { token }),
+            apiFetch(API.GAMES, { token }),
+            apiFetch(API.ME, { token }),
           ]);
           const gamesData = await gamesRes.json();
           const meData = await meRes.json();

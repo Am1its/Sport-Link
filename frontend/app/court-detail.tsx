@@ -18,6 +18,7 @@ import AvatarCircle from '../components/AvatarCircle';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { Springs } from '../constants/motion';
+import { API } from '../constants/endpoints';
 import { BackButton } from '../components/BackButton';
 
 type PlacesData = {
@@ -127,7 +128,7 @@ function ReviewCard({ review, userId, isManager, placeId, token, onDelete, onRef
     if (!replyText.trim()) return;
     setSavingReply(true);
     try {
-      await apiFetch(`/api/courts/${placeId}/reviews/${review.id}/response`, {
+      await apiFetch(API.courtReviewResponse(placeId, review.id), {
         method: 'PUT', token,
         body: JSON.stringify({ response: replyText.trim() }),
       });
@@ -139,7 +140,7 @@ function ReviewCard({ review, userId, isManager, placeId, token, onDelete, onRef
 
   const handleDeleteReply = async () => {
     try {
-      await apiFetch(`/api/courts/${placeId}/reviews/${review.id}/response`, { method: 'DELETE', token });
+      await apiFetch(API.courtReviewResponse(placeId, review.id), { method: 'DELETE', token });
       setReplyText('');
       onRefresh();
     } catch {}
@@ -287,7 +288,7 @@ export default function CourtDetailScreen() {
 
   const load = async () => {
     try {
-      const res = await apiFetch(`/api/courts/${placeId}`, { token });
+      const res = await apiFetch(API.court(placeId), { token });
       const data = await res.json();
       if (data.success) {
         setPlacesData(data.places);
@@ -313,7 +314,7 @@ export default function CourtDetailScreen() {
     setSubmitting(true);
     setSubmitSuccess(false);
     try {
-      await apiFetch(`/api/courts/${placeId}/reviews`, {
+      await apiFetch(API.courtReviews(placeId), {
         method: 'POST',
         token,
         body: JSON.stringify({ rating: myRating, comment: myComment.trim() || null }),
@@ -330,7 +331,7 @@ export default function CourtDetailScreen() {
 
   const handleDeleteReview = async (reviewId: number) => {
     try {
-      await apiFetch(`/api/courts/${placeId}/reviews/${reviewId}`, { method: 'DELETE', token });
+      await apiFetch(API.courtReview(placeId, reviewId), { method: 'DELETE', token });
       setReviews(prev => prev.filter(r => r.id !== reviewId));
       setMyRating(0);
       setMyComment('');
@@ -343,7 +344,7 @@ export default function CourtDetailScreen() {
   const handleClaim = async () => {
     setClaiming(true);
     try {
-      const res = await apiFetch(`/api/courts/${placeId}/claim`, { method: 'POST', token });
+      const res = await apiFetch(API.courtClaim(placeId), { method: 'POST', token });
       const data = await res.json();
       if (data.success) await load();
       else Alert.alert('Cannot claim', data.message);
@@ -359,7 +360,7 @@ export default function CourtDetailScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Release', style: 'destructive', onPress: async () => {
         try {
-          await apiFetch(`/api/courts/${placeId}/claim`, { method: 'DELETE', token });
+          await apiFetch(API.courtClaim(placeId), { method: 'DELETE', token });
           await load();
         } catch {}
       }},
@@ -371,7 +372,7 @@ export default function CourtDetailScreen() {
     if (!msg || postingAnn) return;
     setPostingAnn(true);
     try {
-      const res = await apiFetch(`/api/courts/${placeId}/announcements`, {
+      const res = await apiFetch(API.courtAnnouncements(placeId), {
         method: 'POST', token,
         body: JSON.stringify({ message: msg }),
       });
@@ -386,7 +387,7 @@ export default function CourtDetailScreen() {
 
   const handleDeleteAnnouncement = async (annId: number) => {
     try {
-      await apiFetch(`/api/courts/${placeId}/announcements/${annId}`, { method: 'DELETE', token });
+      await apiFetch(API.courtAnnouncement(placeId, annId), { method: 'DELETE', token });
       setAnnouncements(prev => prev.filter(a => a.id !== annId));
     } catch { Alert.alert('Error', 'Could not delete announcement.'); }
   };

@@ -13,6 +13,8 @@ import { getAvatarColor } from '../../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { ProfileStatsSkeleton } from '../../components/SkeletonLoader';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 import { useFloatingOrb, useCountUp, useStaggerEntrance } from '../../hooks/useAnimations';
 import type { SportPref } from '../../types';
 type Badge = { badge_key: string; earned_at: string };
@@ -101,7 +103,7 @@ export default function ProfileScreen() {
     useCallback(() => {
       const fetchStats = async () => {
         try {
-          const res  = await apiFetch('/api/users/me', { token });
+          const res  = await apiFetch(API.ME, { token });
           const data = await res.json();
           if (data.success) setStats(data.user);
         } catch (err: any) {
@@ -110,7 +112,7 @@ export default function ProfileScreen() {
       };
       const fetchUnread = async () => {
         try {
-          const res  = await apiFetch('/api/notifications', { token });
+          const res  = await apiFetch(API.NOTIFICATIONS, { token });
           const data = await res.json();
           if (data.success) setUnreadNotifs(data.unread_count);
         } catch {}
@@ -156,7 +158,7 @@ export default function ProfileScreen() {
         bio:      editBio.trim() || null,
       };
       if (editAvatar) body.avatar = editAvatar;
-      const res  = await apiFetch('/api/users/me', { method: 'PUT', token, body: JSON.stringify(body) });
+      const res  = await apiFetch(API.ME, { method: 'PUT', token, body: JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       setStats(prev => prev ? { ...prev, ...data.user } : data.user);
@@ -170,7 +172,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/login');
+    router.replace(ROUTES.LOGIN);
   };
 
   const username    = stats?.username ?? '—';
@@ -332,7 +334,7 @@ export default function ProfileScreen() {
         <View style={styles.sportsSection}>
           <View style={styles.sportsSectionHeader}>
             <Text style={styles.sportsSectionTitle}>Sports</Text>
-            <TouchableOpacity onPress={() => router.push('/sport-preferences' as any)}>
+            <TouchableOpacity onPress={() => router.push(ROUTES.SPORT_PREFERENCES as any)}>
               <Text style={styles.sportsSectionEdit}>Edit</Text>
             </TouchableOpacity>
           </View>
@@ -348,10 +350,10 @@ export default function ProfileScreen() {
       <View style={styles.menuContainer}>
         <Text style={styles.menuSection}>Community</Text>
         {[
-          { icon: 'trophy-outline',    iconColor: Colors.yellow,  bg: Colors.yellow + '20', label: 'Leaderboard',       route: '/leaderboard' },
-          { icon: 'people-outline',    iconColor: Colors.blue,    bg: Colors.blueFaint,     label: 'Friends',           route: '/friends' },
-          { icon: 'pulse-outline',     iconColor: Colors.orange,  bg: Colors.orange + '20', label: 'Friend Activity',   route: '/activity' },
-          { icon: 'magnet-outline',    iconColor: Colors.accent,  bg: Colors.accentFaint,   label: 'Discover Players',  route: '/player-matching' },
+          { icon: 'trophy-outline',    iconColor: Colors.yellow,  bg: Colors.yellow + '20', label: 'Leaderboard',       route: ROUTES.LEADERBOARD },
+          { icon: 'people-outline',    iconColor: Colors.blue,    bg: Colors.blueFaint,     label: 'Friends',           route: ROUTES.FRIENDS },
+          { icon: 'pulse-outline',     iconColor: Colors.orange,  bg: Colors.orange + '20', label: 'Friend Activity',   route: ROUTES.ACTIVITY },
+          { icon: 'magnet-outline',    iconColor: Colors.accent,  bg: Colors.accentFaint,   label: 'Discover Players',  route: ROUTES.PLAYER_MATCHING },
         ].map(item => (
           <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => router.push(item.route as any)} activeOpacity={0.7}>
             <View style={styles.menuItemLeft}>
@@ -366,7 +368,7 @@ export default function ProfileScreen() {
 
         <Text style={[styles.menuSection, { marginTop: Spacing.xxl }]}>Account</Text>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/sport-preferences' as any)} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push(ROUTES.SPORT_PREFERENCES as any)} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIconWrap, { backgroundColor: Colors.orange + '20' }]}>
               <MaterialCommunityIcons name="whistle" size={20} color={Colors.orange} />
@@ -376,7 +378,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notification-inbox' as any)} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push(ROUTES.NOTIFICATION_INBOX as any)} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIconWrap, { backgroundColor: Colors.blueFaint }]}>
               <Ionicons name="notifications-outline" size={20} color={Colors.blue} />
@@ -391,7 +393,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications-settings' as any)} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push(ROUTES.NOTIFICATIONS_SETTINGS as any)} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIconWrap, { backgroundColor: Colors.blueFaint }]}>
               <Ionicons name="settings-outline" size={20} color={Colors.blue} />
@@ -401,7 +403,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/blocked-users' as any)} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push(ROUTES.BLOCKED_USERS as any)} activeOpacity={0.7}>
           <View style={styles.menuItemLeft}>
             <View style={[styles.menuIconWrap, { backgroundColor: Colors.errorFaint }]}>
               <Ionicons name="ban-outline" size={20} color={Colors.error} />

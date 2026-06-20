@@ -18,6 +18,8 @@ import { Springs } from '../constants/motion';
 import { usePressAnimation } from '../hooks/useAnimations';
 import { useSound } from '../context/SoundContext';
 import { AuthBackground } from '../components/AuthBackground';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 
 const SPORTS = [
   { key: 'basketball', label: 'Basketball' },
@@ -216,7 +218,7 @@ export default function OnboardingScreen() {
       if (avatar) body.avatar = avatar;
       if (bio.trim()) body.bio = bio.trim();
 
-      const res = await apiFetch('/api/users/me', {
+      const res = await apiFetch(API.ME, {
         method: 'PUT',
         token,
         body: JSON.stringify(body),
@@ -225,7 +227,7 @@ export default function OnboardingScreen() {
       if (!data.success) return Alert.alert('Error', data.message);
 
       if (selectedSports.length > 0) {
-        await apiFetch('/api/users/sport-preferences', {
+        await apiFetch(API.USERS_SPORT_PREFS, {
           method: 'PUT',
           token,
           body: JSON.stringify({
@@ -239,7 +241,7 @@ export default function OnboardingScreen() {
       }
 
       await setOnboardingComplete();
-      router.replace('/(tabs)');
+      router.replace(ROUTES.TABS as any);
     } catch {
       Alert.alert('Error', 'Could not connect to server');
     } finally {

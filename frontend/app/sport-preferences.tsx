@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { SPORT_COLORS, SPORT_ICONS } from '../constants/sports';
 import { Colors, Spacing, Radius, Type } from '../constants/theme';
+import { API } from '../constants/endpoints';
 
 const SPORTS = [
   { key: 'basketball', label: 'Basketball' },
@@ -46,7 +47,7 @@ export default function SportPreferencesScreen() {
   useFocusEffect(useCallback(() => {
     const load = async () => {
       try {
-        const res = await apiFetch('/api/users/sport-preferences', { token });
+        const res = await apiFetch(API.USERS_SPORT_PREFS, { token });
         const data = await res.json();
         if (data.success) {
           setSports(SPORTS.map(s => {
@@ -81,7 +82,7 @@ export default function SportPreferencesScreen() {
       const preferences = sports
         .filter(s => s.enabled)
         .map(({ sport_type, skill_level, is_favorite }) => ({ sport_type, skill_level, is_favorite }));
-      const res = await apiFetch('/api/users/sport-preferences', {
+      const res = await apiFetch(API.USERS_SPORT_PREFS, {
         method: 'PUT', token,
         body: JSON.stringify({ preferences }),
       });

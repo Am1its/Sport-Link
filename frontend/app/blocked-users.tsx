@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { API } from '../constants/endpoints';
 
 type BlockedUser = { id: number; username: string; avatar: string | null };
 
@@ -17,7 +18,7 @@ export default function BlockedUsersScreen() {
 
   const fetchBlocked = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/users/blocked', { token });
+      const res = await apiFetch(API.USERS_BLOCKED, { token });
       const data = await res.json();
       if (data.success) setBlocked(data.blocked);
     } catch (err: any) {
@@ -36,7 +37,7 @@ export default function BlockedUsersScreen() {
       {
         text: 'Unblock', onPress: async () => {
           try {
-            await apiFetch(`/api/users/${user.id}/block`, { method: 'DELETE', token });
+            await apiFetch(API.userBlock(user.id), { method: 'DELETE', token });
             setBlocked(prev => prev.filter(u => u.id !== user.id));
           } catch {
             Alert.alert('Error', 'Could not unblock user');

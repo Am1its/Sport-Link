@@ -11,6 +11,8 @@ import { apiFetch } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../constants/sports';
 import { Colors } from '../constants/theme';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 
 type Suggestion = {
   id: number;
@@ -87,7 +89,7 @@ export default function PlayerMatchingScreen() {
   const handleAddFriend = async (targetId: number) => {
     setPendingIds(prev => new Set(prev).add(targetId));
     try {
-      const res  = await apiFetch('/api/friends', {
+      const res  = await apiFetch(API.FRIENDS, {
         method: 'POST',
         token,
         body: JSON.stringify({ addressee_id: targetId }),
@@ -115,7 +117,7 @@ export default function PlayerMatchingScreen() {
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.85}
-        onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })}
+        onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(item.id) } })}
       >
         {/* Avatar */}
         <View style={styles.cardLeft}>
@@ -263,7 +265,7 @@ export default function PlayerMatchingScreen() {
           </Text>
           <TouchableOpacity
             style={styles.prefsBtn}
-            onPress={() => router.push('/sport-preferences' as any)}
+            onPress={() => router.push(ROUTES.SPORT_PREFERENCES as any)}
           >
             <Text style={styles.prefsBtnText}>Set Sport Preferences</Text>
           </TouchableOpacity>

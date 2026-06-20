@@ -11,6 +11,8 @@ import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { useFloatingOrb, useCountUp } from '../hooks/useAnimations';
 import { Springs } from '../constants/motion';
 import type { SportPref } from '../types';
@@ -81,7 +83,7 @@ export default function PlayerProfileScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await apiFetch(`/api/users/${userId}`, { token });
+        const res = await apiFetch(API.user(userId), { token });
         const data = await res.json();
         if (data.success) setProfile(data.user);
       } catch (err) {
@@ -99,7 +101,7 @@ export default function PlayerProfileScreen() {
     setFriendLoading(true);
     try {
       if (profile.friendship_status === 'none') {
-        const res = await apiFetch('/api/friends', { method: 'POST', token, body: JSON.stringify({ addressee_id: profile.id }) });
+        const res = await apiFetch(API.FRIENDS, { method: 'POST', token, body: JSON.stringify({ addressee_id: profile.id }) });
         const data = await res.json();
         if (data.success) {
           setProfile(p => p ? { ...p, friendship_status: 'pending_sent' } : p);
@@ -107,7 +109,7 @@ export default function PlayerProfileScreen() {
           Alert.alert('Error', data.message);
         }
       } else if (profile.friendship_status === 'pending_received') {
-        const res = await apiFetch(`/api/friends/${profile.friendship_id}/accept`, { method: 'PUT', token });
+        const res = await apiFetch(API.friendAccept(profile.friendship_id!), { method: 'PUT', token });
         const data = await res.json();
         if (data.success) {
           setProfile(p => p ? { ...p, friendship_status: 'friends' } : p);
@@ -124,7 +126,7 @@ export default function PlayerProfileScreen() {
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Confirm', style: 'destructive', onPress: async () => {
-                const res = await apiFetch(`/api/friends/${profile.friendship_id}`, { method: 'DELETE', token });
+                const res = await apiFetch(API.friend(profile.friendship_id!), { method: 'DELETE', token });
                 const data = await res.json();
                 if (data.success) {
                   setProfile(p => p ? { ...p, friendship_status: 'none', friendship_id: null } : p);
@@ -154,7 +156,7 @@ export default function PlayerProfileScreen() {
             {
               text: 'Block', style: 'destructive', onPress: async () => {
                 try {
-                  await apiFetch(`/api/users/${profile.id}/block`, { method: 'POST', token });
+                  await apiFetch(API.userBlock(profile.id), { method: 'POST', token });
                   router.back();
                 } catch { Alert.alert('Error', 'Could not block user'); }
               },
@@ -170,7 +172,7 @@ export default function PlayerProfileScreen() {
   const submitReport = async () => {
     if (!reportReason || !profile) return;
     try {
-      await apiFetch(`/api/users/${profile.id}/report`, {
+      await apiFetch(API.userReport(profile.id), {
         method: 'POST', token,
         body: JSON.stringify({ reason: reportReason }),
       });
@@ -380,7 +382,7 @@ export default function PlayerProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.msgBtn}
-              onPress={() => router.push({ pathname: '/direct-chat' as any, params: { userId: String(profile.id), username: profile.username } })}
+              onPress={() => router.push({ pathname: ROUTES.DIRECT_CHAT as any, params: { userId: String(profile.id), username: profile.username } })}
               activeOpacity={0.8}
             >
               <Ionicons name="chatbubble-outline" size={22} color={Colors.accent} />

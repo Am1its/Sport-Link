@@ -17,6 +17,8 @@ import { formatTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
 import { Colors } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { SOCKET_EVENTS } from '../constants/events';
 import { usePressAnimation, useTypingIndicator } from '../hooks/useAnimations';
 import { useSound } from '../context/SoundContext';
@@ -70,7 +72,7 @@ export default function GameChatScreen() {
     if (newIds.length === 0) return;
     newIds.forEach(uid => seenUserIds.current.add(uid));
     try {
-      const res = await apiFetch(`/api/users/avatars?ids=${newIds.join(',')}`, { token });
+      const res = await apiFetch(`${API.USERS_AVATARS}?ids=${newIds.join(',')}`, { token });
       const data = await res.json();
       if (data.success) {
         const map: Record<number, string | null> = {};
@@ -84,7 +86,7 @@ export default function GameChatScreen() {
     setFetchError(null);
     setLoading(true);
     try {
-      const res  = await apiFetch(`/api/chats/${id}/messages?limit=${PAGE_SIZE}`, { token });
+      const res  = await apiFetch(`${API.chatMessages(id)}?limit=${PAGE_SIZE}`, { token });
       const data = await res.json();
       if (data.success) {
         // Server returns ASC; reverse to newest-first for inverted FlatList
@@ -115,7 +117,7 @@ export default function GameChatScreen() {
     const oldestId = messages[messages.length - 1].id;
     setLoadingMore(true);
     try {
-      const res  = await apiFetch(`/api/chats/${id}/messages?before=${oldestId}&limit=${PAGE_SIZE}`, { token });
+      const res  = await apiFetch(`${API.chatMessages(id)}?before=${oldestId}&limit=${PAGE_SIZE}`, { token });
       const data = await res.json();
       if (data.success) {
         // Server returns ASC; reverse to newest-first, then append (visually older = higher in list)
@@ -166,7 +168,7 @@ export default function GameChatScreen() {
       socketRef.current.emit(SOCKET_EVENTS.SEND_MESSAGE, { gameId: id, content });
     } else {
       setSending(true);
-      apiFetch(`/api/chats/${id}/messages`, { method: 'POST', token, body: JSON.stringify({ content }) })
+      apiFetch(API.chatMessages(id), { method: 'POST', token, body: JSON.stringify({ content }) })
         .then(r => r.json())
         .then(data => { if (data.success) setMessages(prev => [data.message, ...prev]); })
         .catch(err => { if (!(err instanceof UnauthorizedError)) console.warn('Send message error:', err); })
@@ -184,7 +186,7 @@ export default function GameChatScreen() {
         createdAt={msg.created_at}
         isMine={msg.user_id === user?.id}
         avatar={avatarCache[msg.user_id]}
-        onAvatarPress={() => router.push({ pathname: '/player-profile', params: { userId: String(msg.user_id) } } as any)}
+        onAvatarPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE, params: { userId: String(msg.user_id) } } as any)}
         formatTime={formatTime}
       />
     );

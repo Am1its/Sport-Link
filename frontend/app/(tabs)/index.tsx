@@ -36,6 +36,8 @@ import LeafletMap, { LeafletMarker } from '../../components/LeafletMap';
 import type { MapItem, Participant, Region } from '../../types';
 
 import { useMapData, isPast, PENDING_MAP_PAN_KEY } from './map/useMapData';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 import { useMapSearch } from './map/useMapSearch';
 import { MapSearchDropdown } from './map/MapSearchDropdown';
 import { CourtPickerSheet } from './map/CourtPickerSheet';
@@ -114,7 +116,7 @@ function BottomCard({ court, userId, token, onJoined }: {
 
   React.useEffect(() => {
     if (!court.isLocalGame || !court.id || !token) return;
-    apiFetch(`/api/games/${court.id}/participants`, { token })
+    apiFetch(API.gameParticipants(court.id), { token })
       .then(r => r.json())
       .then(d => { if (d.success) setParticipants(d.participants); })
       .catch(() => {});
@@ -131,7 +133,7 @@ function BottomCard({ court, userId, token, onJoined }: {
     Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
     setJoining(true);
     try {
-      const res = await apiFetch(`/api/games/${court.id}/join`, { method: 'POST', token });
+      const res = await apiFetch(API.gameJoin(court.id), { method: 'POST', token });
       const data = await res.json();
       if (!data.success) {
         springBack();
@@ -191,7 +193,7 @@ function BottomCard({ court, userId, token, onJoined }: {
               <TouchableOpacity
                 key={p.id}
                 style={[styles.avatarMiniWrap, { marginLeft: i > 0 ? -10 : 0, zIndex: 10 - i }]}
-                onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(p.id) } })}
+                onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(p.id) } })}
               >
                 <AvatarCircle username={p.username} avatar={p.avatar} size={30} />
               </TouchableOpacity>
@@ -239,7 +241,7 @@ function BottomCard({ court, userId, token, onJoined }: {
         <TouchableOpacity
           style={[styles.joinButton, { backgroundColor: Colors.surface, flexDirection: 'row', justifyContent: 'center', gap: 6 }]}
           onPress={() => router.push({
-            pathname: '/court-detail' as any,
+            pathname: ROUTES.COURT_DETAIL as any,
             params: {
               placeId: court.place_id,
               name: court.name,
@@ -464,7 +466,7 @@ function HomeScreen() {
           if (isSelectingLocation) {
             const { latitude, longitude } = e.nativeEvent.coordinate;
             setIsSelectingLocation(false);
-            router.push({ pathname: '/modal', params: { lat: latitude, lng: longitude } });
+            router.push({ pathname: ROUTES.MODAL, params: { lat: latitude, lng: longitude } });
           } else {
             setSelectedCourt(null);
           }
@@ -593,7 +595,7 @@ function HomeScreen() {
                     <TouchableOpacity onPress={() => setSearchExpanded(true)}>
                       <Ionicons name="search-outline" size={22} color={Colors.surface2} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile' as any)}>
+                    <TouchableOpacity style={styles.profileButton} onPress={() => router.push(ROUTES.PROFILE_TAB as any)}>
                       {myAvatar ? (
                         <Image source={{ uri: `data:image/jpeg;base64,${myAvatar}` }} style={styles.profileAvatar} />
                       ) : (
@@ -906,7 +908,7 @@ function ExpoGoMapScreen() {
     if (isSelectingLocation) {
       setIsSelectingLocation(false);
       setShowAddMenu(false);
-      router.push({ pathname: '/modal', params: { lat: String(lat), lng: String(lng) } });
+      router.push({ pathname: ROUTES.MODAL, params: { lat: String(lat), lng: String(lng) } });
     } else {
       setSelectedCourt(null);
     }
@@ -942,7 +944,7 @@ function ExpoGoMapScreen() {
               <TouchableOpacity onPress={() => setSearchExpanded(true)}>
                 <Ionicons name="search-outline" size={22} color={Colors.textSub} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/profile' as any)}>
+              <TouchableOpacity onPress={() => router.push(ROUTES.PROFILE_TAB as any)}>
                 {myAvatar ? (
                   <Image source={{ uri: `data:image/jpeg;base64,${myAvatar}` }} style={emStyles.avatar} />
                 ) : (

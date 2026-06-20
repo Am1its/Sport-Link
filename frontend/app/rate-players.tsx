@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { usePressAnimation, useEntranceAnimation, useStaggerEntrance } from '../hooks/useAnimations';
 import { Springs } from '../constants/motion';
 import { useSound } from '../context/SoundContext';
@@ -213,7 +215,7 @@ export default function RatePlayersScreen() {
   useEffect(() => {
     const fetchPlayers = async () => {
       try {
-        const res = await apiFetch(`/api/ratings/game/${gameId}`, { token });
+        const res = await apiFetch(API.gameRatings(gameId as string), { token });
         const data = await res.json();
         if (!data.success) return Alert.alert('Error', data.message);
 
@@ -259,7 +261,7 @@ export default function RatePlayersScreen() {
     setSubmitting(true);
     try {
       if (isHost) {
-        const res = await apiFetch('/api/ratings/batch', {
+        const res = await apiFetch(API.RATINGS_BATCH, {
           method: 'POST',
           token,
           body: JSON.stringify({
@@ -270,7 +272,7 @@ export default function RatePlayersScreen() {
         const data = await res.json();
         if (!data.success) return Alert.alert('Error', data.message);
       } else {
-        const res = await apiFetch('/api/ratings/peer', {
+        const res = await apiFetch(API.RATINGS_PEER, {
           method: 'POST',
           token,
           body: JSON.stringify({
@@ -316,7 +318,7 @@ export default function RatePlayersScreen() {
           <TouchableOpacity
             style={styles.doneBtn}
             onPress={() => router.replace({
-              pathname: '/game-results' as any,
+              pathname: ROUTES.GAME_RESULTS as any,
               params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
             })}
           >
@@ -359,7 +361,7 @@ export default function RatePlayersScreen() {
           <TouchableOpacity
             style={styles.doneBtn}
             onPress={() => router.replace({
-              pathname: '/game-results' as any,
+              pathname: ROUTES.GAME_RESULTS as any,
               params: { gameId, sport: sport ?? '', scheduledTime: scheduledTime ?? '' },
             })}
           >
@@ -385,7 +387,7 @@ export default function RatePlayersScreen() {
                 return (
                   <View style={[styles.playerCard, Shadow.card]}>
                     <View style={styles.playerLeft}>
-                      <AvatarCircle player={item} onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })} />
+                      <AvatarCircle player={item} onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(item.id) } })} />
                       <Text style={styles.username}>{item.username}</Text>
                       {status === null && (
                         <View style={styles.pendingBadge}>
@@ -416,7 +418,7 @@ export default function RatePlayersScreen() {
               return (
                 <View style={[styles.playerCard, Shadow.card]}>
                   <View style={styles.playerLeft}>
-                    <AvatarCircle player={item} onPress={() => router.push({ pathname: '/player-profile' as any, params: { userId: String(item.id) } })} />
+                    <AvatarCircle player={item} onPress={() => router.push({ pathname: ROUTES.PLAYER_PROFILE as any, params: { userId: String(item.id) } })} />
                     <Text style={styles.username}>{item.username}</Text>
                   </View>
 

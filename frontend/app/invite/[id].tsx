@@ -9,6 +9,8 @@ import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { getAvatarColor } from '../../utils/avatar';
 import { SPORT_LABELS } from '../../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../../constants/theme';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 
 type InviterProfile = {
   id: number;
@@ -34,7 +36,7 @@ export default function InviteScreen() {
     if (!id) return;
     (async () => {
       try {
-        const res  = await apiFetch(`/api/users/${id}`, { token });
+        const res  = await apiFetch(API.user(id), { token });
         const data = await res.json();
         if (data.success) {
           setProfile(data.user);
@@ -50,11 +52,11 @@ export default function InviteScreen() {
 
   const handleAddFriend = async () => {
     if (!token) {
-      return router.push({ pathname: '/login', params: { redirect: `/invite/${id}` } } as any);
+      return router.push({ pathname: ROUTES.LOGIN, params: { redirect: `/invite/${id}` } } as any);
     }
     setSending(true);
     try {
-      const res  = await apiFetch('/api/friends', {
+      const res  = await apiFetch(API.FRIENDS, {
         method: 'POST', token,
         body: JSON.stringify({ addressee_id: parseInt(id) }),
       });
@@ -88,7 +90,7 @@ export default function InviteScreen() {
       <View style={styles.center}>
         <Ionicons name="alert-circle-outline" size={48} color={Colors.textMuted} />
         <Text style={styles.notFound}>User not found</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.push('/(tabs)' as any)}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.push(ROUTES.TABS as any)}>
           <Text style={styles.backBtnText}>Go to SportLink</Text>
         </TouchableOpacity>
       </View>
@@ -106,7 +108,7 @@ export default function InviteScreen() {
       <View style={styles.hero}>
         <View style={styles.orb1} />
         <View style={styles.orb2} />
-        <TouchableOpacity style={styles.backCircle} onPress={() => router.push('/(tabs)' as any)}>
+        <TouchableOpacity style={styles.backCircle} onPress={() => router.push(ROUTES.TABS as any)}>
           <Ionicons name="home-outline" size={20} color={Colors.text} />
         </TouchableOpacity>
       </View>
@@ -169,14 +171,14 @@ export default function InviteScreen() {
         {!token && (
           <TouchableOpacity
             style={[styles.ctaBtn, styles.ctaBtnOutline, { marginTop: Spacing.sm }]}
-            onPress={() => router.push('/register' as any)}
+            onPress={() => router.push(ROUTES.REGISTER as any)}
             activeOpacity={0.85}
           >
             <Text style={[styles.ctaBtnText, { color: Colors.accent }]}>Create Account</Text>
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity onPress={() => router.push('/(tabs)' as any)} style={styles.skipLink}>
+        <TouchableOpacity onPress={() => router.push(ROUTES.TABS as any)} style={styles.skipLink}>
           <Text style={styles.skipText}>Open SportLink →</Text>
         </TouchableOpacity>
       </View>

@@ -13,6 +13,8 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Radius } from '../constants/theme';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useStaggerEntrance } from '../hooks/useAnimations';
 import { useSound } from '../context/SoundContext';
@@ -118,7 +120,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const res  = await apiFetch('/api/auth/login', {
+      const res  = await apiFetch(API.AUTH_LOGIN, {
         method: 'POST',
         body: JSON.stringify({ email: email.trim(), password }),
       });
@@ -127,7 +129,7 @@ export default function LoginScreen() {
       await login(data.token, data.user);
       play('chime');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace((redirect ?? '/(tabs)') as any);
+      router.replace((redirect ?? ROUTES.TABS) as any);
     } catch {
       Alert.alert('Error', 'Could not connect to server.');
     } finally {
@@ -238,7 +240,7 @@ export default function LoginScreen() {
                 {/* Footer */}
                 <View style={styles.footer}>
                   <Text style={styles.footerText}>New player? </Text>
-                  <TouchableOpacity onPress={() => router.push('/register')} activeOpacity={0.7}>
+                  <TouchableOpacity onPress={() => router.push(ROUTES.REGISTER as any)} activeOpacity={0.7}>
                     <Text style={styles.footerLink}>Create account →</Text>
                   </TouchableOpacity>
                 </View>

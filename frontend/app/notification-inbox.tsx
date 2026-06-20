@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { BackButton } from '../components/BackButton';
 import { Colors } from '../constants/theme';
+import { API } from '../constants/endpoints';
 
 type Notification = {
   id: number;
@@ -39,7 +40,7 @@ export default function NotificationInboxScreen() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/notifications', { token });
+      const res = await apiFetch(API.NOTIFICATIONS, { token });
       const data = await res.json();
       if (data.success) setNotifications(data.notifications);
     } catch (err) {
@@ -54,14 +55,14 @@ export default function NotificationInboxScreen() {
   const markRead = async (id: number) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     try {
-      await apiFetch(`/api/notifications/${id}/read`, { method: 'PUT', token });
+      await apiFetch(API.notificationRead(id), { method: 'PUT', token });
     } catch {}
   };
 
   const markAllRead = async () => {
     setMarkingAll(true);
     try {
-      await apiFetch('/api/notifications/read-all', { method: 'PUT', token });
+      await apiFetch(API.NOTIFICATIONS_READ_ALL, { method: 'PUT', token });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch {}
     setMarkingAll(false);

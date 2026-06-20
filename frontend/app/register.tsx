@@ -13,6 +13,8 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { Colors, Spacing, Radius } from '../constants/theme';
+import { API } from '../constants/endpoints';
+import { ROUTES } from '../constants/routes';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useStaggerEntrance, useFieldShake, useSuccessBurst } from '../hooks/useAnimations';
 import { useSound } from '../context/SoundContext';
@@ -137,7 +139,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const res  = await apiFetch('/api/auth/register', {
+      const res  = await apiFetch(API.AUTH_REGISTER, {
         method: 'POST',
         body: JSON.stringify({ username: username.trim(), email: email.trim(), password }),
       });
@@ -150,7 +152,7 @@ export default function RegisterScreen() {
       play('success');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       triggerBurst(() => {
-        router.replace('/onboarding');
+        router.replace(ROUTES.ONBOARDING);
       });
     } catch {
       Alert.alert('Error', 'Could not connect to server.');

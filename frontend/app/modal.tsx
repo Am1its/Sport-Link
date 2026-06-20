@@ -20,6 +20,7 @@ import { reverseGeocode } from '../utils/geocode';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow, Type } from '../constants/theme';
+import { API } from '../constants/endpoints';
 import { Springs } from '../constants/motion';
 import { usePressAnimation, useFieldShake } from '../hooks/useAnimations';
 import { useSound } from '../context/SoundContext';
@@ -129,7 +130,7 @@ export default function GameFormModal() {
 
   useEffect(() => {
     if (isEdit) return;
-    apiFetch('/api/friends', { token })
+    apiFetch(API.FRIENDS, { token })
       .then(r => r.json())
       .then(d => { if (d.success) setFriends(d.friends); })
       .catch(() => {});
@@ -231,7 +232,7 @@ export default function GameFormModal() {
         if (selectedFriendIds.size > 0) body.invited_friends = Array.from(selectedFriendIds);
       }
 
-      const res  = await apiFetch(isEdit ? `/api/games/${gameId}` : '/api/games', { method, token, body: JSON.stringify(body) });
+      const res  = await apiFetch(isEdit ? API.game(gameId as string) : API.GAMES, { method, token, body: JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
 
