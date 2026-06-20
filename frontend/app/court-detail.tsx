@@ -729,5 +729,5 @@ const styles = StyleSheet.create({
   annInputRow:     { marginTop: 6, gap: 8 },
   annInput:        { backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 12, color: Colors.text, fontSize: 14, minHeight: 60, textAlignVertical: 'top', borderWidth: 1.5, borderColor: Colors.orange + '66' },
   annPostBtn:      { backgroundColor: Colors.orange, borderRadius: Radius.pill, height: 42, alignItems: 'center', justifyContent: 'center' },
-  annPostBtnText:  { color: '#FFFFFF', fontWeight: '900', fontSize: 14 },
+  annPostBtnText:  { color: Colors.text, fontWeight: '900', fontSize: 14 },
 });

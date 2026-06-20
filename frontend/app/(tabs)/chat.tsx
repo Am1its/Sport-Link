@@ -343,8 +343,8 @@ const styles = StyleSheet.create({
   tabActive:     { backgroundColor: Colors.accent },
   tabText:       { fontSize: 14, fontWeight: '700', color: Colors.textMuted },
   tabTextActive: { color: Colors.bg, fontWeight: '800' },
-  tabBadge:      { backgroundColor: '#FF3B30', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
-  tabBadgeText:  { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  tabBadge:      { backgroundColor: Colors.error, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  tabBadgeText:  { color: Colors.text, fontSize: 10, fontWeight: '900' },
 
   // Rows
   rowOuter: { position: 'relative', overflow: 'hidden' },
@@ -364,8 +364,8 @@ const styles = StyleSheet.create({
   avatarLetter: { fontSize: 20, fontWeight: '900' },
   onlineDot:    { position: 'absolute', bottom: 1, right: 1, width: 13, height: 13, borderRadius: 7, backgroundColor: Colors.accent, borderWidth: 2, borderColor: Colors.bg },
 
-  unreadBadge:     { backgroundColor: '#FF3B30', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
-  unreadBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  unreadBadge:     { backgroundColor: Colors.error, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  unreadBadgeText: { color: Colors.text, fontSize: 11, fontWeight: '900' },
 
   // Empty state
   emptyIconWrap: { width: 76, height: 76, borderRadius: 38, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md },

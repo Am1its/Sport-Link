@@ -401,7 +401,7 @@ export default function OnboardingScreen() {
                           <Ionicons
                             name={pref.favorite ? 'heart' : 'heart-outline'}
                             size={20}
-                            color={pref.favorite ? '#FF6B6B' : Colors.textHint}
+                            color={pref.favorite ? Colors.error : Colors.textHint}
                           />
                         </TouchableOpacity>
                       </View>

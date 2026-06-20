@@ -9,6 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { BackButton } from '../components/BackButton';
+import { Colors } from '../constants/theme';
 
 type Notification = {
   id: number;
@@ -76,7 +77,7 @@ export default function NotificationInboxScreen() {
         {unreadCount > 0 ? (
           <TouchableOpacity onPress={markAllRead} disabled={markingAll}>
             {markingAll
-              ? <ActivityIndicator size="small" color="#0FEA95" />
+              ? <ActivityIndicator size="small" color={Colors.accent} />
               : <Text style={styles.markAllText}>Mark all read</Text>}
           </TouchableOpacity>
         ) : (
@@ -86,11 +87,11 @@ export default function NotificationInboxScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#0FEA95" />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="notifications-outline" size={70} color="#2C2C2E" />
+          <Ionicons name="notifications-outline" size={70} color={Colors.surface} />
           <Text style={styles.emptyText}>No notifications yet</Text>
         </View>
       ) : (
@@ -120,22 +121,22 @@ export default function NotificationInboxScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
 
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
-  headerTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
-  markAllText: { color: '#0FEA95', fontSize: 13, fontWeight: '700', width: 80, textAlign: 'right' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.surface },
+  headerTitle: { color: Colors.text, fontSize: 18, fontWeight: '800' },
+  markAllText: { color: Colors.accent, fontSize: 13, fontWeight: '700', width: 80, textAlign: 'right' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: '#636366', fontSize: 16, marginTop: 12 },
+  emptyText: { color: Colors.textMuted, fontSize: 16, marginTop: 12 },
 
   list: { paddingVertical: 8 },
-  item: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#2C2C2E' },
-  itemUnread: { backgroundColor: '#0FEA9508' },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#0FEA95', marginTop: 6 },
+  item: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: Colors.surface },
+  itemUnread: { backgroundColor: Colors.accentFaint },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accent, marginTop: 6 },
   dotRead: { backgroundColor: 'transparent' },
   itemContent: { flex: 1 },
-  itemTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', marginBottom: 3 },
-  itemBody: { color: '#AEAEB2', fontSize: 13, lineHeight: 18, marginBottom: 5 },
-  itemTime: { color: '#636366', fontSize: 11 },
+  itemTitle: { color: Colors.text, fontSize: 15, fontWeight: '700', marginBottom: 3 },
+  itemBody: { color: Colors.textSub, fontSize: 13, lineHeight: 18, marginBottom: 5 },
+  itemTime: { color: Colors.textMuted, fontSize: 11 },
 });

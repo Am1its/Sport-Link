@@ -14,8 +14,7 @@ import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { ProfileStatsSkeleton } from '../../components/SkeletonLoader';
 import { useFloatingOrb, useCountUp, useStaggerEntrance } from '../../hooks/useAnimations';
-
-type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
+import type { SportPref } from '../../types';
 type Badge = { badge_key: string; earned_at: string };
 
 const BADGE_LABELS: Record<string, string> = {
@@ -226,7 +225,7 @@ export default function ProfileScreen() {
             )}
             {isEditing && (
               <View style={styles.avatarEditOverlay}>
-                <Ionicons name="camera" size={22} color="#FFFFFF" />
+                <Ionicons name="camera" size={22} color={Colors.text} />
               </View>
             )}
           </View>
@@ -501,5 +500,5 @@ const styles = StyleSheet.create({
   menuText:      { color: Colors.text, fontSize: 15, fontWeight: '600' },
 
   notifBadge:     { backgroundColor: Colors.error, borderRadius: 9, minWidth: 18, height: 18, paddingHorizontal: 4, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
-  notifBadgeText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  notifBadgeText: { color: Colors.text, fontSize: 11, fontWeight: '800' },
 });

@@ -8,13 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import AvatarCircle from '../components/AvatarCircle';
 import { BackButton } from '../components/BackButton';
-
-type Participant = {
-  id: number;
-  username: string;
-  avatar: string | null;
-  role: 'host' | 'player';
-};
+import { Colors } from '../constants/theme';
+import type { Participant } from '../types';
 
 export default function GameParticipantsScreen() {
   const router = useRouter();
@@ -49,7 +44,7 @@ export default function GameParticipantsScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#0FEA95" />
+          <ActivityIndicator size="large" color={Colors.accent} />
         </View>
       ) : (
         <FlatList
@@ -72,12 +67,12 @@ export default function GameParticipantsScreen() {
                   </View>
                 )}
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#48484A" />
+              <Ionicons name="chevron-forward" size={18} color={Colors.textHint} />
             </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Ionicons name="people-outline" size={60} color="#3A3A3C" />
+              <Ionicons name="people-outline" size={60} color={Colors.surface2} />
               <Text style={styles.emptyText}>No players yet</Text>
             </View>
           }
@@ -88,28 +83,28 @@ export default function GameParticipantsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1C1C1E' },
+  container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingTop: 60, paddingBottom: 16, paddingHorizontal: 20,
-    borderBottomWidth: 1, borderBottomColor: '#2C2C2E',
+    borderBottomWidth: 1, borderBottomColor: Colors.surface,
   },
-  title: { flex: 1, fontSize: 18, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
+  title: { flex: 1, fontSize: 18, fontWeight: '800', color: Colors.text, textAlign: 'center' },
 
   list: { paddingTop: 10, paddingBottom: 30 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     marginHorizontal: 20, marginVertical: 4,
-    backgroundColor: '#2C2C2E', borderRadius: 16, padding: 14,
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 14,
   },
   rowInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowName: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  rowName: { fontSize: 16, fontWeight: '700', color: Colors.text },
   hostBadge: {
-    backgroundColor: '#0FEA9518', borderRadius: 8, borderWidth: 1,
-    borderColor: '#0FEA9555', paddingHorizontal: 8, paddingVertical: 2,
+    backgroundColor: Colors.accentFaint, borderRadius: 8, borderWidth: 1,
+    borderColor: Colors.accentBorder, paddingHorizontal: 8, paddingVertical: 2,
   },
-  hostBadgeText: { color: '#0FEA95', fontSize: 11, fontWeight: '800' },
-  emptyText: { color: '#636366', fontSize: 15, marginTop: 12 },
+  hostBadgeText: { color: Colors.accent, fontSize: 11, fontWeight: '800' },
+  emptyText: { color: Colors.textMuted, fontSize: 15, marginTop: 12 },
 });

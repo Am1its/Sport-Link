@@ -13,9 +13,9 @@ import { Colors, Spacing, Radius, Type, Shadow } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
 import { useFloatingOrb, useCountUp } from '../hooks/useAnimations';
 import { Springs } from '../constants/motion';
+import type { SportPref } from '../types';
 
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
-type SportPref = { sport_type: string; skill_level: number; is_favorite: number | boolean };
 type Badge = { badge_key: string; earned_at: string };
 
 const BADGE_LABELS: Record<string, string> = {

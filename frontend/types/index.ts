@@ -1,7 +1,14 @@
 export type SportPref = {
   sport_type: string;
   skill_level: number;
-  is_favorite: number | boolean;
+  is_favorite: boolean;
+};
+
+export type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
 };
 
 export type Game = {
@@ -53,7 +60,7 @@ export type Participant = {
   id: number;
   username: string;
   avatar: string | null;
-  role: string;
+  role: 'host' | 'player';
 };
 
 export type UserProfile = {
