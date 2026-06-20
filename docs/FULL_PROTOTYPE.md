@@ -250,13 +250,10 @@ Auth: JWT passed via `socket.handshake.auth.token` — unauthenticated connectio
 ### Tabs
 
 **Map (Home) — `(tabs)/index.tsx`**
-- GPS permission → device location → fetches courts (Google Places) + games (`/api/games`).
-- Custom markers: hollow dashed for outdoor courts; filled tinted for gyms/studios; green circle for community games.
-- Grid-based game clustering at low zoom (no library) — tap cluster to zoom in.
-- Filter bar: All / Games / Courts + 8 sport sub-chips.
-- FAB: "Drop Pin" or "Choose Court" (bottom sheet) → game creation modal.
-- Bottom card: Your Game / Join Game (spring haptic animation) / Full / Public Court states.
-- Past games filtered from map.
+- **Dual code path:** `Constants.appOwnership === 'expo'` detects Expo Go. `export default isExpoGo ? ExpoGoMapScreen : HomeScreen`.
+- **HomeScreen** (dev builds / standalone): `expo-location` + `react-native-maps`. Custom markers: hollow dashed for outdoor courts; filled tinted for gyms/studios; green circle for community games. Grid-based game clustering at low zoom — tap cluster to zoom in.
+- **ExpoGoMapScreen** (QR scan / Expo Go): `LeafletMap.tsx` WebView (Leaflet 1.9.4 + CartoDB Voyager tiles + MDI sport icons). Feature parity with HomeScreen: search bar (debounced, recent searches, pans map via `panTarget` prop), drop-pin FAB menu ("Drop Pin" → tap-map mode with green banner; "Choose Court" → bottom-sheet picker), All/Games/Courts type filter + sport sub-filter chips, recenter button, same BottomCard join flow.
+- Both screens: GPS permission → device location → fetches courts (Google Places) + games (`/api/games`). Filter bar: All / Games / Courts + 12 sport sub-chips. FAB: "Drop Pin" or "Choose Court" (bottom sheet) → game creation modal with correct lat/lng. Bottom card: Your Game / Join Game (spring haptic animation) / Full / Public Court states. Past games filtered from map.
 
 **Discover — `(tabs)/discover.tsx`**
 - Fetches all upcoming games; optional Haversine radius filter (`?lat=&lng=&radius_km=`).
@@ -421,6 +418,9 @@ cd frontend && npm install && npx expo start
 
 # 7. Scan the QR code with Expo Go
 # Make sure your phone and Mac are on the same Wi-Fi network
+# Note: Expo Go shows the LeafletMap (WebView) instead of react-native-maps.
+# For the full native map experience, run: npx expo run:ios (simulator) or
+# npx expo run:ios --device (USB, same Wi-Fi + Metro running).
 ```
 
 **socket.io note:** The socket.io server runs on the same port (3000) as the REST API — no extra port or process needed.

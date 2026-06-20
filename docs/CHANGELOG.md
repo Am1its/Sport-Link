@@ -4,6 +4,42 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Expo Go QR Map] — June 2026
+
+**Goal:** Make the app fully usable via Expo Go QR scan (no dev build, no Apple account required). Needed for live class presentation where attendees scan a QR code.
+
+### Root Cause
+`react-native-maps` is no longer bundled in Expo Go starting SDK 49. Any scan of the QR code crashed with `RNMapsAirModule: null is not an object`. All other app functionality (auth, games, chat, DMs, courts, realtime) already worked in Expo Go — only the map was blocked.
+
+### Solution: Dual Code Path
+- **Detection:** `Constants.appOwnership === 'expo'` (from `expo-constants`) reliably returns `'expo'` only in Expo Go, not in dev builds or production. Previous attempts using `Constants.executionEnvironment` and `try/catch require('react-native-maps')` both incorrectly showed the fallback in dev builds.
+- **Conditional require:** `react-native-maps` is now imported only when `!isExpoGo`, preventing the crash at module-load time.
+- **Export switch:** `export default isExpoGo ? ExpoGoMapScreen : HomeScreen` — native map for dev/prod builds, Leaflet WebView for Expo Go.
+
+### New Component: `frontend/components/LeafletMap.tsx`
+Isolated WebView-based map. No data fetching — purely presentational.
+- **Map tiles:** CartoDB Voyager (free, no API key).
+- **Sport icons:** `@mdi/font@7.4.47` loaded from CDN. MDI class names are identical to `SPORT_ICONS` values (e.g. `mdi-basketball`), so no mapping needed.
+- **Props:** `region` (initial center), `markers: LeafletMarker[]`, `userLocation`, `recenterTrigger` (counter), `panTarget` (for search panning), `onMarkerPress`, `onMapPress`.
+- **RN → WebView:** `injectJavaScript` calling `window.setMarkers(json)`, `window.setView(lat, lng)`, `window.setUser(lat, lng)`. All injections guarded by `readyRef.current` (set when WebView posts `{type:'ready'}`).
+- **WebView → RN:** `window.ReactNativeWebView.postMessage(JSON.stringify({type, ...}))`. Types: `ready`, `marker` (placeId), `mapclick` (lat, lng).
+- **Pin styles:** Game pins = dark 34px circle, sport icon + colored border; joined games get green accent. Court pins = lighter 26px hollow ring. User location = blue dot.
+
+### New Screen: `ExpoGoMapScreen` (in `app/(tabs)/index.tsx`)
+Full feature parity with the native HomeScreen:
+- **Search bar:** collapsible (search icon → TextInput in header). Debounced 400ms via `searchPlaces()`. Dropdown shows recent searches (AsyncStorage) and live results. Selecting a result injects `setView` via `panTarget` prop.
+- **Drop pin:** FAB opens add menu ("Drop Pin" / "Choose Court") identical to native. Drop Pin → green banner "📍 Tap on the map to place a pin" → map tap navigates to game creation modal with those coordinates. Choose Court → bottom-sheet FlatList of nearby courts.
+- **Type filter:** "All / Community Games / Courts" chip row above sport chips.
+- **Sport filter:** same 12-sport chip row as native.
+- **Recenter button:** increments `recenterTrigger` → WebView pans to `userLocation`.
+- **BottomCard:** same component as native — full join flow, participant avatars, Full/Joined states.
+- **Bug fixed:** FAB previously pushed `/modal` without lat/lng params, causing backend "latitude, longitude are required" error. Now passes `userLocation ?? region` coordinates.
+
+### Dependency Added
+- `react-native-webview: 13.15.0` — bundled in Expo Go, SDK 54-compatible. Added via `npx expo install`.
+
+---
+
 ## [Add Padel, Hiking, Walking Sports] — June 2026
 
 **Goal:** Expand supported sports from 9 to 12 by adding padel, hiking, and walking across all layers.

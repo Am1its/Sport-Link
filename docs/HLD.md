@@ -35,6 +35,7 @@ The system follows a **Client-Server** architecture with a persistent WebSocket 
 | Auth | JWT (90-day expiry) | Stateless; `AsyncStorage` persistence; auto-logout on 401 via global handler |
 | Push | Expo Push API | Native token registration; backend sends via `https` to `exp.host` |
 | Maps | `react-native-maps` + Google Places | Native map rendering; 4-query parallel court discovery |
+| Expo Go map | `react-native-webview` + Leaflet.js | `react-native-maps` not bundled in Expo Go (SDK 49+); WebView Leaflet map with CartoDB Voyager tiles provides full feature parity for QR-scan demos without a dev build |
 
 ---
 
