@@ -211,18 +211,18 @@ sequenceDiagram
     A->>SRV: connect — join room user_A
     B->>SRV: connect — join room user_B
 
-    Note over A,SRV,B: Game Chat
+    Note over A,B: Game Chat
     A->>SRV: emit send_message { gameId, content }
     SRV->>SRV: INSERT into Messages
     SRV-->>A: emit new_message
     SRV-->>B: emit new_message
 
-    Note over A,SRV,B: Direct Messages
+    Note over A,B: Direct Messages
     A->>SRV: POST /api/dm/:userId
     SRV->>SRV: INSERT into DirectMessages
     SRV-->>B: emit new_dm to room user_B
 
-    Note over A,SRV,B: Push Notifications
+    Note over A,EXPO: Push Notifications
     SRV->>SRV: INSERT into Notifications
     SRV->>EXPO: sendPushNotifications(token, payload)
     EXPO-->>B: push to device
