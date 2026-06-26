@@ -22,6 +22,8 @@ const activityRoutes      = require('./routes/activity');
 const geocodeRoutes       = require('./routes/geocode');
 const shareRoutes         = require('./routes/share');
 
+const { SPORT_LABELS, SPORT_EMOJI } = require('./utils/sportLabels');
+
 const _corsEnv = process.env.CORS_ORIGIN?.trim();
 const ALLOWED_ORIGINS = _corsEnv
   ? _corsEnv.split(',').map(o => o.trim()).filter(Boolean)
@@ -72,18 +74,6 @@ function escapeHtml(str) {
 }
 
 // --- Game share landing page (Open Graph social preview + deep link) ---
-const SPORT_LABELS = {
-  basketball: 'Basketball', football: 'Football', tennis: 'Tennis',
-  volleyball: 'Volleyball', yoga: 'Yoga', gym: 'Gym',
-  studio: 'Studio', footvolley: 'Footvolley', swimming: 'Swimming',
-  padel: 'Padel', hiking: 'Hiking', walking: 'Walking',
-};
-const SPORT_EMOJI = {
-  basketball: '🏀', football: '⚽', tennis: '🎾',
-  volleyball: '🏐', yoga: '🧘', gym: '💪',
-  studio: '💃', footvolley: '🏐', swimming: '🏊',
-  padel: '🏓', hiking: '🥾', walking: '🚶',
-};
 
 app.get('/game/:id', async (req, res) => {
   const gameId = parseInt(req.params.id);

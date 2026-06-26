@@ -152,9 +152,15 @@ router.post('/batch', authMiddleware, async (req, res) => {
     if (game.host_id !== userId)
       return res.status(403).json({ success: false, message: 'Only the host can mark attendance' });
 
+    // Only allow ratings for actual participants of this game
+    const [participantRows] = await pool.execute(
+      'SELECT user_id FROM GameParticipants WHERE game_id = ?', [game_id]
+    );
+    const validRateeIds = new Set(participantRows.map(r => r.user_id));
+
     const rows = ratings
-      .filter(r => r.ratee_id !== userId)
-      .map(r => [game_id, userId, r.ratee_id, r.attended ? 1 : 0]);
+      .filter(r => Number(r.ratee_id) !== userId && validRateeIds.has(Number(r.ratee_id)))
+      .map(r => [game_id, userId, Number(r.ratee_id), r.attended ? 1 : 0]);
 
     if (rows.length > 0) {
       const placeholders = rows.map(() => '(?, ?, ?, ?)').join(', ');
@@ -190,8 +196,19 @@ router.post('/peer', authMiddleware, async (req, res) => {
     if (!participation)
       return res.status(403).json({ success: false, message: 'You were not a participant in this game' });
 
+    // Build the valid ratee set: host + all participants, excluding self
+    const [[gameRow]] = await pool.execute('SELECT host_id FROM Games WHERE id = ?', [game_id]);
+    const [participantRows] = await pool.execute(
+      'SELECT user_id FROM GameParticipants WHERE game_id = ?', [game_id]
+    );
+    const validRateeIds = new Set([
+      gameRow.host_id,
+      ...participantRows.map(r => r.user_id),
+    ]);
+    validRateeIds.delete(userId);
+
     const rows = ratings
-      .filter(r => r.ratee_id !== userId)
+      .filter(r => validRateeIds.has(Number(r.ratee_id)))
       .map(r => {
         const skillVal = (r.skill >= 1 && r.skill <= 5) ? r.skill : null;
         return [

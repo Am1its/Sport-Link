@@ -4,6 +4,7 @@ const pool = require('../../db');
 const authMiddleware = require('../../middleware/authMiddleware');
 const sendPushNotifications = require('../../utils/sendPushNotification');
 const { optionalUserId, toMapGame } = require('./helpers');
+const { ISRAEL_NOW_SQL, parseIsraelTime } = require('../../utils/israelTime');
 
 // GET /api/games — public; optional ?lat=&lng=&radius_km=&q= for distance + text filter
 // Authenticated: sorted by sport preference match + skill proximity.
@@ -63,7 +64,7 @@ router.get('/', async (req, res) => {
 
     const [rows] = await pool.execute(`
       SELECT g.*, COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count
-        ${userId ? ', CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS is_joined' : ''}
+        ${userId ? ", CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ? AND status = 'joined') AS UNSIGNED) AS is_joined" : ''}
         ${useRadius ? `, ${haversineExpr} AS distance_km` : ''}
       FROM Games g
       LEFT JOIN GameParticipants gp ON gp.game_id = g.id
@@ -72,7 +73,7 @@ router.get('/', async (req, res) => {
         AND (
           g.scheduled_time IS NULL
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') IS NULL
-          OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > DATE_SUB(NOW(), INTERVAL 3 HOUR)
+          OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > DATE_SUB(${ISRAEL_NOW_SQL}, INTERVAL 3 HOUR)
         )
         ${userId ? `AND g.host_id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
         AND g.host_id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)` : ''}
@@ -147,9 +148,9 @@ router.get('/:id', async (req, res) => {
     params.push(gameId);
 
     const [[row]] = await pool.execute(`
-      SELECT g.*, COUNT(gp.user_id) AS participant_count,
+      SELECT g.*, COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count,
         u.username AS host_username
-        ${userId ? ', CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS is_joined' : ''}
+        ${userId ? ", CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ? AND status = 'joined') AS UNSIGNED) AS is_joined" : ''}
       FROM Games g
       LEFT JOIN GameParticipants gp ON gp.game_id = g.id
       JOIN Users u ON u.id = g.host_id
@@ -190,8 +191,8 @@ router.post('/', authMiddleware, async (req, res) => {
     return res.status(400).json({ success: false, message: 'location_desc must be 200 characters or less' });
 
   if (scheduled_time) {
-    const parsed = new Date(scheduled_time);
-    if (!isNaN(parsed.getTime()) && parsed <= new Date())
+    const parsed = parseIsraelTime(scheduled_time);
+    if (parsed && parsed <= new Date())
       return res.status(400).json({ success: false, message: 'scheduled_time must be in the future' });
   }
 
@@ -199,7 +200,7 @@ router.post('/', authMiddleware, async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO Games (host_id, sport_type, level, latitude, longitude, location_desc, scheduled_time, equipment_notes, max_players, title, photo, recurrence, neighborhood)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, sport_type, level, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null, photo || null, recurrenceVal, neighborhood || null]
+      [req.user.id, sport_type, levelNum, latitude, longitude, location_desc || null, scheduled_time || null, equipment_notes || null, max_players || null, title || null, photo || null, recurrenceVal, neighborhood || null]
     );
     const gameId = result.insertId;
 
@@ -249,7 +250,7 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     const [[row]] = await pool.execute(
-      `SELECT g.*, COUNT(gp.user_id) AS participant_count
+      `SELECT g.*, COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count
        FROM Games g LEFT JOIN GameParticipants gp ON gp.game_id = g.id
        WHERE g.id = ? GROUP BY g.id`,
       [gameId]
@@ -322,7 +323,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     );
 
     const [[row]] = await pool.execute(
-      `SELECT g.*, COUNT(gp.user_id) AS participant_count
+      `SELECT g.*, COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count
        FROM Games g LEFT JOIN GameParticipants gp ON gp.game_id = g.id
        WHERE g.id = ? GROUP BY g.id`,
       [gameId]

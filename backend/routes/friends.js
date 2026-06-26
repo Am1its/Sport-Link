@@ -52,16 +52,25 @@ router.get('/requests', authMiddleware, async (req, res) => {
 // POST /api/friends — send a friend request
 router.post('/', authMiddleware, async (req, res) => {
   const requesterId = req.user.id;
-  const { addressee_id } = req.body;
-  if (!addressee_id) return res.status(400).json({ success: false, message: 'addressee_id is required' });
-  if (addressee_id === requesterId) return res.status(400).json({ success: false, message: 'Cannot friend yourself' });
+  const addresseeId = Number(req.body.addressee_id);
+  if (!addresseeId) return res.status(400).json({ success: false, message: 'addressee_id is required' });
+  if (addresseeId === requesterId) return res.status(400).json({ success: false, message: 'Cannot friend yourself' });
 
   try {
+    // Reject if either party has blocked the other
+    const [[blocked]] = await pool.execute(
+      `SELECT 1 FROM BlockedUsers
+       WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)
+       LIMIT 1`,
+      [requesterId, addresseeId, addresseeId, requesterId]
+    );
+    if (blocked) return res.status(403).json({ success: false, message: 'Blocked' });
+
     // Check if any relationship already exists (either direction)
     const [[existing]] = await pool.execute(`
       SELECT id, status FROM Friends
       WHERE (requester_id=? AND addressee_id=?) OR (requester_id=? AND addressee_id=?)
-    `, [requesterId, addressee_id, addressee_id, requesterId]);
+    `, [requesterId, addresseeId, addresseeId, requesterId]);
 
     if (existing) {
       const msg = existing.status === 'accepted' ? 'Already friends' : 'Request already sent';
@@ -70,11 +79,11 @@ router.post('/', authMiddleware, async (req, res) => {
 
     await pool.execute(
       'INSERT INTO Friends (requester_id, addressee_id) VALUES (?, ?)',
-      [requesterId, addressee_id]
+      [requesterId, addresseeId]
     );
 
     // Notify the addressee
-    const [[addressee]] = await pool.execute('SELECT push_token, username FROM Users WHERE id = ?', [addressee_id]);
+    const [[addressee]] = await pool.execute('SELECT push_token, username FROM Users WHERE id = ?', [addresseeId]);
     const [[requester]] = await pool.execute('SELECT username FROM Users WHERE id = ?', [requesterId]);
     if (addressee?.push_token) {
       sendPushNotifications([{

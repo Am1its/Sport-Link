@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ReAnimated from 'react-native-reanimated';
-import type { AnimatedStyleProp } from 'react-native-reanimated';
+import type { AnimatedStyle } from 'react-native-reanimated';
 import type { ViewStyle } from 'react-native';
 import { Colors } from '../../../constants/theme';
 
@@ -11,7 +11,7 @@ type Props = {
   onToggle: () => void;
   onDropPin: () => void;
   onChooseCourt: () => void;
-  fabRotateStyle?: AnimatedStyleProp<ViewStyle>;
+  fabRotateStyle?: AnimatedStyle<ViewStyle>;
 };
 
 export function AddFab({ isOpen, onToggle, onDropPin, onChooseCourt, fabRotateStyle }: Props) {

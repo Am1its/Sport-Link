@@ -1,13 +1,8 @@
 const express = require('express');
 const pool = require('../db');
+const { SPORT_LABELS, SPORT_EMOJI: SPORT_EMOJIS } = require('../utils/sportLabels');
 
 const router = express.Router();
-
-const SPORT_EMOJIS = {
-  basketball: '🏀', tennis: '🎾', volleyball: '🏐', football: '⚽',
-  yoga: '🧘', gym: '💪', studio: '🎵', footvolley: '🤾', swimming: '🏊',
-  padel: '🏓', hiking: '🥾', walking: '🚶',
-};
 
 function renderPage({ title, description, image, url, deepLink, ctaText }) {
   return `<!DOCTYPE html>
@@ -96,7 +91,7 @@ router.get('/game/:id', async (req, res) => {
     if (!game) return res.status(404).send('Game not found');
 
     const emoji = SPORT_EMOJIS[game.sport_type] ?? '🏅';
-    const sport = game.sport_type ? game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1) : 'Game';
+    const sport = SPORT_LABELS[game.sport_type] ?? (game.sport_type ? game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1) : 'Game');
     const gameTitle = game.title || `${sport} Game`;
     const spots = game.max_players - game.current_players;
     const spotsText = spots > 0 ? `${spots} spot${spots !== 1 ? 's' : ''} left` : 'Full';

@@ -10,6 +10,8 @@
  * @param {Function} sendPushNotifications
  * @param {Function} checkAndAwardBadges
  */
+const { ISRAEL_NOW_SQL } = require('../utils/israelTime');
+
 function startAutoComplete(pool, sendPushNotifications, checkAndAwardBadges) {
   async function autoCompleteGames() {
     const hours = parseInt(process.env.AUTO_COMPLETE_HOURS ?? '3', 10) || 3;
@@ -20,7 +22,7 @@ function startAutoComplete(pool, sendPushNotifications, checkAndAwardBadges) {
                parent_game_id
         FROM Games
         WHERE status = 'active'
-          AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i') <= DATE_SUB(NOW(), INTERVAL ? HOUR)
+          AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i') <= DATE_SUB(${ISRAEL_NOW_SQL}, INTERVAL ? HOUR)
       `, [hours]);
 
       for (const game of games) {
@@ -114,6 +116,8 @@ function startAutoComplete(pool, sendPushNotifications, checkAndAwardBadges) {
               ? Math.floor((now - lastDate) / 86400000)
               : 999;
 
+            // Only increment streak once per day; skip if already updated today
+            if (daysSinceLast === 0) continue;
             const newStreak = daysSinceLast <= 8 ? (u.current_streak || 0) + 1 : 1;
             const newLongest = Math.max(newStreak, u.longest_streak || 0);
 

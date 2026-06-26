@@ -73,6 +73,13 @@ router.get('/:userId', async (req, res) => {
   if (isNaN(other)) return res.status(400).json({ success: false, message: 'Invalid userId' });
 
   try {
+    const [[blocked]] = await pool.execute(
+      `SELECT 1 FROM BlockedUsers
+       WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)
+       LIMIT 1`,
+      [me, other, other, me]
+    );
+    if (blocked) return res.status(403).json({ success: false, message: 'Blocked' });
     const [markResult] = await pool.execute(
       'UPDATE DirectMessages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ? AND is_read = 0',
       [me, other]
@@ -128,6 +135,19 @@ router.post('/:userId', async (req, res) => {
   try {
     const [[receiver]] = await pool.execute('SELECT id FROM Users WHERE id = ?', [other]);
     if (!receiver) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const [[blocked]] = await pool.execute(
+      `SELECT 1 FROM BlockedUsers
+       WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)
+       LIMIT 1`,
+      [me, other, other, me]
+    );
+    if (blocked) return res.status(403).json({ success: false, message: 'Blocked' });
+
+    if (type === 'event') {
+      const [[game]] = await pool.execute('SELECT id FROM Games WHERE id = ?', [event_id]);
+      if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
+    }
 
     const [result] = await pool.execute(
       'INSERT INTO DirectMessages (sender_id, receiver_id, content, type, event_id) VALUES (?, ?, ?, ?, ?)',

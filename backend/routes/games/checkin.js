@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
 const authMiddleware = require('../../middleware/authMiddleware');
+const { parseIsraelTime } = require('../../utils/israelTime');
 
 // POST /api/games/:id/checkin — participant or host marks themselves checked in;
 // enforces a 30-minute window around scheduled_time
@@ -23,7 +24,7 @@ router.post('/:id/checkin', authMiddleware, async (req, res) => {
     }
 
     if (game.scheduled_time) {
-      const scheduled = new Date(game.scheduled_time.replace(' ', 'T') + ':00');
+      const scheduled = parseIsraelTime(game.scheduled_time);
       const now = new Date();
       const diff = (now - scheduled) / 60000; // minutes
       if (diff < -30 || diff > 30) {

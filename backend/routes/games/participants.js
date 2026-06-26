@@ -124,49 +124,69 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
 router.delete('/:id/leave', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.id);
   const userId = req.user.id;
-  try {
-    const [[game]] = await pool.execute(
-      "SELECT host_id FROM Games WHERE id = ? AND status = 'active'", [gameId]
-    );
-    if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
-    if (game.host_id === userId)
-      return res.status(400).json({ success: false, message: 'The host cannot leave — delete the game instead' });
 
-    const [[participation]] = await pool.execute(
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[game]] = await conn.execute(
+      "SELECT host_id FROM Games WHERE id = ? AND status = 'active' FOR UPDATE", [gameId]
+    );
+    if (!game) {
+      await conn.rollback();
+      return res.status(404).json({ success: false, message: 'Game not found' });
+    }
+    if (game.host_id === userId) {
+      await conn.rollback();
+      return res.status(400).json({ success: false, message: 'The host cannot leave — delete the game instead' });
+    }
+
+    const [[participation]] = await conn.execute(
       'SELECT id, status FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]
     );
-    if (!participation)
+    if (!participation) {
+      await conn.rollback();
       return res.status(400).json({ success: false, message: 'You are not in this game' });
+    }
 
-    await pool.execute('DELETE FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]);
+    await conn.execute('DELETE FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]);
 
     // Promote the first waitlisted player when a joined slot opens
+    let promoted = null;
     if (participation.status === 'joined') {
-      const [[next]] = await pool.execute(
+      const [[next]] = await conn.execute(
         "SELECT gp.id, gp.user_id, u.push_token FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.status = 'waitlist' ORDER BY gp.waitlist_position ASC LIMIT 1",
         [gameId]
       );
       if (next) {
-        await pool.execute(
+        await conn.execute(
           "UPDATE GameParticipants SET status = 'joined', waitlist_position = NULL WHERE id = ?",
           [next.id]
         );
-        if (next.push_token) {
-          const [[g]] = await pool.execute('SELECT title, sport_type FROM Games WHERE id = ?', [gameId]);
-          sendPushNotifications([{
-            to: next.push_token,
-            title: '🎉 You\'re in!',
-            body: `A spot opened in ${g?.title || g?.sport_type || 'a game'}. You're now joined!`,
-            data: { gameId },
-          }]);
-        }
+        promoted = next;
       }
+    }
+
+    await conn.commit();
+
+    // Send push notification outside the transaction
+    if (promoted?.push_token) {
+      const [[g]] = await pool.execute('SELECT title, sport_type FROM Games WHERE id = ?', [gameId]);
+      sendPushNotifications([{
+        to: promoted.push_token,
+        title: '🎉 You\'re in!',
+        body: `A spot opened in ${g?.title || g?.sport_type || 'a game'}. You're now joined!`,
+        data: { gameId },
+      }]);
     }
 
     res.json({ success: true });
   } catch (err) {
+    await conn.rollback();
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    conn.release();
   }
 });
 

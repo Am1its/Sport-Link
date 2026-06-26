@@ -8,6 +8,8 @@
  * @param {import('mysql2/promise').Pool} pool
  * @param {Function} sendPushNotifications
  */
+const { ISRAEL_NOW_SQL } = require('../utils/israelTime');
+
 function startReminders(pool, sendPushNotifications) {
   async function sendGameReminders() {
     try {
@@ -19,8 +21,8 @@ function startReminders(pool, sendPushNotifications) {
         WHERE status = 'active'
           AND reminder_sent_at IS NULL
           AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i')
-              BETWEEN DATE_ADD(NOW(), INTERVAL 25 MINUTE)
-                AND   DATE_ADD(NOW(), INTERVAL 35 MINUTE)
+              BETWEEN DATE_ADD(${ISRAEL_NOW_SQL}, INTERVAL 25 MINUTE)
+                AND   DATE_ADD(${ISRAEL_NOW_SQL}, INTERVAL 35 MINUTE)
       `);
 
       for (const game of games) {

@@ -232,7 +232,7 @@ export default function GameFormModal() {
         if (selectedFriendIds.size > 0) body.invited_friends = Array.from(selectedFriendIds);
       }
 
-      const res  = await apiFetch(isEdit ? API.game(gameId as string) : API.GAMES, { method, token, body: JSON.stringify(body) });
+      const res  = await apiFetch(isEdit ? API.game(String(gameId)) : API.GAMES, { method, token, body: JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
 
