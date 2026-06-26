@@ -226,6 +226,7 @@ eas submit --platform ios --profile production
 
 | Document | Description |
 |---|---|
+| [`docs/architecture.md`](docs/architecture.md) | Architecture diagrams — screen navigation, auth flow, API route map, real-time events, DB ERD, game lifecycle, map dual-path |
 | [`docs/API.md`](docs/API.md) | Complete API reference — all endpoints, socket events, rate limits |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Railway + EAS + Sentry runbook, migration checklist, App Store submission steps |
 | [`docs/APP_STORE_METADATA.md`](docs/APP_STORE_METADATA.md) | App Store Connect copy, keywords, screenshot list, reviewer notes |

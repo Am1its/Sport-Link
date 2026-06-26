@@ -60,48 +60,46 @@ flowchart TD
 ## 2. Auth Flow
 
 ```mermaid
-sequenceDiagram
-    participant U as User
-    participant FE as Frontend
-    participant BE as Backend
-    participant G as Google OAuth
-    participant AS as AsyncStorage
+flowchart TD
+    START([App opens]) --> GATE{Token in\nAsyncStorage?}
+    GATE -->|No| LOGINSCREEN[login.tsx]
+    GATE -->|Yes, onboarding incomplete| ONBOARDING
+    GATE -->|Yes, complete| TABS(["/(tabs)"])
 
-    rect rgb(40,40,60)
-        Note over U,AS: Email / Password Login
-        U->>FE: enter email + password
-        FE->>BE: POST /api/auth/login
-        BE-->>FE: { token, user }
-        FE->>AS: store token
-        FE->>FE: router.replace(onboarding or tabs)
+    subgraph EMAIL["Email Login"]
+        LOGINSCREEN -->|enter email + password| POSTLOGIN["POST /api/auth/login"]
+        POSTLOGIN -->|200 token + user| STORETOKEN1[store token]
+        STORETOKEN1 --> GATE2{onboarding\ncomplete?}
+        GATE2 -->|no| ONBOARDING
+        GATE2 -->|yes| TABS
     end
 
-    rect rgb(40,60,40)
-        Note over U,AS: Google Sign-In (PKCE)
-        U->>FE: tap Google button
-        FE->>G: useAuthRequest (code_challenge)
-        G-->>FE: auth code
-        FE->>G: exchangeCodeAsync (+ code_verifier in extraParams)
-        G-->>FE: access_token
-        FE->>BE: POST /api/auth/google { access_token }
-        BE->>G: GET userinfo endpoint
-        G-->>BE: { email, name, google_id }
-        BE-->>FE: { token, user }
-        FE->>AS: store token
-        FE->>FE: onboarding_complete? → tabs : onboarding
+    subgraph GOOGLE["Google Sign-In — PKCE"]
+        LOGINSCREEN -->|tap Google button| PKCE["useAuthRequest\nsend code_challenge"]
+        PKCE -->|redirect| GAUTH[Google OAuth]
+        GAUTH -->|auth code| EXCHANGE["exchangeCodeAsync\n+ code_verifier in extraParams"]
+        EXCHANGE -->|access_token| POSTGOOGLE["POST /api/auth/google"]
+        POSTGOOGLE -->|validate via userinfo| GINFO[Google userinfo API]
+        GINFO -->|email + google_id| POSTGOOGLE
+        POSTGOOGLE -->|200 token + user| STORETOKEN2[store token]
+        STORETOKEN2 --> GATE3{onboarding\ncomplete?}
+        GATE3 -->|no| ONBOARDING
+        GATE3 -->|yes| TABS
     end
 
-    rect rgb(60,40,40)
-        Note over U,AS: Registration → Onboarding
-        U->>FE: fill username/email/password
-        FE->>BE: POST /api/auth/register
-        BE-->>FE: { token, user }
-        FE->>AS: store token
-        FE->>FE: router.replace('/onboarding')
-        Note over FE: 4-step wizard:<br/>Photo → Bio → Sports → Levels
-        FE->>BE: PUT /api/users/me (avatar, bio, onboarding_complete:true)
-        FE->>BE: PUT /api/users/sport-preferences
-        FE->>FE: router.replace('/(tabs)')
+    subgraph REG["Registration → Onboarding"]
+        LOGINSCREEN -->|no account| REGISTER[register.tsx]
+        REGISTER -->|username + email + password| POSTREG["POST /api/auth/register"]
+        POSTREG -->|200 token + user| STORETOKEN3[store token]
+        STORETOKEN3 --> ONBOARDING
+
+        ONBOARDING["onboarding.tsx\n4-step wizard"] -->|Step 1| PHOTO[Photo]
+        PHOTO --> BIO[Bio]
+        BIO --> SPORTS[Sports — multi-select]
+        SPORTS --> LEVELS[Levels + Favorites]
+        LEVELS -->|finish| PUTME["PUT /api/users/me\nonboarding_complete: true"]
+        PUTME --> PUTPREFS["PUT /api/users/sport-preferences"]
+        PUTPREFS --> TABS
     end
 ```
 
@@ -204,36 +202,30 @@ graph LR
 
 ```mermaid
 sequenceDiagram
-    participant FE1 as Client A
-    participant SRV as Server (socket.io)
-    participant FE2 as Client B
+    participant A as Client A
+    participant SRV as Server
+    participant B as Client B
+    participant EXPO as Expo Push
 
-    Note over FE1,FE2: On connect — every client joins their personal room
-    FE1->>SRV: join room "user_${myId}"
-    FE2->>SRV: join room "user_${myId}"
+    Note over A,B: Connection setup
+    A->>SRV: connect — join room user_A
+    B->>SRV: connect — join room user_B
 
-    rect rgb(40,50,70)
-        Note over FE1,FE2: Game Chat
-        FE1->>SRV: emit "send_message" { gameId, content }
-        SRV->>SRV: persist to Messages table
-        SRV-->>FE1: emit "new_message" (to game room)
-        SRV-->>FE2: emit "new_message" (to game room)
-    end
+    Note over A,SRV,B: Game Chat
+    A->>SRV: emit send_message { gameId, content }
+    SRV->>SRV: INSERT into Messages
+    SRV-->>A: emit new_message
+    SRV-->>B: emit new_message
 
-    rect rgb(40,70,50)
-        Note over FE1,FE2: Direct Messages
-        FE1->>SRV: POST /api/dm/:userId (REST)
-        SRV->>SRV: persist to DirectMessages table
-        SRV-->>FE2: emit "new_dm" (to "user_${receiverId}" room)
-        Note over FE2: receiver sees message in real-time
-    end
+    Note over A,SRV,B: Direct Messages
+    A->>SRV: POST /api/dm/:userId
+    SRV->>SRV: INSERT into DirectMessages
+    SRV-->>B: emit new_dm to room user_B
 
-    rect rgb(70,50,40)
-        Note over FE1,FE2: Push Notifications (Expo)
-        SRV->>SRV: sendPushNotifications helper
-        SRV-->>FE2: Expo push to device token
-        SRV->>SRV: persist to Notifications table
-    end
+    Note over A,SRV,B: Push Notifications
+    SRV->>SRV: INSERT into Notifications
+    SRV->>EXPO: sendPushNotifications(token, payload)
+    EXPO-->>B: push to device
 ```
 
 ---
