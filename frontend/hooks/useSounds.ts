@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
@@ -14,7 +14,7 @@ const SOUND_FILES = {
 export type SoundName = keyof typeof SOUND_FILES;
 
 export function useSounds() {
-  const sounds = useRef<Partial<Record<SoundName, Audio.Sound>>>({});
+  const players = useRef<Partial<Record<SoundName, AudioPlayer>>>({});
   const enabledRef = useRef(true);
 
   useEffect(() => {
@@ -26,14 +26,14 @@ export function useSounds() {
 
       const stored = await AsyncStorage.getItem('sounds_enabled');
       enabledRef.current = stored !== 'false';
-      if (!enabledRef.current) return;
+      if (!enabledRef.current || !mounted) return;
 
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: false });
+      await setAudioModeAsync({ playsInSilentMode: false });
+      if (!mounted) return;
 
       for (const [name, file] of Object.entries(SOUND_FILES) as [SoundName, any][]) {
         try {
-          const { sound } = await Audio.Sound.createAsync(file, { shouldPlay: false });
-          if (mounted) sounds.current[name] = sound;
+          players.current[name] = createAudioPlayer(file);
         } catch {}
       }
     }
@@ -41,17 +41,17 @@ export function useSounds() {
     preload();
     return () => {
       mounted = false;
-      Object.values(sounds.current).forEach(s => s?.unloadAsync());
+      Object.values(players.current).forEach(p => p?.remove());
     };
   }, []);
 
   const play = useCallback(async (name: SoundName) => {
     if (!enabledRef.current) return;
     try {
-      const sound = sounds.current[name];
-      if (!sound) return;
-      await sound.setPositionAsync(0);
-      await sound.playAsync();
+      const player = players.current[name];
+      if (!player) return;
+      await player.seekTo(0);
+      player.play();
     } catch {}
   }, []);
 

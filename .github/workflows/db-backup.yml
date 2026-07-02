@@ -1,0 +1,62 @@
+name: Weekly database backup
+
+# Free weekly MySQL backup via GitHub Actions — no Railway Pro plan required.
+# Requires a repo secret DATABASE_URL set to Railway's PUBLIC MySQL connection
+# string (Railway dashboard -> MySQL service -> Connect -> "MYSQL_PUBLIC_URL"),
+# e.g. mysql://user:pass@host.proxy.rlwy.net:12345/railway
+# GitHub Actions runners can't reach Railway's private network, so it must be
+# the public URL, not the internal one used by the backend service itself.
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # Every Sunday at 03:00 UTC
+  workflow_dispatch: {} # Allows manual "Run workflow" from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set. Add it in repo Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          # mysqldump needs discrete -h/-u/-p/db args, not a connection URL — parse with
+          # Node's URL parser (handles URL-encoded passwords) and pass args via spawnSync
+          # so the password never touches the shell parser.
+          node -e '
+            const { spawnSync } = require("child_process");
+            const fs = require("fs");
+            const u = new URL(process.env.DATABASE_URL);
+            const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+            const outFile = `sportlink_backup_${stamp}.sql`;
+            const args = [
+              "--single-transaction", "--routines", "--triggers",
+              "-h", u.hostname,
+              "-P", u.port || "3306",
+              "-u", decodeURIComponent(u.username),
+              `-p${decodeURIComponent(u.password)}`,
+              u.pathname.slice(1),
+            ];
+            const result = spawnSync("mysqldump", args, { encoding: "utf8", maxBuffer: 1024 * 1024 * 1024 });
+            if (result.status !== 0) {
+              console.error(result.stderr);
+              process.exit(result.status || 1);
+            }
+            fs.writeFileSync(outFile, result.stdout);
+            console.log(`Wrote ${outFile} (${result.stdout.length} bytes)`);
+          '
+          gzip sportlink_backup_*.sql
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sportlink-db-backup-${{ github.run_id }}
+          path: sportlink_backup_*.sql.gz
+          retention-days: 90

@@ -352,7 +352,7 @@ app.get('/privacy', (req, res) => {
   <p>Your data is retained as long as your account is active. You may contact us to delete your account and all associated data.</p>
 
   <h2>5. Your Rights</h2>
-  <p>You have the right to access, correct, or delete your personal data. Contact us at <a href="mailto:oran2107@gmail.com">oran2107@gmail.com</a>.</p>
+  <p>You have the right to access, correct, or delete your personal data. You can permanently delete your account and all associated data at any time in the app (Profile &gt; Delete Account), or contact us at <a href="mailto:oran2107@gmail.com">oran2107@gmail.com</a>.</p>
 
   <h2>6. Children</h2>
   <p>SportLink is not intended for users under 13. We do not knowingly collect data from children under 13.</p>

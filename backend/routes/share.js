@@ -1,6 +1,5 @@
 const express = require('express');
 const pool = require('../db');
-const { SPORT_LABELS, SPORT_EMOJI: SPORT_EMOJIS } = require('../utils/sportLabels');
 
 const router = express.Router();
 
@@ -62,72 +61,12 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function formatGameTime(t) {
-  if (!t) return '';
-  const [datePart, timePart] = t.split(' ');
-  if (!datePart) return t;
-  const [, month, day] = datePart.split('-');
-  if (!timePart) return `${day}/${month}`;
-  const [hour, min] = timePart.split(':');
-  const h = parseInt(hour, 10);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${day}/${month} at ${h12}:${min} ${ampm}`;
-}
-
-// GET /share/game/:id
-router.get('/game/:id', async (req, res) => {
+// GET /share/game/:id — the canonical game landing page lives at /game/:id (server.js);
+// redirect rather than maintaining two divergent HTML implementations of the same page.
+router.get('/game/:id', (req, res) => {
   const gameId = parseInt(req.params.id);
   if (isNaN(gameId)) return res.status(404).send('Not found');
-  try {
-    const [[game]] = await pool.execute(
-      `SELECT g.id, g.title, g.sport_type, g.scheduled_time, g.location_desc,
-              g.max_players, g.status, u.username AS host_name,
-              (SELECT COUNT(CASE WHEN COALESCE(status, 'joined') = 'joined' THEN 1 END)
-               FROM GameParticipants WHERE game_id = g.id) AS joined_players
-       FROM Games g JOIN Users u ON u.id = g.host_id
-       WHERE g.id = ?`,
-      [gameId]
-    );
-    if (!game) return res.status(404).send('Game not found');
-
-    const emoji = SPORT_EMOJIS[game.sport_type] ?? '🏅';
-    const sport = SPORT_LABELS[game.sport_type] ?? (game.sport_type ? game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1) : 'Game');
-    const gameTitle = game.title || `${sport} Game`;
-    // Host occupies one slot; display count = joined participants + host
-    const currentPlayers = game.joined_players + 1;
-    const hasCapacity = game.max_players != null;
-    const spots = hasCapacity ? (game.max_players - 1) - game.joined_players : null;
-    const spotsText = !hasCapacity ? '' : spots > 0 ? `${spots} spot${spots !== 1 ? 's' : ''} left` : 'Full';
-    const when = formatGameTime(game.scheduled_time);
-    const where = game.location_desc || '';
-
-    const description = [
-      `Hosted by ${game.host_name}`,
-      when,
-      where,
-      hasCapacity
-        ? `${currentPlayers}/${game.max_players} players${spotsText ? ` · ${spotsText}` : ''}`
-        : `${currentPlayers} player${currentPlayers !== 1 ? 's' : ''}`,
-    ].filter(Boolean).join(' · ');
-
-    const BASE = process.env.RAILWAY_PUBLIC_DOMAIN
-      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-      : 'https://sport-link-production.up.railway.app';
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderPage({
-      title: `${emoji} ${gameTitle}`,
-      description,
-      image: null,
-      url: `${BASE}/share/game/${gameId}`,
-      deepLink: `sportlink://game/${gameId}`,
-      ctaText: game.status === 'active' ? 'Join This Game' : 'View Game',
-    }));
-  } catch (err) {
-    console.error('share/game error:', err);
-    res.status(500).send('Server error');
-  }
+  res.redirect(301, `/game/${gameId}`);
 });
 
 // GET /share/court/:placeId

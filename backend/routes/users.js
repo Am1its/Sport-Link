@@ -241,6 +241,21 @@ router.put('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// DELETE /api/users/me — permanently delete the current user's account.
+// Every FK referencing Users(id) is ON DELETE CASCADE, so this transitively removes
+// all games hosted, participations, messages, ratings, friends, DMs, reviews, etc.
+router.delete('/me', authMiddleware, async (req, res) => {
+  try {
+    const [result] = await pool.execute('DELETE FROM Users WHERE id = ?', [req.user.id]);
+    if (result.affectedRows === 0)
+      return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // GET /api/users/search?q= — find users by username prefix (for friend requests)
 router.get('/search', authMiddleware, async (req, res) => {
   const q = (req.query.q || '').trim();

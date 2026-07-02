@@ -88,6 +88,7 @@ export default function ProfileScreen() {
   const [editAvatar, setEditAvatar]     = useState<string | null>(null);
   const [saving, setSaving]             = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const tabOpacity = useSharedValue(0);
   const tabFadeStyle = useAnimatedStyle(() => ({ opacity: tabOpacity.value }));
@@ -173,6 +174,49 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     await logout();
     router.replace(ROUTES.LOGIN);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This permanently deletes your account, hosted games, messages, ratings, and all other data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'Your account and all associated data will be permanently deleted.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete Permanently',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setDeletingAccount(true);
+                    try {
+                      const res  = await apiFetch(API.ME, { method: 'DELETE', token });
+                      const data = await res.json();
+                      if (!data.success) {
+                        setDeletingAccount(false);
+                        return Alert.alert('Error', data.message || 'Could not delete account');
+                      }
+                      await logout();
+                      router.replace(ROUTES.LOGIN);
+                    } catch {
+                      setDeletingAccount(false);
+                      Alert.alert('Error', 'Could not connect to server');
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const username    = stats?.username ?? '—';
@@ -420,6 +464,21 @@ export default function ProfileScreen() {
             </View>
             <Text style={[styles.menuText, { color: Colors.error }]}>Sign Out</Text>
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.7}
+          disabled={deletingAccount}
+        >
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.menuIconWrap, { backgroundColor: Colors.errorFaint }]}>
+              <Ionicons name="trash-outline" size={20} color={Colors.error} />
+            </View>
+            <Text style={[styles.menuText, { color: Colors.error }]}>Delete Account</Text>
+          </View>
+          {deletingAccount && <ActivityIndicator size="small" color={Colors.error} />}
         </TouchableOpacity>
       </View>
 

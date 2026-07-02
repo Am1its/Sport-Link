@@ -66,7 +66,14 @@ SHOW COLUMNS FROM CourtReviews LIKE 'owner_response';
 
 ### Database Backups
 
-Railway automated backups require the Pro plan ($20/month). **Deferred until post-launch** when real user data exists and the Pro plan is justified.
+Railway automated backups require the Pro plan ($20/month). Instead, a free weekly backup runs via
+GitHub Actions: `.github/workflows/db-backup.yml` (Sundays 03:00 UTC + manual "Run workflow" trigger).
+It dumps the DB and uploads it as a build artifact (90-day retention, downloadable from the Actions tab).
+
+**To activate it:** add a repo secret named `DATABASE_URL` set to Railway's **public** MySQL connection
+string (Railway dashboard → MySQL service → Connect tab → `MYSQL_PUBLIC_URL`, not the internal one the
+backend service uses — GitHub's runners can't reach Railway's private network). Repo → Settings → Secrets
+and variables → Actions → New repository secret.
 
 Manual backup on demand (run from your machine with Railway's external MySQL connection string):
 ```bash
@@ -185,7 +192,7 @@ The `sportlink://` URL scheme is registered in `app.json → scheme`. Supported 
 
 - [x] Run migration 019 on Railway MySQL
 - [x] Set `EXPO_PUBLIC_SENTRY_DSN` in Railway env vars
-- [ ] Database backups — deferred until Pro plan (post-launch)
+- [ ] Database backups — weekly GitHub Actions workflow drafted (`.github/workflows/db-backup.yml`); needs `DATABASE_URL` repo secret added to activate
 - [ ] Create Apple Developer account ($99/yr)
 - [ ] Create app record in App Store Connect (get `ascAppId`)
 - [ ] Fill `appleTeamId` in `eas.json`

@@ -43,13 +43,56 @@ async function sendPushNotifications(messages) {
 
   return new Promise((resolve) => {
     const req = https.request(options, (res) => {
-      res.on('data', () => {});
-      res.on('end', resolve);
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', async () => {
+        await clearDeadTokens(pushable, body);
+        resolve();
+      });
     });
-    req.on('error', (err) => console.error('Push notification error:', err));
+    req.on('error', (err) => {
+      console.error('Push notification error:', err);
+      resolve();
+    });
     req.write(payload);
     req.end();
   });
+}
+
+/**
+ * Parses the Expo push ticket response and clears push_token for any user whose
+ * token Expo has already flagged as DeviceNotRegistered, so we stop pushing dead tokens.
+ * Ticket order in the response always matches the request order (Expo API guarantee).
+ * @param {Array<{user_id: number, to: string}>} pushable
+ * @param {string} responseBody
+ */
+async function clearDeadTokens(pushable, responseBody) {
+  let parsed;
+  try {
+    parsed = JSON.parse(responseBody);
+  } catch {
+    return; // Not JSON (network/proxy error page, etc.) — nothing to parse
+  }
+
+  const tickets = parsed?.data;
+  if (!Array.isArray(tickets) || tickets.length !== pushable.length) return;
+
+  const deadUserIds = tickets
+    .map((ticket, i) => (
+      ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered'
+        ? pushable[i].user_id
+        : null
+    ))
+    .filter(Boolean);
+
+  if (deadUserIds.length === 0) return;
+
+  try {
+    const placeholders = deadUserIds.map(() => '?').join(',');
+    await pool.execute(`UPDATE Users SET push_token = NULL WHERE id IN (${placeholders})`, deadUserIds);
+  } catch (err) {
+    console.error('Clear dead push token error:', err.message);
+  }
 }
 
 module.exports = sendPushNotifications;

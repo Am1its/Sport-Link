@@ -1,6 +1,6 @@
 # SportLink — Full Project Audit & Improvement Spec
 
-**Status update (2026-07-02, same day):** Batch 1 (backend bugs — B1, B2, B3, B4, B5, B6, B11, B15) and Batch 2 (frontend bug/UX parity — B7, B8, B13, F3, F6, U2, U3) both implemented and verified (Batch 1: live request tests against local MySQL; Batch 2: `tsc --noEmit` clean + `expo lint` clean on all touched files). Details in each item below marked `[DONE]`. Batches 3-5 not started.
+**Status update (2026-07-02, same day):** Batches 1, 2, and 3 implemented and verified same day. Batch 1 (backend bugs): live request tests against local MySQL. Batch 2 (frontend parity): `tsc --noEmit` + `expo lint` clean. Batch 3 (pre-launch): account deletion verified via a live cascade-delete test touching all 16 tables; expo-audio migration verified via `expo-doctor` + typecheck; push receipt handling verified via a mocked Expo response; landing-page redirect verified live; DB backup workflow verified by running its exact dump logic against a real local MySQL instance (workflow itself needs a `DATABASE_URL` secret from the user to activate on GitHub — see item 5 below). Details in each item below marked `[DONE]`. Batches 4-5 not started.
 
 **Date:** 2026-07-02
 **Scope:** Full read of `backend/` (all routes, crons, sockets, utils), `frontend/` (all tabs, key screens, components, hooks, utils), `docs/` (business strategy, product definitions, prior code reviews), memory & CLAUDE.md.
@@ -148,7 +148,7 @@ Leaderboard, friends, participants, DM conversations, reviews, activity — each
 
 **Fix:** skip the debounce effect on first render (ref flag), or drop the focus-effect fetch and let the debounce own it.
 
-### P5. Expo push receipts ignored (deferred L5, still open)
+### P5. Expo push receipts ignored (deferred L5, still open) `[DONE]`
 Dead/rotated tokens accumulate; Expo eventually throttles senders who keep pushing to `DeviceNotRegistered` tokens.
 
 **Fix:** parse the ticket response in `sendPushNotification.js`; on `DeviceNotRegistered`, `UPDATE Users SET push_token = NULL`.
@@ -167,11 +167,11 @@ Dead/rotated tokens accumulate; Expo eventually throttles senders who keep pushi
 
 ## 4. 🚨 Pre-launch blockers (App Store reality check)
 
-1. **In-app account deletion is missing — Apple will reject.** App Review Guideline 5.1.1(v) requires apps with account creation to offer **in-app** account deletion. The privacy policy says "contact us to delete" — that alone fails review. Needed: `DELETE /api/users/me` (FKs already cascade for most tables; add explicit deletes for Games/Messages or anonymize), plus a "Delete Account" row with a confirm dialog in profile → Account.
-2. **`expo-av` is deprecated** (SDK 54 is its last release; removed in SDK 55). The sound system (`useSounds.ts`) is the only consumer. Migrate to `expo-audio` (`createAudioPlayer`) — small, contained change, better done before the SDK 55 upgrade forces it.
-3. **`apple-itunes-app` meta tags still say `app-id=PLACEHOLDER`** (`server.js:170,259`) — harmless now, must be filled once the App Store ID exists (smart banner won't render otherwise).
-4. **Two divergent game landing pages**: `server.js GET /game/:id` (used by GameCard share) and `share.js GET /share/game/:id` — different HTML, different count bugs (B6). Consolidate on one and 301 the other.
-5. **DB backups** still manual (known deferral) — worth a weekly `mysqldump` GitHub Action or cron on Railway before real users, not after.
+1. **In-app account deletion is missing — Apple will reject.** `[DONE]` App Review Guideline 5.1.1(v) requires apps with account creation to offer **in-app** account deletion. Added `DELETE /api/users/me` (verified end-to-end: every FK referencing Users(id) is ON DELETE CASCADE, confirmed via information_schema and a live test that touched all 16 tables) + a "Delete Account" row with a double-confirm dialog in profile → Account. Privacy policy text updated to mention it.
+2. **`expo-av` is deprecated** `[DONE]` (SDK 54 is its last release; removed in SDK 55). Migrated `useSounds.ts` to `expo-audio` (`createAudioPlayer`/`setAudioModeAsync`); added the `expo-asset` peer dependency `expo-audio` requires (was missing, caught via `expo-doctor`); uninstalled `expo-av`.
+3. **`apple-itunes-app` meta tags still say `app-id=PLACEHOLDER`** (`server.js:170,259`) — still open, can't be filled until a real App Store ID exists.
+4. **Two divergent game landing pages** `[DONE]`: `share.js GET /share/game/:id` now 301-redirects to the canonical `server.js GET /game/:id` (confirmed nothing in the frontend ever linked to the `/share/*` variant — it was dead code); removed the now-unused duplicate HTML/SQL. `/share/court/:placeId` left as-is (not a duplicate — no court-sharing UI exists yet, so nothing to consolidate).
+5. **DB backups** `[DONE, needs activation]` — `.github/workflows/db-backup.yml` added (weekly cron + manual dispatch, mysqldump piped through Node's URL parser to avoid shell-injecting the password, gzipped, uploaded as a 90-day artifact). Verified the exact dump logic against a real local MySQL instance. **Needs a `DATABASE_URL` repo secret (Railway's public MySQL connection string) added by the user to actually run** — this is the one Batch 3 item that couldn't be fully completed without Railway dashboard access.
 
 ---
 
