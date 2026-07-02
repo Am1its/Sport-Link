@@ -48,11 +48,10 @@ router.post('/:id/boost', authMiddleware, async (req, res) => {
 
     if (game.latitude && game.longitude) {
       const [targets] = await pool.execute(`
-        SELECT DISTINCT u.push_token
+        SELECT DISTINCT u.id, u.push_token
         FROM SportPreferences sp
         JOIN Users u ON u.id = sp.user_id
         WHERE sp.sport_type = ?
-          AND u.push_token IS NOT NULL
           AND u.id != ?
           AND u.id NOT IN (SELECT user_id FROM GameParticipants WHERE game_id = ?)
           AND (
@@ -85,6 +84,7 @@ router.post('/:id/boost', authMiddleware, async (req, res) => {
       if (targets.length > 0) {
         const label = game.title || game.location_desc || game.sport_type;
         sendPushNotifications(targets.map(t => ({
+          user_id: t.id,
           to: t.push_token,
           title: `🔥 ${game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1)} game near you!`,
           body: `A game needs one more player: ${label}`,

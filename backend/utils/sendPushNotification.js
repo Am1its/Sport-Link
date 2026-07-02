@@ -2,41 +2,33 @@ const https = require('https');
 const pool = require('../db');
 
 /**
- * Send one or more Expo push notifications and persist them in the Notifications table.
- * @param {Array<{to: string, title: string, body: string, data?: object}>} messages
+ * Persist a notification for every message with a `user_id`, and send an Expo push
+ * for the subset that also have a valid `to` push token. These two channels are
+ * intentionally independent — a user without (or who declined) push notifications
+ * still gets the notification in their in-app inbox.
+ * @param {Array<{user_id: number, to?: string|null, title: string, body: string, data?: object}>} messages
  */
 async function sendPushNotifications(messages) {
-  const filtered = messages.filter(m => m.to && m.to.startsWith('ExponentPushToken['));
-  if (filtered.length === 0) return;
+  const withUser = messages.filter(m => m.user_id);
+  if (withUser.length === 0) return;
 
-  // Persist to DB: look up user_id for each push token
+  // Always persist to the in-app inbox, regardless of push-token availability
   try {
-    const tokens = [...new Set(filtered.map(m => m.to))];
-    const placeholders = tokens.map(() => '?').join(',');
-    const [rows] = await pool.execute(
-      `SELECT id, push_token FROM Users WHERE push_token IN (${placeholders})`,
-      tokens
+    const insertPlaceholders = withUser.map(() => '(?, ?, ?, ?)').join(', ');
+    const insertValues = withUser.flatMap(m => [m.user_id, m.title, m.body, m.data ? JSON.stringify(m.data) : null]);
+    await pool.execute(
+      `INSERT INTO Notifications (user_id, title, body, data) VALUES ${insertPlaceholders}`,
+      insertValues
     );
-    const tokenToUserId = {};
-    rows.forEach(r => { tokenToUserId[r.push_token] = r.id; });
-
-    const inserts = filtered
-      .map(m => ({ userId: tokenToUserId[m.to], title: m.title, body: m.body, data: m.data ?? null }))
-      .filter(m => m.userId);
-
-    if (inserts.length > 0) {
-      const insertPlaceholders = inserts.map(() => '(?, ?, ?, ?)').join(', ');
-      const insertValues = inserts.flatMap(m => [m.userId, m.title, m.body, m.data ? JSON.stringify(m.data) : null]);
-      await pool.execute(
-        `INSERT INTO Notifications (user_id, title, body, data) VALUES ${insertPlaceholders}`,
-        insertValues
-      );
-    }
   } catch (err) {
     console.error('Notification DB persist error:', err.message);
   }
 
-  const payload = JSON.stringify(filtered);
+  // Only send to Expo for entries with a valid token
+  const pushable = withUser.filter(m => m.to && m.to.startsWith('ExponentPushToken['));
+  if (pushable.length === 0) return;
+
+  const payload = JSON.stringify(pushable.map(({ to, title, body, data }) => ({ to, title, body, data })));
   const options = {
     hostname: 'exp.host',
     path: '/--/api/v2/push/send',

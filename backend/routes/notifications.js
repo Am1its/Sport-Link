@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   try {
-    const [[{ unread_count }], [rows]] = await Promise.all([
+    const [countRes, listRes] = await Promise.all([
       pool.execute(
         'SELECT COUNT(*) AS unread_count FROM Notifications WHERE user_id = ? AND is_read = FALSE',
         [userId]
@@ -22,6 +22,8 @@ router.get('/', authMiddleware, async (req, res) => {
         [userId]
       ),
     ]);
+    const unread_count = countRes[0][0].unread_count;
+    const rows = listRes[0];
     res.json({ success: true, notifications: rows, unread_count: Number(unread_count) });
   } catch (err) {
     console.error(err);

@@ -83,7 +83,8 @@ router.get('/game/:id', async (req, res) => {
     const [[game]] = await pool.execute(
       `SELECT g.id, g.title, g.sport_type, g.scheduled_time, g.location_desc,
               g.max_players, g.status, u.username AS host_name,
-              (SELECT COUNT(*) FROM GameParticipants WHERE game_id = g.id) AS current_players
+              (SELECT COUNT(CASE WHEN COALESCE(status, 'joined') = 'joined' THEN 1 END)
+               FROM GameParticipants WHERE game_id = g.id) AS joined_players
        FROM Games g JOIN Users u ON u.id = g.host_id
        WHERE g.id = ?`,
       [gameId]
@@ -93,8 +94,11 @@ router.get('/game/:id', async (req, res) => {
     const emoji = SPORT_EMOJIS[game.sport_type] ?? '🏅';
     const sport = SPORT_LABELS[game.sport_type] ?? (game.sport_type ? game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1) : 'Game');
     const gameTitle = game.title || `${sport} Game`;
-    const spots = game.max_players - game.current_players;
-    const spotsText = spots > 0 ? `${spots} spot${spots !== 1 ? 's' : ''} left` : 'Full';
+    // Host occupies one slot; display count = joined participants + host
+    const currentPlayers = game.joined_players + 1;
+    const hasCapacity = game.max_players != null;
+    const spots = hasCapacity ? (game.max_players - 1) - game.joined_players : null;
+    const spotsText = !hasCapacity ? '' : spots > 0 ? `${spots} spot${spots !== 1 ? 's' : ''} left` : 'Full';
     const when = formatGameTime(game.scheduled_time);
     const where = game.location_desc || '';
 
@@ -102,7 +106,9 @@ router.get('/game/:id', async (req, res) => {
       `Hosted by ${game.host_name}`,
       when,
       where,
-      `${game.current_players}/${game.max_players} players · ${spotsText}`,
+      hasCapacity
+        ? `${currentPlayers}/${game.max_players} players${spotsText ? ` · ${spotsText}` : ''}`
+        : `${currentPlayers} player${currentPlayers !== 1 ? 's' : ''}`,
     ].filter(Boolean).join(' · ');
 
     const BASE = process.env.RAILWAY_PUBLIC_DOMAIN

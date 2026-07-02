@@ -46,14 +46,13 @@ async function checkAndAwardBadges(userId, pool) {
 
     // Send push notification for each new badge
     const [[user]] = await pool.execute('SELECT push_token FROM Users WHERE id = ?', [userId]);
-    if (user?.push_token) {
-      sendPushNotifications(newBadges.map(b => ({
-        to: user.push_token,
-        title: '🏅 New Badge Earned!',
-        body: b.label,
-        data: { screen: 'profile' },
-      })));
-    }
+    sendPushNotifications(newBadges.map(b => ({
+      user_id: userId,
+      to: user?.push_token ?? null,
+      title: '🏅 New Badge Earned!',
+      body: b.label,
+      data: { screen: 'profile' },
+    })));
   } catch (err) {
     console.error('checkAndAwardBadges error:', err);
   }

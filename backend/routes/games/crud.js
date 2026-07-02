@@ -4,7 +4,7 @@ const pool = require('../../db');
 const authMiddleware = require('../../middleware/authMiddleware');
 const sendPushNotifications = require('../../utils/sendPushNotification');
 const { optionalUserId, toMapGame } = require('./helpers');
-const { ISRAEL_NOW_SQL, parseIsraelTime } = require('../../utils/israelTime');
+const { israelNowString, parseIsraelTime } = require('../../utils/israelTime');
 
 // GET /api/games — public; optional ?lat=&lng=&radius_km=&q= for distance + text filter
 // Authenticated: sorted by sport preference match + skill proximity.
@@ -30,15 +30,17 @@ router.get('/', async (req, res) => {
     // 1. userId for is_joined EXISTS (if authed)
     // 2. lat, lng, lat for haversine (if radius)
     // 3. userId for SportPreferences JOIN (if authed)
-    // 4. userId x2 for block filter WHERE subqueries (if authed)
-    // 5. search term (if q) — FULLTEXT or two LIKE params
-    // 6. date_from, date_to (if date filter)
-    // 7. neighborhood (if neighborhood filter)
-    // 8. radius_km for HAVING (if radius)
+    // 4. israelNowString for the scheduled_time cutoff (always)
+    // 5. userId x2 for block filter WHERE subqueries (if authed)
+    // 6. search term (if q) — FULLTEXT or two LIKE params
+    // 7. date_from, date_to (if date filter)
+    // 8. neighborhood (if neighborhood filter)
+    // 9. radius_km for HAVING (if radius)
     const params = [];
     if (userId) params.push(userId);
     if (useRadius) params.push(parseFloat(lat), parseFloat(lng), parseFloat(lat));
     if (userId) params.push(userId);
+    params.push(israelNowString());
     if (userId) params.push(userId, userId);
     if (useSearch) {
       if (searchTerm.length >= 3) {
@@ -73,7 +75,7 @@ router.get('/', async (req, res) => {
         AND (
           g.scheduled_time IS NULL
           OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') IS NULL
-          OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > DATE_SUB(${ISRAEL_NOW_SQL}, INTERVAL 3 HOUR)
+          OR STR_TO_DATE(g.scheduled_time, '%Y-%m-%d %H:%i') > DATE_SUB(STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'), INTERVAL 3 HOUR)
         )
         ${userId ? `AND g.host_id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
         AND g.host_id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)` : ''}
@@ -236,16 +238,15 @@ router.post('/', authMiddleware, async (req, res) => {
       const [[host]] = await pool.execute('SELECT username FROM Users WHERE id = ?', [req.user.id]);
       const friendPlaceholders = verifiedFriends.map(() => '?').join(',');
       const [friendRows] = await pool.execute(
-        `SELECT push_token FROM Users WHERE id IN (${friendPlaceholders})`, verifiedFriends
+        `SELECT id, push_token FROM Users WHERE id IN (${friendPlaceholders})`, verifiedFriends
       );
-      const notifications = friendRows
-        .filter(r => r.push_token)
-        .map(r => ({
-          to: r.push_token,
-          title: "🏅 You've been added to a game!",
-          body: `${host.username} added you to a ${sport_type} game.`,
-          data: { gameId },
-        }));
+      const notifications = friendRows.map(r => ({
+        user_id: r.id,
+        to: r.push_token,
+        title: "🏅 You've been added to a game!",
+        body: `${host.username} added you to a ${sport_type} game.`,
+        data: { gameId },
+      }));
       if (notifications.length) sendPushNotifications(notifications);
     }
 
@@ -291,8 +292,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (location_desc && location_desc.length > 200)
       return res.status(400).json({ success: false, message: 'location_desc must be 200 characters or less' });
     if (scheduled_time) {
-      const parsed = new Date(scheduled_time);
-      if (!isNaN(parsed.getTime()) && parsed <= new Date())
+      const parsed = parseIsraelTime(scheduled_time);
+      if (parsed && parsed <= new Date())
         return res.status(400).json({ success: false, message: 'scheduled_time must be in the future' });
     }
 
@@ -348,10 +349,10 @@ router.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only the host can delete this game' });
 
     const [participantRows] = await pool.execute(`
-      SELECT u.push_token
+      SELECT u.id, u.push_token
       FROM GameParticipants gp
       JOIN Users u ON u.id = gp.user_id
-      WHERE gp.game_id = ? AND u.push_token IS NOT NULL
+      WHERE gp.game_id = ?
     `, [gameId]);
 
     await pool.execute("UPDATE Games SET status = 'cancelled' WHERE id = ?", [gameId]);
@@ -359,6 +360,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     if (participantRows.length > 0) {
       const [[host]] = await pool.execute('SELECT username FROM Users WHERE id = ?', [userId]);
       sendPushNotifications(participantRows.map(r => ({
+        user_id: r.id,
         to: r.push_token,
         title: '❌ Game cancelled',
         body: `${host.username}'s ${game.sport_type} game has been cancelled.`,

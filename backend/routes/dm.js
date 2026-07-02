@@ -18,8 +18,11 @@ const fetchMsg = async (msgId, viewerId) => {
       g.location_desc  AS game_location,
       g.max_players    AS game_max_players,
       g.status         AS game_status,
-      (SELECT COUNT(*) FROM GameParticipants WHERE game_id = g.id) AS game_current_players,
-      CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS game_joined,
+      -- +1 accounts for the host, who occupies a slot but has no GameParticipants row;
+      -- matches max_players so the frontend's plain current/max display and fullness check are correct
+      (SELECT COUNT(CASE WHEN COALESCE(status, 'joined') = 'joined' THEN 1 END)
+       FROM GameParticipants WHERE game_id = g.id) + 1 AS game_current_players,
+      CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ? AND status = 'joined') AS UNSIGNED) AS game_joined,
       CAST((g.host_id = ?) AS UNSIGNED) AS game_is_host
     FROM DirectMessages dm
     LEFT JOIN Games g ON dm.event_id = g.id AND dm.type = 'event'
@@ -99,18 +102,22 @@ router.get('/:userId', async (req, res) => {
         g.location_desc  AS game_location,
         g.max_players    AS game_max_players,
         g.status         AS game_status,
-        (SELECT COUNT(*) FROM GameParticipants WHERE game_id = g.id) AS game_current_players,
-        CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ?) AS UNSIGNED) AS game_joined,
+        -- +1 accounts for the host, who occupies a slot but has no GameParticipants row;
+        -- matches max_players so the frontend's plain current/max display and fullness check are correct
+        (SELECT COUNT(CASE WHEN COALESCE(status, 'joined') = 'joined' THEN 1 END)
+         FROM GameParticipants WHERE game_id = g.id) + 1 AS game_current_players,
+        CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ? AND status = 'joined') AS UNSIGNED) AS game_joined,
         CAST((g.host_id = ?) AS UNSIGNED) AS game_is_host
       FROM DirectMessages dm
       LEFT JOIN Games g ON dm.event_id = g.id AND dm.type = 'event'
       WHERE (dm.sender_id = ? AND dm.receiver_id = ?)
          OR (dm.sender_id = ? AND dm.receiver_id = ?)
-      ORDER BY dm.created_at ASC
+      ORDER BY dm.id DESC
       LIMIT 100
     `, [me, me, me, other, other, me]);
 
-    res.json({ success: true, messages });
+    // Query returns newest-first (to LIMIT correctly); reverse to chronological ASC for the client
+    res.json({ success: true, messages: messages.reverse() });
   } catch (err) {
     console.error('DM fetch error:', err);
     res.status(500).json({ success: false, message: 'Server error' });

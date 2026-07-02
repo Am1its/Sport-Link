@@ -14,7 +14,7 @@ router.get('/game/:gameId/results', authMiddleware, async (req, res) => {
     if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
 
     const [[participation]] = await pool.execute(
-      'SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ?',
+      "SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ? AND status = 'joined'",
       [gameId, userId]
     );
     if (game.host_id !== userId && !participation)
@@ -27,7 +27,7 @@ router.get('/game/:gameId/results', authMiddleware, async (req, res) => {
       const [[{ unrated }]] = await pool.execute(`
         SELECT COUNT(*) AS unrated
         FROM GameParticipants gp
-        WHERE gp.game_id = ?
+        WHERE gp.game_id = ? AND gp.status = 'joined'
           AND NOT EXISTS (
             SELECT 1 FROM Ratings r WHERE r.game_id = ? AND r.rater_id = ? AND r.ratee_id = gp.user_id
           )
@@ -39,7 +39,7 @@ router.get('/game/:gameId/results', authMiddleware, async (req, res) => {
         FROM (
           SELECT ? AS user_id
           UNION
-          SELECT user_id FROM GameParticipants WHERE game_id = ?
+          SELECT user_id FROM GameParticipants WHERE game_id = ? AND status = 'joined'
         ) others
         WHERE others.user_id != ?
           AND NOT EXISTS (
@@ -67,7 +67,7 @@ router.get('/game/:gameId/results', authMiddleware, async (req, res) => {
       FROM (
         SELECT ? AS user_id
         UNION
-        SELECT user_id FROM GameParticipants WHERE game_id = ?
+        SELECT user_id FROM GameParticipants WHERE game_id = ? AND status = 'joined'
       ) participants
       JOIN Users u ON u.id = participants.user_id
       LEFT JOIN Ratings     r  ON r.game_id  = ? AND r.ratee_id = u.id AND r.rater_id = ?
@@ -93,7 +93,7 @@ router.get('/game/:gameId', authMiddleware, async (req, res) => {
     if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
 
     const [[participation]] = await pool.execute(
-      'SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ?',
+      "SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ? AND status = 'joined'",
       [gameId, userId]
     );
     if (game.host_id !== userId && !participation)
@@ -108,7 +108,7 @@ router.get('/game/:gameId', authMiddleware, async (req, res) => {
         SELECT u.id, u.username, u.avatar
         FROM GameParticipants gp
         JOIN Users u ON u.id = gp.user_id
-        WHERE gp.game_id = ?
+        WHERE gp.game_id = ? AND gp.status = 'joined'
           AND NOT EXISTS (
             SELECT 1 FROM Ratings r
             WHERE r.game_id = ? AND r.rater_id = ? AND r.ratee_id = gp.user_id
@@ -120,7 +120,7 @@ router.get('/game/:gameId', authMiddleware, async (req, res) => {
         FROM (
           SELECT host_id AS user_id FROM Games WHERE id = ?
           UNION
-          SELECT user_id FROM GameParticipants WHERE game_id = ?
+          SELECT user_id FROM GameParticipants WHERE game_id = ? AND status = 'joined'
         ) combined
         JOIN Users u ON u.id = combined.user_id
         WHERE combined.user_id != ?
@@ -147,14 +147,16 @@ router.post('/batch', authMiddleware, async (req, res) => {
     return res.status(400).json({ success: false, message: 'game_id and ratings[] are required' });
 
   try {
-    const [[game]] = await pool.execute('SELECT host_id FROM Games WHERE id = ?', [game_id]);
+    const [[game]] = await pool.execute('SELECT host_id, status FROM Games WHERE id = ?', [game_id]);
     if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
     if (game.host_id !== userId)
       return res.status(403).json({ success: false, message: 'Only the host can mark attendance' });
+    if (game.status !== 'completed')
+      return res.status(400).json({ success: false, message: 'The game must be completed before attendance can be marked' });
 
-    // Only allow ratings for actual participants of this game
+    // Only allow ratings for actual, joined (non-waitlisted) participants of this game
     const [participantRows] = await pool.execute(
-      'SELECT user_id FROM GameParticipants WHERE game_id = ?', [game_id]
+      "SELECT user_id FROM GameParticipants WHERE game_id = ? AND status = 'joined'", [game_id]
     );
     const validRateeIds = new Set(participantRows.map(r => r.user_id));
 
@@ -186,23 +188,24 @@ router.post('/peer', authMiddleware, async (req, res) => {
     return res.status(400).json({ success: false, message: 'game_id and ratings[] are required' });
 
   try {
-    const [[game]] = await pool.execute('SELECT host_id FROM Games WHERE id = ?', [game_id]);
+    const [[game]] = await pool.execute('SELECT host_id, status FROM Games WHERE id = ?', [game_id]);
     if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
+    if (game.status !== 'completed')
+      return res.status(400).json({ success: false, message: 'The game must be completed before you can rate players' });
 
     const [[participation]] = await pool.execute(
-      'SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ?',
+      "SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ? AND status = 'joined'",
       [game_id, userId]
     );
     if (!participation)
       return res.status(403).json({ success: false, message: 'You were not a participant in this game' });
 
-    // Build the valid ratee set: host + all participants, excluding self
-    const [[gameRow]] = await pool.execute('SELECT host_id FROM Games WHERE id = ?', [game_id]);
+    // Build the valid ratee set: host + all joined (non-waitlisted) participants, excluding self
     const [participantRows] = await pool.execute(
-      'SELECT user_id FROM GameParticipants WHERE game_id = ?', [game_id]
+      "SELECT user_id FROM GameParticipants WHERE game_id = ? AND status = 'joined'", [game_id]
     );
     const validRateeIds = new Set([
-      gameRow.host_id,
+      game.host_id,
       ...participantRows.map(r => r.user_id),
     ]);
     validRateeIds.delete(userId);

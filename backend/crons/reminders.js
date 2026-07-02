@@ -8,22 +8,23 @@
  * @param {import('mysql2/promise').Pool} pool
  * @param {Function} sendPushNotifications
  */
-const { ISRAEL_NOW_SQL } = require('../utils/israelTime');
+const { israelNowString } = require('../utils/israelTime');
 
 function startReminders(pool, sendPushNotifications) {
   async function sendGameReminders() {
     try {
       // Only games whose reminder has never been sent (reminder_sent_at IS NULL).
       // Survives server restarts — no more in-memory dedup.
+      const nowStr = israelNowString();
       const [games] = await pool.execute(`
         SELECT id, title, sport_type, host_id
         FROM Games
         WHERE status = 'active'
           AND reminder_sent_at IS NULL
           AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i')
-              BETWEEN DATE_ADD(${ISRAEL_NOW_SQL}, INTERVAL 25 MINUTE)
-                AND   DATE_ADD(${ISRAEL_NOW_SQL}, INTERVAL 35 MINUTE)
-      `);
+              BETWEEN DATE_ADD(STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'), INTERVAL 25 MINUTE)
+                AND   DATE_ADD(STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'), INTERVAL 35 MINUTE)
+      `, [nowStr, nowStr]);
 
       for (const game of games) {
         // Atomic claim — prevents double-fire on rolling deploys / multiple processes.
@@ -34,28 +35,28 @@ function startReminders(pool, sendPushNotifications) {
         if (claim.affectedRows === 0) continue;
 
         const [rows] = await pool.execute(`
-          SELECT u.push_token
+          SELECT u.id, u.push_token
           FROM Users u
-          WHERE u.id = ? AND u.push_token IS NOT NULL
+          WHERE u.id = ?
           UNION
-          SELECT u.push_token
+          SELECT u.id, u.push_token
           FROM GameParticipants gp
           JOIN Users u ON u.id = gp.user_id
-          WHERE gp.game_id = ? AND u.push_token IS NOT NULL
+          WHERE gp.game_id = ?
         `, [game.host_id, game.id]);
 
-        const tokens = rows.map(r => r.push_token).filter(Boolean);
-        if (tokens.length === 0) continue;
+        if (rows.length === 0) continue;
 
         const sportLabel = game.sport_type.charAt(0).toUpperCase() + game.sport_type.slice(1);
         const gameTitle  = game.title || `${sportLabel} Game`;
-        await sendPushNotifications(tokens.map(to => ({
-          to,
+        await sendPushNotifications(rows.map(r => ({
+          user_id: r.id,
+          to: r.push_token,
           title: '⏰ Game starting soon!',
           body:  `${gameTitle} starts in ~30 minutes. Get ready!`,
           data:  { gameId: game.id },
         })));
-        console.log(`🔔 Sent reminders for game ${game.id} (${gameTitle}) to ${tokens.length} player(s)`);
+        console.log(`🔔 Sent reminders for game ${game.id} (${gameTitle}) to ${rows.length} player(s)`);
       }
     } catch (err) {
       console.error('Game reminder error:', err.message);

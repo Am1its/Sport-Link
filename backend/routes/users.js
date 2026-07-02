@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
 const { KARMA_SQL } = require('../utils/karmaSQL');
+const { isValidUsername } = require('../utils/validators');
 
 const router = express.Router();
 
@@ -193,7 +194,8 @@ router.put('/me', authMiddleware, async (req, res) => {
     if (bio !== undefined && bio && bio.length > 200)
       return res.status(400).json({ success: false, message: 'bio must be 200 characters or less' });
     if (username !== undefined) {
-      if (!username.trim()) return res.status(400).json({ success: false, message: 'Username cannot be empty' });
+      if (!isValidUsername(username))
+        return res.status(400).json({ success: false, message: 'Username must be 3-30 characters (letters, numbers, underscore, period only)' });
       const [[taken]] = await pool.execute(
         'SELECT id FROM Users WHERE username = ? AND id != ?', [username.trim(), userId]
       );

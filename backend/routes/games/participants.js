@@ -101,9 +101,10 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     // Notify the host (outside transaction)
     const [[joiner]]  = await pool.execute('SELECT username FROM Users WHERE id = ?', [userId]);
     const [[hostRow]] = await pool.execute('SELECT push_token FROM Users WHERE id = ?', [game.host_id]);
-    if (!waitlisted && hostRow?.push_token) {
+    if (!waitlisted) {
       sendPushNotifications([{
-        to: hostRow.push_token,
+        user_id: game.host_id,
+        to: hostRow?.push_token ?? null,
         title: '🏅 New player joined!',
         body: `${joiner.username} joined your ${game.sport_type} game.`,
         data: { gameId },
@@ -170,9 +171,10 @@ router.delete('/:id/leave', authMiddleware, async (req, res) => {
     await conn.commit();
 
     // Send push notification outside the transaction
-    if (promoted?.push_token) {
+    if (promoted) {
       const [[g]] = await pool.execute('SELECT title, sport_type FROM Games WHERE id = ?', [gameId]);
       sendPushNotifications([{
+        user_id: promoted.user_id,
         to: promoted.push_token,
         title: '🎉 You\'re in!',
         body: `A spot opened in ${g?.title || g?.sport_type || 'a game'}. You're now joined!`,

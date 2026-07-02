@@ -10,7 +10,7 @@
  * @param {Function} sendPushNotifications
  * @param {Function} checkAndAwardBadges
  */
-const { ISRAEL_NOW_SQL } = require('../utils/israelTime');
+const { israelNowString } = require('../utils/israelTime');
 
 function startAutoComplete(pool, sendPushNotifications, checkAndAwardBadges) {
   async function autoCompleteGames() {
@@ -22,8 +22,8 @@ function startAutoComplete(pool, sendPushNotifications, checkAndAwardBadges) {
                parent_game_id
         FROM Games
         WHERE status = 'active'
-          AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i') <= DATE_SUB(${ISRAEL_NOW_SQL}, INTERVAL ? HOUR)
-      `, [hours]);
+          AND STR_TO_DATE(scheduled_time, '%Y-%m-%d %H:%i') <= DATE_SUB(STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'), INTERVAL ? HOUR)
+      `, [israelNowString(), hours]);
 
       for (const game of games) {
         const [result] = await pool.execute(
@@ -61,14 +61,13 @@ function startAutoComplete(pool, sendPushNotifications, checkAndAwardBadges) {
 
               // Notify host about the next occurrence
               const [[hostRow]] = await pool.execute('SELECT push_token FROM Users WHERE id = ?', [game.host_id]);
-              if (hostRow?.push_token) {
-                sendPushNotifications([{
-                  to: hostRow.push_token,
-                  title: '🔁 Recurring game scheduled!',
-                  body: `Your ${gameTitle} has been rescheduled for ${nextTime}.`,
-                  data: { gameId: newGame.insertId },
-                }]);
-              }
+              sendPushNotifications([{
+                user_id: game.host_id,
+                to: hostRow?.push_token ?? null,
+                title: '🔁 Recurring game scheduled!',
+                body: `Your ${gameTitle} has been rescheduled for ${nextTime}.`,
+                data: { gameId: newGame.insertId },
+              }]);
             }
           } catch (recurErr) {
             console.error(`Recurring game spawn error for game ${game.id}:`, recurErr.message);
@@ -76,21 +75,20 @@ function startAutoComplete(pool, sendPushNotifications, checkAndAwardBadges) {
         }
 
         const [rows] = await pool.execute(`
-          SELECT u.push_token
+          SELECT u.id, u.push_token
           FROM Users u
-          WHERE u.id = ? AND u.push_token IS NOT NULL
+          WHERE u.id = ?
           UNION
-          SELECT u.push_token
+          SELECT u.id, u.push_token
           FROM GameParticipants gp
           JOIN Users u ON u.id = gp.user_id
-          WHERE gp.game_id = ? AND u.push_token IS NOT NULL
+          WHERE gp.game_id = ?
         `, [game.host_id, game.id]);
 
-        const tokens = rows.map(r => r.push_token).filter(Boolean);
-
-        if (tokens.length > 0) {
-          await sendPushNotifications(tokens.map(to => ({
-            to,
+        if (rows.length > 0) {
+          await sendPushNotifications(rows.map(r => ({
+            user_id: r.id,
+            to: r.push_token,
             title: '🏅 Rate your teammates!',
             body:  `${gameTitle} has ended. How did everyone do?`,
             data:  { gameId: game.id },

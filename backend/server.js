@@ -83,7 +83,7 @@ app.get('/game/:id', async (req, res) => {
     const [[game]] = await pool.execute(
       `SELECT g.id, g.sport_type, g.title, g.location_desc, g.scheduled_time,
               g.level, g.max_players, u.username AS host_username,
-              COUNT(gp.user_id) AS participant_count
+              COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count
        FROM Games g
        JOIN Users u ON u.id = g.host_id
        LEFT JOIN GameParticipants gp ON gp.game_id = g.id

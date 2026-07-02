@@ -85,14 +85,13 @@ router.post('/', authMiddleware, async (req, res) => {
     // Notify the addressee
     const [[addressee]] = await pool.execute('SELECT push_token, username FROM Users WHERE id = ?', [addresseeId]);
     const [[requester]] = await pool.execute('SELECT username FROM Users WHERE id = ?', [requesterId]);
-    if (addressee?.push_token) {
-      sendPushNotifications([{
-        to: addressee.push_token,
-        title: '👋 New friend request!',
-        body: `${requester.username} wants to be your friend.`,
-        data: { screen: 'friends' },
-      }]);
-    }
+    sendPushNotifications([{
+      user_id: addresseeId,
+      to: addressee?.push_token ?? null,
+      title: '👋 New friend request!',
+      body: `${requester.username} wants to be your friend.`,
+      data: { screen: 'friends' },
+    }]);
 
     res.status(201).json({ success: true });
   } catch (err) {
@@ -119,14 +118,13 @@ router.put('/:id/accept', authMiddleware, async (req, res) => {
     // Notify the original requester
     const [[requester]] = await pool.execute('SELECT push_token FROM Users WHERE id = ?', [row.requester_id]);
     const [[accepter]]  = await pool.execute('SELECT username FROM Users WHERE id = ?', [userId]);
-    if (requester?.push_token) {
-      sendPushNotifications([{
-        to: requester.push_token,
-        title: '🤝 Friend request accepted!',
-        body: `${accepter.username} accepted your friend request.`,
-        data: { screen: 'friends' },
-      }]);
-    }
+    sendPushNotifications([{
+      user_id: row.requester_id,
+      to: requester?.push_token ?? null,
+      title: '🤝 Friend request accepted!',
+      body: `${accepter.username} accepted your friend request.`,
+      data: { screen: 'friends' },
+    }]);
 
     res.json({ success: true });
   } catch (err) {

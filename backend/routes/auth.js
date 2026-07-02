@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const pool = require('../db');
+const { isValidEmail, isValidUsername, isValidPassword } = require('../utils/validators');
 
 const router = express.Router();
 
@@ -14,14 +15,23 @@ router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password)
     return res.status(400).json({ success: false, message: 'All fields are required' });
+  if (!isValidUsername(username))
+    return res.status(400).json({ success: false, message: 'Username must be 3-30 characters (letters, numbers, underscore, period only)' });
+  if (!isValidEmail(email))
+    return res.status(400).json({ success: false, message: 'Please enter a valid email address' });
+  if (!isValidPassword(password))
+    return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+
+  const cleanUsername = username.trim();
+  const cleanEmail = email.trim();
 
   try {
     const password_hash = await bcrypt.hash(password, 10);
     const [result] = await pool.execute(
       'INSERT INTO Users (username, email, password_hash, onboarding_complete) VALUES (?, ?, ?, FALSE)',
-      [username, email, password_hash]
+      [cleanUsername, cleanEmail, password_hash]
     );
-    const user = { id: result.insertId, username, onboarding_complete: false };
+    const user = { id: result.insertId, username: cleanUsername, onboarding_complete: false };
     res.status(201).json({ success: true, token: signToken(user), user });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY')

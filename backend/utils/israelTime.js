@@ -5,11 +5,26 @@
  */
 
 /**
- * SQL expression that returns the current time in Israel local time.
- * Use wherever MySQL NOW() is compared against stored scheduled_time strings.
- * CONVERT_TZ requires timezone tables; on Railway MySQL these are available.
+ * Returns the current instant's Israel local wall-clock time as 'YYYY-MM-DD HH:MM:SS'.
+ * Computed in Node via Intl (correctly handles the IDT/IST DST transition), then bound
+ * as a SQL parameter — e.g. `DATE_SUB(STR_TO_DATE(?, '%Y-%m-%d %H:%i:%s'), INTERVAL 3 HOUR)`.
+ * Avoids relying on MySQL CONVERT_TZ named-zone support, which requires timezone
+ * tables that may not be loaded on every MySQL host (and a fixed '+03:00' offset,
+ * used previously, is wrong for the ~5 winter months when Israel is UTC+2).
  */
-const ISRAEL_NOW_SQL = `CONVERT_TZ(NOW(), '+00:00', '+03:00')`;
+function israelNowString() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const p = {};
+  for (const part of parts) p[part.type] = part.value;
+  const hour = p.hour === '24' ? '00' : p.hour;
+  return `${p.year}-${p.month}-${p.day} ${hour}:${p.minute}:${p.second}`;
+}
 
 /**
  * Parse a stored 'YYYY-MM-DD HH:MM' Israel-local string into a JS Date (UTC instant).
@@ -48,4 +63,4 @@ function parseIsraelTime(str) {
   return new Date(Date.UTC(year, month - 1, day, hour, minute) - offsetMs);
 }
 
-module.exports = { ISRAEL_NOW_SQL, parseIsraelTime };
+module.exports = { israelNowString, parseIsraelTime };
