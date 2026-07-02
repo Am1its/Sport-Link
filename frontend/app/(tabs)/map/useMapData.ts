@@ -11,12 +11,6 @@ export const PENDING_MAP_PAN_KEY = 'pending_map_pan';
 
 export type PendingPan = { lat: number; lng: number } | null;
 
-export function isPast(scheduledTime: string | null | undefined): boolean {
-  if (!scheduledTime) return false;
-  const d = new Date(scheduledTime);
-  return !isNaN(d.getTime()) && d < new Date();
-}
-
 export function useMapData(token: string | null) {
   const [courts, setCourts] = useState<MapItem[]>([]);
   const [games, setGames] = useState<MapItem[]>([]);

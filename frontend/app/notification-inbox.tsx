@@ -11,6 +11,7 @@ import { apiFetch, UnauthorizedError } from '../utils/api';
 import { BackButton } from '../components/BackButton';
 import { Colors } from '../constants/theme';
 import { API } from '../constants/endpoints';
+import { navigateFromNotification } from '../utils/notificationNav';
 
 type Notification = {
   id: number;
@@ -59,6 +60,11 @@ export default function NotificationInboxScreen() {
     } catch {}
   };
 
+  const handlePress = (item: Notification) => {
+    markRead(item.id);
+    navigateFromNotification(item.data, router);
+  };
+
   const markAllRead = async () => {
     setMarkingAll(true);
     try {
@@ -104,7 +110,7 @@ export default function NotificationInboxScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.item, !item.is_read && styles.itemUnread]}
-              onPress={() => markRead(item.id)}
+              onPress={() => handlePress(item)}
               activeOpacity={0.75}
             >
               <View style={[styles.dot, item.is_read && styles.dotRead]} />

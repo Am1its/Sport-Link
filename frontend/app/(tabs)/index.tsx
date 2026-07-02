@@ -35,7 +35,8 @@ import AvatarCircle from '../../components/AvatarCircle';
 import LeafletMap, { LeafletMarker } from '../../components/LeafletMap';
 import type { MapItem, Participant, Region } from '../../types';
 
-import { useMapData, isPast, PENDING_MAP_PAN_KEY } from './map/useMapData';
+import { useMapData, PENDING_MAP_PAN_KEY } from './map/useMapData';
+import { isPastGame } from '../../utils/time';
 import { API } from '../../constants/endpoints';
 import { ROUTES } from '../../constants/routes';
 import { useMapSearch } from './map/useMapSearch';
@@ -107,6 +108,7 @@ function BottomCard({ court, userId, token, onJoined }: {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const isOwnGame  = court.isLocalGame && court.host_id === userId;
   const [isJoined, setIsJoined] = useState(!!court.is_joined);
+  const [isWaitlisted, setIsWaitlisted] = useState(false);
   const participantCount = court.participant_count ?? 0;
   const isFull = court.max_players != null && participantCount >= court.max_players - 1;
   const displayCount = participantCount + 1;
@@ -140,10 +142,15 @@ function BottomCard({ court, userId, token, onJoined }: {
         return Alert.alert('Error', data.message);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setIsJoined(true);
-      onJoined(data.participant_count);
       springBack();
-      Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
+      if (data.waitlisted) {
+        setIsWaitlisted(true);
+        Alert.alert("You're on the waitlist!", `You're #${data.waitlist_position} in line.`);
+      } else {
+        setIsJoined(true);
+        onJoined(data.participant_count);
+        Alert.alert("You're in! 🎉", 'Game added to My Schedule.');
+      }
     } catch (err) {
       if (err instanceof UnauthorizedError) return;
       springBack();
@@ -171,10 +178,17 @@ function BottomCard({ court, userId, token, onJoined }: {
             )}
           </View>
         </View>
-        <View style={styles.ratingBadge}>
-          <Ionicons name="star" size={14} color={Colors.yellow} />
-          <Text style={styles.ratingText}>{court.rating}</Text>
-        </View>
+        {court.isLocalGame ? (
+          <View style={styles.levelBadge}>
+            <Ionicons name="flash" size={13} color={Colors.blue} />
+            <Text style={styles.levelBadgeText}>Lv.{court.rating}</Text>
+          </View>
+        ) : (
+          <View style={styles.ratingBadge}>
+            <Ionicons name="star" size={14} color={Colors.yellow} />
+            <Text style={styles.ratingText}>{court.rating}</Text>
+          </View>
+        )}
       </View>
 
       {court.vicinity ? <Text style={styles.cardAddress}>{court.vicinity}</Text> : null}
@@ -219,15 +233,31 @@ function BottomCard({ court, userId, token, onJoined }: {
             <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
             <Text style={[styles.joinButtonText, { color: Colors.accent }]}>Your Game</Text>
           </View>
+        ) : isWaitlisted ? (
+          <View style={[styles.joinButton, { backgroundColor: Colors.warning + '22', borderWidth: 1.5, borderColor: Colors.warningBorder, flexDirection: 'row', gap: 6 }]}>
+            <Ionicons name="time-outline" size={18} color={Colors.warning} />
+            <Text style={[styles.joinButtonText, { color: Colors.warning }]}>On Waitlist</Text>
+          </View>
         ) : isJoined ? (
           <View style={[styles.joinButton, { backgroundColor: Colors.accentFaint, borderWidth: 1.5, borderColor: Colors.accentBorder, flexDirection: 'row', gap: 6 }]}>
             <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
             <Text style={[styles.joinButtonText, { color: Colors.accent }]}>Joined</Text>
           </View>
         ) : isFull ? (
-          <View style={[styles.joinButton, { backgroundColor: Colors.surface }]}>
-            <Text style={[styles.joinButtonText, { color: Colors.error }]}>Full</Text>
-          </View>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <TouchableOpacity
+              style={[styles.joinButton, { backgroundColor: Colors.warning + '22', borderWidth: 1.5, borderColor: Colors.warningBorder, flexDirection: 'row', gap: 6 }]}
+              onPress={handleJoin}
+              disabled={joining}
+            >
+              {joining
+                ? <ActivityIndicator color={Colors.warning} />
+                : <>
+                    <Ionicons name="time-outline" size={18} color={Colors.warning} />
+                    <Text style={[styles.joinButtonText, { color: Colors.warning }]}>Join Waitlist</Text>
+                  </>}
+            </TouchableOpacity>
+          </Animated.View>
         ) : (
           <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
             <TouchableOpacity style={styles.joinButton} onPress={handleJoin} disabled={joining}>
@@ -437,7 +467,7 @@ function HomeScreen() {
     );
   }
 
-  const activeGames = games.filter(g => !isPast(g.scheduled_time ?? null));
+  const activeGames = games.filter(g => !isPastGame(g.scheduled_time ?? null));
   const filteredGames = sportFilter === 'all'
     ? activeGames
     : activeGames.filter(g => g.sport_type === sportFilter);
@@ -795,6 +825,8 @@ const styles = StyleSheet.create({
   urgentBadgeText: { color: Colors.error, fontSize: 11, fontWeight: '800' },
   ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9C4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, height: 25 },
   ratingText: { fontSize: 14, fontWeight: '700', marginLeft: 4, color: '#FBC02D' },
+  levelBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.blueFaint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, height: 25 },
+  levelBadgeText: { fontSize: 14, fontWeight: '700', color: Colors.blue },
   cardAddress: { fontSize: 14, color: Colors.textMuted, marginBottom: 10, lineHeight: 22 },
   playersRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   playersText: { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
@@ -874,7 +906,7 @@ function ExpoGoMapScreen() {
     setRecenterTrigger(v => v + 1);
   };
 
-  const activeGames = games.filter(g => !isPast(g.scheduled_time));
+  const activeGames = games.filter(g => !isPastGame(g.scheduled_time));
   const filteredGames = sportFilter === 'all' ? activeGames : activeGames.filter(g => g.sport_type === sportFilter);
   const filteredCourts = sportFilter === 'all' ? courts : courts.filter(c => c.sport_type === sportFilter);
 

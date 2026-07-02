@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../utils/api';
 import { getAvatarColor } from '../utils/avatar';
-import { formatTime } from '../utils/time';
+import { formatTime, parseGameTime } from '../utils/time';
 import { API_BASE } from '../constants/api';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../constants/sports';
 import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
@@ -43,6 +43,7 @@ type DmMessage = {
   game_current_players?: number;
   game_joined?: boolean | number;
   game_is_host?: boolean | number;
+  game_waitlisted?: boolean;
 };
 
 type MyGame = {
@@ -203,10 +204,8 @@ export default function DirectChatScreen() {
       if (data.success) {
         const now = new Date();
         const upcoming = (data.games as MyGame[]).filter(g => {
-          const [dp, tp] = g.scheduled_time.split(' ');
-          const [yr, mo, dy] = dp.split('-').map(Number);
-          const [hr, mn]     = (tp || '00:00').split(':').map(Number);
-          return new Date(yr, mo - 1, dy, hr, mn) > now;
+          const d = parseGameTime(g.scheduled_time);
+          return d != null && d > now;
         });
         setMyGames(upcoming);
       }
@@ -233,6 +232,13 @@ export default function DirectChatScreen() {
       const res  = await apiFetch(API.gameJoin(gameId), { method: 'POST', token });
       const data = await res.json();
       if (!data.success) return Alert.alert('Cannot join', data.message);
+      if (data.waitlisted) {
+        setMessages(prev => prev.map(m =>
+          m.event_id === gameId ? { ...m, game_waitlisted: true } : m
+        ));
+        Alert.alert("You're on the waitlist!", `You're #${data.waitlist_position} in line.`);
+        return;
+      }
       setMessages(prev => prev.map(m =>
         m.event_id === gameId ? { ...m, game_joined: 1, game_current_players: (m.game_current_players || 0) + 1 } : m
       ));
@@ -451,8 +457,9 @@ export default function DirectChatScreen() {
 function EventCard({ msg, isOwn, onJoin }: { msg: DmMessage; isOwn: boolean; onJoin: () => void }) {
   const color    = SPORT_COLORS[msg.game_sport as keyof typeof SPORT_COLORS] ?? Colors.accent;
   const icon     = SPORT_ICONS[msg.game_sport  as keyof typeof SPORT_ICONS]  ?? 'trophy';
-  const joined   = !!msg.game_joined;
-  const isHost   = !!msg.game_is_host;
+  const joined     = !!msg.game_joined;
+  const waitlisted = !!msg.game_waitlisted;
+  const isHost     = !!msg.game_is_host;
   const isFull   = msg.game_current_players != null && msg.game_max_players != null &&
                    msg.game_current_players >= msg.game_max_players;
   const isActive = msg.game_status === 'active';
@@ -477,10 +484,14 @@ function EventCard({ msg, isOwn, onJoin }: { msg: DmMessage; isOwn: boolean; onJ
           <Text style={styles.eventCardDone}>Ended</Text>
         ) : isHost ? (
           <Text style={styles.eventCardHosted}>You host</Text>
+        ) : waitlisted ? (
+          <Text style={styles.eventCardWaitlisted}>On Waitlist</Text>
         ) : joined ? (
           <Text style={styles.eventCardJoined}>✓ Joined</Text>
         ) : isFull ? (
-          <Text style={styles.eventCardFull}>Full</Text>
+          <TouchableOpacity style={styles.waitlistBtn} onPress={onJoin} activeOpacity={0.8}>
+            <Text style={styles.waitlistBtnText}>Join Waitlist</Text>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.joinBtn} onPress={onJoin} activeOpacity={0.8}>
             <Text style={styles.joinBtnText}>Join</Text>
@@ -541,9 +552,11 @@ const styles = StyleSheet.create({
   eventCardJoined: { fontSize: 13, color: Colors.accent, fontWeight: '700' },
   eventCardHosted: { fontSize: 13, color: Colors.orange, fontWeight: '700' },
   eventCardDone:   { fontSize: 13, color: Colors.textMuted, fontWeight: '600' },
-  eventCardFull:   { fontSize: 13, color: Colors.error, fontWeight: '600' },
+  eventCardWaitlisted: { fontSize: 13, color: Colors.warning, fontWeight: '700' },
   joinBtn:     { backgroundColor: Colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 },
   joinBtnText: { color: Colors.bg, fontSize: 13, fontWeight: '900' },
+  waitlistBtn:     { backgroundColor: Colors.warning + '22', borderWidth: 1, borderColor: Colors.warningBorder, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6 },
+  waitlistBtnText: { color: Colors.warning, fontSize: 13, fontWeight: '900' },
 
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: Spacing.md, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSub, backgroundColor: Colors.bg, gap: 8 },
   shareBtn: { paddingBottom: 2 },

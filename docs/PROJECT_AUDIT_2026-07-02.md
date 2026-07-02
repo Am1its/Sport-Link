@@ -1,6 +1,6 @@
 # SportLink — Full Project Audit & Improvement Spec
 
-**Status update (2026-07-02, same day):** Batch 1 (all of section 8's backend bug batch — B1, B2, B3, B4, B5, B6, B11, B15) implemented, syntax-checked, and verified against a local MySQL instance with end-to-end request tests. Details in each item below marked `[DONE]`. Batches 2-5 not started.
+**Status update (2026-07-02, same day):** Batch 1 (backend bugs — B1, B2, B3, B4, B5, B6, B11, B15) and Batch 2 (frontend bug/UX parity — B7, B8, B13, F3, F6, U2, U3) both implemented and verified (Batch 1: live request tests against local MySQL; Batch 2: `tsc --noEmit` clean + `expo lint` clean on all touched files). Details in each item below marked `[DONE]`. Batches 3-5 not started.
 
 **Date:** 2026-07-02
 **Scope:** Full read of `backend/` (all routes, crons, sockets, utils), `frontend/` (all tabs, key screens, components, hooks, utils), `docs/` (business strategy, product definitions, prior code reviews), memory & CLAUDE.md.
@@ -68,14 +68,14 @@ The June fix standardized `participant_count` in `games/` routes, but three plac
 
 **Fix:** use the rule-26 `COUNT(CASE WHEN COALESCE(status,'joined')='joined' ...)` everywhere; define one convention (host occupies slot 1, display = participants+1, full = participants ≥ max−1) and apply it in all three; guard `max_players IS NULL` in share.js.
 
-### B7. Waitlist is unreachable from the Map (dead-end "Full" button)
+### B7. Waitlist is unreachable from the Map (dead-end "Full" button) `[DONE]`
 **Files:** `frontend/app/(tabs)/index.tsx:227-230` (BottomCard) vs `frontend/components/GameCard.tsx:242-252`.
 
 Discover's GameCard correctly offers **"Join Waitlist"** when full; the map's BottomCard renders a dead "Full" label. Same backend, same game — inconsistent affordance on the primary discovery surface.
 
 **Fix:** port the GameCard full-state branch to BottomCard (button → `POST /join` → handle `data.waitlisted` → "On Waitlist #N" state).
 
-### B8. Joining a full game from a DM event card fakes success
+### B8. Joining a full game from a DM event card fakes success `[DONE]`
 **File:** `frontend/app/direct-chat.tsx:231-242` — `handleJoinGame` ignores `data.waitlisted` and marks the card `game_joined: 1` + increments the count. A waitlisted user sees "✓ Joined" and an inflated count.
 
 **Fix:** check `data.waitlisted` and show a waitlist alert/state like GameCard does.
@@ -107,7 +107,7 @@ Discover's GameCard correctly offers **"Join Waitlist"** when full; the map's Bo
 
 **Fix:** either finish both (add a `game_typing` socket event; compare `last_message_at` vs stored `chat_last_read` in `chat.tsx` to bold unread event chats — cheap, no backend change needed for the unread part) or delete the dead writes. Recommended: finish the unread badge (high perceived value), drop or complete typing.
 
-### B13. Fragile non-ISO date parsing on the frontend
+### B13. Fragile non-ISO date parsing on the frontend `[DONE]`
 **Files:** `frontend/utils/time.ts:34` (`isPastGame`), `frontend/app/(tabs)/map/useMapData.ts:16` (`isPast`) — both call `new Date('YYYY-MM-DD HH:MM')`, a non-ISO format whose parsing is engine-dependent; meanwhile `games.tsx:30` and `direct-chat.tsx:205-210` parse the same strings two other ways.
 
 **Fix:** one `parseGameTime(str): Date | null` in `utils/time.ts` (split-and-construct like direct-chat does — always valid, device-local) and use it in all four places. Also removes the duplicated `isPast`/`isPastGame` pair.
@@ -184,7 +184,7 @@ Dead/rotated tokens accumulate; Expo eventually throttles senders who keep pushi
 ### F2. Karma consequences ("ghost gating")
 Business doc promises ghosting "eventually restricts joining high-demand games" — karma is currently cosmetic. **Spec:** if karma < threshold (e.g. −5), block joining games in their final N hours (`POST /join` check + friendly error), or show a "reliability" tier on join requests. Even a soft version (host sees joiner's attendance rate) adds real trust value.
 
-### F3. Events-tab unread badges (finish B12)
+### F3. Events-tab unread badges (finish B12) `[DONE]`
 Client-only: compare `last_message_at` with the stored `chat_last_read_${id}`; bold row + count chip like the Friends tab. Big perceived polish for ~30 lines.
 
 ### F4. Notify participants when a game is edited
@@ -193,7 +193,7 @@ Client-only: compare `last_message_at` with the stored `chat_last_read_${id}`; b
 ### F5. "Search this area" on the map
 Courts are fetched once around the initial location (`useMapData` runs `fetchCourts` only on mount). Pan to another neighborhood → stale courts. **Spec:** the standard floating "Search this area" chip appears after the region moves > X km from last fetch center; taps `GET /courts/nearby` with the new center. Games are global already, so this is courts-only.
 
-### F6. Notification inbox rows should navigate
+### F6. Notification inbox rows should navigate `[DONE]`
 `notification-inbox.tsx` rows only mark-as-read on tap; the payload `data` already carries `gameId`/`screen`. Reuse `navigateFromNotification()` from `_layout.tsx` on row press. Tiny change, expected behavior.
 
 ### F7. Host management of participants
@@ -215,8 +215,8 @@ Full spec already written (`docs/superpowers/specs/2026-06-12-hebrew-i18n-rtl-de
 ## 6. 🎨 UI/UX polish
 
 - **U1. Map header/game count on light background** uses inverted colors by design, but `index.tsx` styles carry ~8 raw hex/rgba values (`#f0f0f0`, `rgba(255,255,255,0.95)`, `#E5E5EA`, `#FFF9C4`, `#FBC02D`, `#999`) — violates rule 9. Add `Colors.light*` tokens to `theme.ts` and migrate. Same for `LEVEL_META` colors in `modal.tsx:46-51` (move to `sports.ts`/`theme.ts` as `LEVEL_COLORS`).
-- **U2. BottomCard shows game "rating" star = skill level** (`toMapGame` maps `rating: row.level`; `index.tsx:174-177` renders it with a ⭐). A star badge reading "3" implies review score, not level. Show `Lv.3` chip (like GameCard) for games and keep ⭐ only for courts.
-- **U3. Level label "Inter"** (`modal.tsx:48`) — abbreviation reads oddly next to `SKILL_LABELS`' "Intermediate"; "Mid" or full word.
+- **U2. BottomCard shows game "rating" star = skill level** `[DONE]` (`toMapGame` maps `rating: row.level`; `index.tsx:174-177` renders it with a ⭐). A star badge reading "3" implies review score, not level. Show `Lv.3` chip (like GameCard) for games and keep ⭐ only for courts.
+- **U3. Level label "Inter"** `[DONE]` (`modal.tsx:48`) — abbreviation reads oddly next to `SKILL_LABELS`' "Intermediate"; "Mid" or full word.
 - **U4. Accessibility — reduced motion & sound toggle.** The app is animation/sound-heavy (great for demo). Respect `useReducedMotion()` from Reanimated in the shared hooks (`useAnimations.ts` is a single choke point — one check covers the whole app), and add a "Sounds" switch in notification/settings persisting to AsyncStorage, read in `SoundContext`.
 - **U5. `runOnJS` → `scheduleOnRN`** (`index.tsx:9,399`): `runOnJS` is deprecated in Reanimated 4 and removed in 5 (per Software Mansion guidance). One call site; migrate to `scheduleOnRN` from `react-native-worklets` when convenient.
 - **U6. Waitlist position honesty:** positions never compact when someone ahead leaves the waitlist (`MAX(waitlist_position)+1` on join, no renumber on waitlist-leave) — a user can sit at "#4" in an empty queue. Either renumber on leave or display rank via `ROW_NUMBER()` at read time.

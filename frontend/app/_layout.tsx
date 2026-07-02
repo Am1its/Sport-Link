@@ -7,24 +7,13 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SoundProvider } from '../context/SoundContext';
 import { registerPushToken } from '../utils/registerPushToken';
 import { setUnauthorizedHandler } from '../utils/api';
-import { ROUTES } from '../constants/routes';
+import { navigateFromNotification } from '../utils/notificationNav';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   debug: false,
   tracesSampleRate: 0.2,
 });
-
-function navigateFromNotification(data: Record<string, any>, router: ReturnType<typeof useRouter>) {
-  if (!data) return;
-  if (data.gameId) {
-    router.push({ pathname: ROUTES.GAME_DETAIL as any, params: { id: String(data.gameId) } });
-  } else if (data.screen === 'friends') {
-    router.push(ROUTES.FRIENDS as any);
-  } else if (data.screen === 'games') {
-    router.push(ROUTES.GAMES_TAB as any);
-  }
-}
 
 function AppServices() {
   const { token, logout, user } = useAuth();

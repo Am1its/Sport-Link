@@ -15,7 +15,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
-import { isPastGame } from '../../utils/time';
+import { isPastGame, parseGameTime } from '../../utils/time';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { GamesSkeleton } from '../../components/SkeletonLoader';
@@ -26,10 +26,9 @@ import { Springs } from '../../constants/motion';
 import type { Game } from '../../types';
 
 function isWithinCheckinWindow(scheduledTime: string | null): boolean {
-  if (!scheduledTime) return false;
-  const scheduled = new Date(scheduledTime.replace(' ', 'T') + ':00');
-  const now = new Date();
-  const diffMin = (now.getTime() - scheduled.getTime()) / 60000;
+  const scheduled = parseGameTime(scheduledTime);
+  if (!scheduled) return false;
+  const diffMin = (Date.now() - scheduled.getTime()) / 60000;
   return diffMin >= -30 && diffMin <= 30;
 }
 

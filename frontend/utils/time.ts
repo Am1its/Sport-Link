@@ -29,10 +29,21 @@ export function getThisWeekRange(): DateRange {
   return { date_from: toDateStr(now), date_to: toDateStr(endSun) };
 }
 
-export const isPastGame = (scheduledTime: string | null): boolean => {
-  if (!scheduledTime) return false;
-  const d = new Date(scheduledTime);
-  return !isNaN(d.getTime()) && d < new Date();
+// Parses the backend's 'YYYY-MM-DD HH:MM' scheduled_time format into a device-local Date.
+// `new Date('YYYY-MM-DD HH:MM')` is non-ISO and engine-dependent — always split and construct.
+export function parseGameTime(scheduledTime: string | null | undefined): Date | null {
+  if (!scheduledTime) return null;
+  const [datePart, timePart] = scheduledTime.split(' ');
+  if (!datePart) return null;
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = (timePart || '00:00').split(':').map(Number);
+  if ([year, month, day, hour, minute].some(n => isNaN(n))) return null;
+  return new Date(year, month - 1, day, hour, minute);
+}
+
+export const isPastGame = (scheduledTime: string | null | undefined): boolean => {
+  const d = parseGameTime(scheduledTime);
+  return d != null && d < new Date();
 };
 
 export const formatTime = (iso: string): string =>

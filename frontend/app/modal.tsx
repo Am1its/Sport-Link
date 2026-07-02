@@ -45,7 +45,7 @@ const SPORTS = [
 const LEVEL_META = [
   { n: 1, label: 'Beginner',  color: '#4ADE80' },
   { n: 2, label: 'Casual',    color: '#A3E635' },
-  { n: 3, label: 'Inter',     color: '#FACC15' },
+  { n: 3, label: 'Mid',       color: '#FACC15' },
   { n: 4, label: 'Advanced',  color: '#FB923C' },
   { n: 5, label: 'Pro',       color: '#F87171' },
 ];

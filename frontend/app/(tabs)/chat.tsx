@@ -8,6 +8,7 @@ import Animated, {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { formatChatTimestamp } from '../../utils/time';
@@ -95,8 +96,17 @@ export default function ChatScreen() {
   const [gameChats, setGameChats] = useState<GameChat[]>([]);
   const [dms, setDms]             = useState<DMConversation[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [lastReadMap, setLastReadMap] = useState<Record<string, string>>({});
 
   const totalUnread = dms.reduce((sum, c) => sum + (c.unread_count || 0), 0);
+
+  const hasUnreadEvent = (item: GameChat): boolean => {
+    if (!item.last_message_at) return false;
+    const lastRead = lastReadMap[String(item.id)];
+    return !lastRead || new Date(item.last_message_at) > new Date(lastRead);
+  };
+
+  const unreadEventCount = gameChats.filter(hasUnreadEvent).length;
 
   // ── Tab fade-in ──────────────────────────────────────────────────────────────
   const tabOpacity = useSharedValue(0);
@@ -120,7 +130,18 @@ export default function ChatScreen() {
             apiFetch(API.DM,    { token }),
           ]);
           const [gData, dData] = await Promise.all([gRes.json(), dRes.json()]);
-          if (gData.success) setGameChats(gData.chats);
+          if (gData.success) {
+            setGameChats(gData.chats);
+            const chats: GameChat[] = gData.chats;
+            if (chats.length > 0) {
+              const pairs = await AsyncStorage.multiGet(chats.map(c => `chat_last_read_${c.id}`));
+              const map: Record<string, string> = {};
+              pairs.forEach(([key, value]) => {
+                if (value) map[key.replace('chat_last_read_', '')] = value;
+              });
+              setLastReadMap(map);
+            }
+          }
           if (dData.success) setDms(dData.conversations);
         } catch (err) {
           if (err instanceof UnauthorizedError) return;
@@ -159,34 +180,43 @@ export default function ChatScreen() {
 
   // ── Render helpers ───────────────────────────────────────────────────────────
   const renderGameChat = ({ item, index }: { item: GameChat; index: number }) => {
-    const color    = SPORT_COLORS[item.sport_type] ?? Colors.accent;
-    const icon     = SPORT_ICONS[item.sport_type]  ?? 'map-marker';
-    const gameName = `${sportLabel(item.sport_type)} Game`;
+    const color     = SPORT_COLORS[item.sport_type] ?? Colors.accent;
+    const icon      = SPORT_ICONS[item.sport_type]  ?? 'map-marker';
+    const gameName  = `${sportLabel(item.sport_type)} Game`;
+    const hasUnread = hasUnreadEvent(item);
     return (
       <StaggeredRow index={index}>
         <TouchableOpacity
-          style={styles.row}
+          style={styles.rowOuter}
           onPress={() => router.push({ pathname: ROUTES.GAME_CHAT, params: { id: item.id, name: gameName } })}
           activeOpacity={0.7}
         >
-          <View style={[styles.iconCircle, { backgroundColor: color + '18', borderColor: color + '55' }]}>
-            <MaterialCommunityIcons name={icon as any} size={24} color={color} />
-          </View>
-          <View style={styles.rowBody}>
-            <View style={styles.rowTop}>
-              <Text style={styles.rowTitle}>{gameName}</Text>
-              <Text style={styles.rowTime}>{formatChatTimestamp(item.last_message_at)}</Text>
+          {hasUnread && <UnreadBar />}
+          <View style={styles.row}>
+            <View style={[styles.iconCircle, { backgroundColor: color + '18', borderColor: color + '55' }]}>
+              <MaterialCommunityIcons name={icon as any} size={24} color={color} />
             </View>
-            {item.location_desc ? (
-              <Text style={styles.rowSub} numberOfLines={1}>{item.location_desc}</Text>
-            ) : null}
-            <Text style={styles.rowPreview} numberOfLines={1}>
-              {item.last_message
-                ? `${item.last_sender}: ${item.last_message}`
-                : 'No messages yet — say hi!'}
-            </Text>
+            <View style={styles.rowBody}>
+              <View style={styles.rowTop}>
+                <Text style={[styles.rowTitle, hasUnread && { color: Colors.text, fontWeight: '800' }]}>
+                  {gameName}
+                </Text>
+                <Text style={styles.rowTime}>{formatChatTimestamp(item.last_message_at)}</Text>
+              </View>
+              {item.location_desc ? (
+                <Text style={styles.rowSub} numberOfLines={1}>{item.location_desc}</Text>
+              ) : null}
+              <Text
+                style={[styles.rowPreview, hasUnread && { color: Colors.textSub, fontWeight: '600' }]}
+                numberOfLines={1}
+              >
+                {item.last_message
+                  ? `${item.last_sender}: ${item.last_message}`
+                  : 'No messages yet — say hi!'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
           </View>
-          <Ionicons name="chevron-forward" size={17} color={Colors.textHint} />
         </TouchableOpacity>
       </StaggeredRow>
     );
@@ -264,6 +294,11 @@ export default function ChatScreen() {
         >
           <Ionicons name="trophy-outline" size={15} color={tab === 'events' ? Colors.bg : Colors.textMuted} />
           <Text style={[styles.tabText, tab === 'events' && styles.tabTextActive]}>Events</Text>
+          {unreadEventCount > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{unreadEventCount > 9 ? '9+' : unreadEventCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'friends' && styles.tabActive]}
