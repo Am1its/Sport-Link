@@ -1,6 +1,6 @@
 # SportLink — Full Project Audit & Improvement Spec
 
-**Status update (2026-07-02, same day):** Batches 1, 2, and 3 implemented and verified same day. Batch 1 (backend bugs): live request tests against local MySQL. Batch 2 (frontend parity): `tsc --noEmit` + `expo lint` clean. Batch 3 (pre-launch): account deletion verified via a live cascade-delete test touching all 16 tables; expo-audio migration verified via `expo-doctor` + typecheck; push receipt handling verified via a mocked Expo response; landing-page redirect verified live; DB backup workflow verified by running its exact dump logic against a real local MySQL instance (workflow itself needs a `DATABASE_URL` secret from the user to activate on GitHub — see item 5 below). Details in each item below marked `[DONE]`. Batches 4-5 not started.
+**Status update (2026-07-02, same day):** Batches 1-4 implemented and verified same day. Batch 1 (backend bugs): live request tests against local MySQL. Batch 2 (frontend parity): `tsc --noEmit` + `expo lint` clean. Batch 3 (pre-launch): account deletion verified via a live cascade-delete test touching all 16 tables; expo-audio migration verified via `expo-doctor` + typecheck; push receipt handling verified via a mocked Expo response; landing-page redirect verified live; DB backup workflow verified by running its exact dump logic against a real local MySQL instance (workflow itself needs a `DATABASE_URL` secret from the user to activate on GitHub — done, secret added and workflow token scope fixed). Batch 4 (features): F1/F4/F7/F2 all verified end-to-end against local MySQL with fixture data; F2 implemented as the "soft" option per user decision (host-visible attendance rate, no join blocking); F5 ("search this area") implemented and typechecked but **not visually verified on a device/simulator** — no iOS/Android runtime available in this environment. Details in each item below marked `[DONE]`. Batch 5 (Hebrew i18n) not started.
 
 **Date:** 2026-07-02
 **Scope:** Full read of `backend/` (all routes, crons, sockets, utils), `frontend/` (all tabs, key screens, components, hooks, utils), `docs/` (business strategy, product definitions, prior code reviews), memory & CLAUDE.md.
@@ -177,26 +177,26 @@ Dead/rotated tokens accumulate; Expo eventually throttles senders who keep pushi
 
 ## 5. 💡 Feature opportunities (ranked by leverage)
 
-### F1. Close the loop on the "Dynamic Skill" system — the data already exists
+### F1. Close the loop on the "Dynamic Skill" system — the data already exists `[DONE]`
 `BUSINESS_STRATEGY.md` sells this as the core trust mechanic: *"If a user claims to be a '5' but the community rates them a '2', their profile dynamically adjusts."* Today `PeerRatings.skill` (1–5) is collected on every rating flow and then **used for nothing** except the per-game results screen.
 **Spec:** compute `community_skill = AVG(pr.skill)` per user (optionally per top sport, min 3 ratings); show it next to the self-reported level on profile/player-profile ("Self: 4 · Community: 3.2 ⭐"); optionally feed it into Discover's skill-proximity sort instead of the self-reported `SportPreferences.skill_level`. Backend: one query; frontend: one chip. Highest story-per-effort ratio in the backlog.
 
-### F2. Karma consequences ("ghost gating")
-Business doc promises ghosting "eventually restricts joining high-demand games" — karma is currently cosmetic. **Spec:** if karma < threshold (e.g. −5), block joining games in their final N hours (`POST /join` check + friendly error), or show a "reliability" tier on join requests. Even a soft version (host sees joiner's attendance rate) adds real trust value.
+### F2. Karma consequences ("ghost gating") `[DONE — soft version]`
+Business doc promises ghosting "eventually restricts joining high-demand games" — karma is currently cosmetic. User chose the soft option (no join blocking): host now sees each participant's attendance rate in `game-participants.tsx`. No `POST /join` restriction was added — revisit hard gating post-launch if ghosting becomes a real problem.
 
 ### F3. Events-tab unread badges (finish B12) `[DONE]`
 Client-only: compare `last_message_at` with the stored `chat_last_read_${id}`; bold row + count chip like the Friends tab. Big perceived polish for ~30 lines.
 
-### F4. Notify participants when a game is edited
+### F4. Notify participants when a game is edited `[DONE]`
 `PUT /games/:id` changes time/location silently — participants find out when they show up at the wrong court. **Spec:** on edit, diff `scheduled_time`/`location_desc`, push "⏰ Game time changed to …" to joined participants (helper + notification pattern already exists for delete).
 
-### F5. "Search this area" on the map
+### F5. "Search this area" on the map `[DONE — not visually tested on device]`
 Courts are fetched once around the initial location (`useMapData` runs `fetchCourts` only on mount). Pan to another neighborhood → stale courts. **Spec:** the standard floating "Search this area" chip appears after the region moves > X km from last fetch center; taps `GET /courts/nearby` with the new center. Games are global already, so this is courts-only.
 
 ### F6. Notification inbox rows should navigate `[DONE]`
 `notification-inbox.tsx` rows only mark-as-read on tap; the payload `data` already carries `gameId`/`screen`. Reuse `navigateFromNotification()` from `_layout.tsx` on row press. Tiny change, expected behavior.
 
-### F7. Host management of participants
+### F7. Host management of participants `[DONE]`
 Hosts can't remove a no-show/problem player before the game (only cancel everything). **Spec:** `DELETE /games/:id/participants/:userId` (host-only, triggers waitlist promotion — logic already exists in leave) + a remove button in `game-participants.tsx` when `is_host`.
 
 ### F8. Hebrew i18n + RTL

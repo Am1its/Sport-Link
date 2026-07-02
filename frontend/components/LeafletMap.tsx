@@ -21,7 +21,7 @@ type Props = {
   clusterZoomTarget?: { latitude: number; longitude: number } | null;
   onMarkerPress: (placeId: string) => void;
   onMapPress: (lat: number, lng: number) => void;
-  onZoom?: (latDelta: number) => void;
+  onZoom?: (latDelta: number, center: { lat: number; lng: number }) => void;
 };
 
 const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
@@ -62,7 +62,8 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
 
     function reportZoom(){
       var b = map.getBounds();
-      post({ type:'zoom', latDelta: b.getNorth()-b.getSouth() });
+      var c = map.getCenter();
+      post({ type:'zoom', latDelta: b.getNorth()-b.getSouth(), lat: c.lat, lng: c.lng });
     }
     map.on('zoomend moveend', reportZoom);
 
@@ -147,7 +148,7 @@ export default function LeafletMap({
       if (msg.type === 'ready') { readyRef.current = true; injectMarkers(); injectUser(); }
       else if (msg.type === 'marker') onMarkerPress(msg.placeId);
       else if (msg.type === 'mapclick') onMapPress(msg.lat, msg.lng);
-      else if (msg.type === 'zoom' && onZoom) onZoom(msg.latDelta);
+      else if (msg.type === 'zoom' && onZoom) onZoom(msg.latDelta, { lat: msg.lat, lng: msg.lng });
     } catch {}
   };
 

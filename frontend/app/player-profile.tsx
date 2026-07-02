@@ -330,6 +330,11 @@ export default function PlayerProfileScreen() {
                       {!!pref.is_favorite && <Ionicons name="heart" size={11} color={Colors.error} />}
                     </View>
                     <Text style={[styles.chipLevel, { color: c + 'AA' }]}>{lvl}</Text>
+                    {pref.community_skill != null && (
+                      <Text style={[styles.chipCommunity, { color: c }]}>
+                        ⭐ {pref.community_skill.toFixed(1)} community
+                      </Text>
+                    )}
                   </View>
                 </View>
               );
@@ -484,6 +489,7 @@ const styles = StyleSheet.create({
   chipNameRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chipName:      { fontSize: 13, fontWeight: '700' },
   chipLevel:     { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  chipCommunity: { fontSize: 10, fontWeight: '600', marginTop: 2 },
 
   // Action row
   actionRow:     { flexDirection: 'row', marginHorizontal: Spacing.xl, marginTop: Spacing.xl, gap: 10 },

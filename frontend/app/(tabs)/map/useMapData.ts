@@ -20,12 +20,14 @@ export function useMapData(token: string | null) {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [initialRegion, setInitialRegion] = useState({ latitude: 32.0853, longitude: 34.7818 });
   const [pendingPan, setPendingPan] = useState<PendingPan>(null);
+  const [lastCourtsFetchCenter, setLastCourtsFetchCenter] = useState<{ lat: number; lng: number } | null>(null);
 
   const fetchCourts = async (lat: number, lng: number) => {
     try {
       const res = await apiFetch(`${API.COURTS_NEARBY}?lat=${lat}&lng=${lng}`, { token });
       const data = await res.json();
       if (data.success) setCourts(data.courts);
+      setLastCourtsFetchCenter({ lat, lng });
     } catch (err) {
       console.warn('Courts fetch error:', err);
     } finally {
@@ -107,5 +109,7 @@ export function useMapData(token: string | null) {
     clearPendingPan,
     setCourts,
     setGames,
+    fetchCourts,
+    lastCourtsFetchCenter,
   };
 }

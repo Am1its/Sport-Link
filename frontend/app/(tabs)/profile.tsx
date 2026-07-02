@@ -71,6 +71,11 @@ function SportChip({ pref, index }: { pref: SportPref; index: number }) {
             {!!pref.is_favorite && <Ionicons name="heart" size={10} color={Colors.error} />}
           </View>
           <Text style={[styles.chipLevel, { color: c + 'AA' }]}>{lvl}</Text>
+          {pref.community_skill != null && (
+            <Text style={[styles.chipCommunity, { color: c }]}>
+              ⭐ {pref.community_skill.toFixed(1)} community
+            </Text>
+          )}
         </View>
       </View>
     </Animated.View>
@@ -550,6 +555,7 @@ const styles = StyleSheet.create({
   chipNameRow:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chipName:            { fontSize: 13, fontWeight: '700' },
   chipLevel:           { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  chipCommunity:       { fontSize: 10, fontWeight: '600', marginTop: 2 },
 
   // Menu
   menuContainer: { marginTop: Spacing.xxl, paddingHorizontal: Spacing.xl, paddingBottom: 50 },

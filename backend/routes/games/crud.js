@@ -297,6 +297,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
         return res.status(400).json({ success: false, message: 'scheduled_time must be in the future' });
     }
 
+    const newScheduledTime = scheduled_time !== undefined ? (scheduled_time || null) : game.scheduled_time;
+    const newLocationDesc  = location_desc  !== undefined ? (location_desc  || null) : game.location_desc;
+
     await pool.execute(
       `UPDATE Games SET
          sport_type      = ?,
@@ -312,8 +315,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
       [
         sport_type || game.sport_type,
         level      || game.level,
-        location_desc   !== undefined ? (location_desc   || null) : game.location_desc,
-        scheduled_time  !== undefined ? (scheduled_time  || null) : game.scheduled_time,
+        newLocationDesc,
+        newScheduledTime,
         equipment_notes !== undefined ? (equipment_notes || null) : game.equipment_notes,
         max_players     !== undefined && max_players !== '' ? parseInt(max_players) : (max_players === '' ? null : game.max_players),
         title           !== undefined ? (title || null) : game.title,
@@ -329,6 +332,38 @@ router.put('/:id', authMiddleware, async (req, res) => {
        WHERE g.id = ? GROUP BY g.id`,
       [gameId]
     );
+
+    // Notify joined participants when the host changes time or location — they'd otherwise
+    // find out by showing up at the wrong place/time.
+    const timeChanged     = newScheduledTime !== game.scheduled_time;
+    const locationChanged = newLocationDesc  !== game.location_desc;
+    if (timeChanged || locationChanged) {
+      try {
+        const [participantRows] = await pool.execute(
+          `SELECT u.id, u.push_token
+           FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id
+           WHERE gp.game_id = ? AND gp.status = 'joined'`,
+          [gameId]
+        );
+        if (participantRows.length > 0) {
+          const sportLabel = row.sport_type.charAt(0).toUpperCase() + row.sport_type.slice(1);
+          const gameTitle  = row.title || `${sportLabel} Game`;
+          const parts = [];
+          if (timeChanged) parts.push(newScheduledTime ? `now starts at ${newScheduledTime}` : 'time was removed');
+          if (locationChanged) parts.push(newLocationDesc ? `moved to ${newLocationDesc}` : 'location was removed');
+          sendPushNotifications(participantRows.map(r => ({
+            user_id: r.id,
+            to: r.push_token,
+            title: '⏰ Game updated',
+            body: `${gameTitle} ${parts.join(' and ')}.`,
+            data: { gameId },
+          })));
+        }
+      } catch (notifyErr) {
+        console.error('Game edit notification error:', notifyErr.message);
+      }
+    }
+
     res.json({ success: true, game: toMapGame(row) });
   } catch (err) {
     console.error(err);

@@ -67,6 +67,7 @@ export const API = {
   gameComplete:          (id: number | string) => `/api/games/${id}/complete`,
   gamePostPhoto:         (id: number | string) => `/api/games/${id}/post-photo`,
   gameParticipants:      (id: number | string) => `/api/games/${id}/participants`,
+  gameRemoveParticipant: (id: number | string, userId: number | string) => `/api/games/${id}/participants/${userId}`,
 
   // Chats
   chatMessages:          (gameId: number | string) => `/api/chats/${gameId}/messages`,

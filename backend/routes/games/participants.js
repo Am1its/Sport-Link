@@ -11,13 +11,24 @@ router.get('/:id/participants', authMiddleware, async (req, res) => {
     const [[game]] = await pool.execute('SELECT host_id FROM Games WHERE id = ?', [gameId]);
     if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
 
+    // attendance_rate = % of past rated games this user actually showed up to (host-submitted
+    // Ratings.attended); a reliability signal so the host can judge who they're playing with.
+    // NULL when the user has no rated games yet (distinct from a 0% rate).
+    const attendanceRateExpr = `(
+      SELECT CASE WHEN COUNT(*) = 0 THEN NULL
+             ELSE ROUND(100 * SUM(CASE WHEN attended = 1 THEN 1 ELSE 0 END) / COUNT(*))
+        END
+      FROM Ratings WHERE ratee_id = u.id
+    )`;
+
     const [rows] = await pool.execute(`
       SELECT u.id, u.username, u.avatar,
              'host'  AS role,
              1       AS is_host,
              NULL    AS status,
              NULL    AS waitlist_position,
-             0       AS checked_in
+             0       AS checked_in,
+             ${attendanceRateExpr} AS attendance_rate
       FROM Users u WHERE u.id = ?
       UNION ALL
       SELECT u.id, u.username, u.avatar,
@@ -25,7 +36,8 @@ router.get('/:id/participants', authMiddleware, async (req, res) => {
              0        AS is_host,
              gp.status,
              gp.waitlist_position,
-             (gp.checked_in_at IS NOT NULL) AS checked_in
+             (gp.checked_in_at IS NOT NULL) AS checked_in,
+             ${attendanceRateExpr} AS attendance_rate
       FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id
       WHERE gp.game_id = ?
       ORDER BY is_host DESC, role ASC
@@ -178,6 +190,91 @@ router.delete('/:id/leave', authMiddleware, async (req, res) => {
         to: promoted.push_token,
         title: '🎉 You\'re in!',
         body: `A spot opened in ${g?.title || g?.sport_type || 'a game'}. You're now joined!`,
+        data: { gameId },
+      }]);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    await conn.rollback();
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    conn.release();
+  }
+});
+
+// DELETE /api/games/:id/participants/:userId — host only; removes a player before the game
+// (e.g. a no-show or problem player). Promotes the first waitlisted player, same as a normal leave.
+router.delete('/:id/participants/:userId', authMiddleware, async (req, res) => {
+  const gameId = parseInt(req.params.id);
+  const targetUserId = parseInt(req.params.userId);
+  const hostId = req.user.id;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[game]] = await conn.execute(
+      "SELECT host_id, title, sport_type FROM Games WHERE id = ? AND status = 'active' FOR UPDATE", [gameId]
+    );
+    if (!game) {
+      await conn.rollback();
+      return res.status(404).json({ success: false, message: 'Game not found' });
+    }
+    if (game.host_id !== hostId) {
+      await conn.rollback();
+      return res.status(403).json({ success: false, message: 'Only the host can remove players' });
+    }
+    if (targetUserId === hostId) {
+      await conn.rollback();
+      return res.status(400).json({ success: false, message: 'The host cannot remove themselves' });
+    }
+
+    const [[participation]] = await conn.execute(
+      'SELECT id, status FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, targetUserId]
+    );
+    if (!participation) {
+      await conn.rollback();
+      return res.status(404).json({ success: false, message: 'Player is not in this game' });
+    }
+
+    await conn.execute('DELETE FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, targetUserId]);
+
+    // Promote the first waitlisted player when a joined slot opens
+    let promoted = null;
+    if (participation.status === 'joined') {
+      const [[next]] = await conn.execute(
+        "SELECT gp.id, gp.user_id, u.push_token FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.status = 'waitlist' ORDER BY gp.waitlist_position ASC LIMIT 1",
+        [gameId]
+      );
+      if (next) {
+        await conn.execute(
+          "UPDATE GameParticipants SET status = 'joined', waitlist_position = NULL WHERE id = ?",
+          [next.id]
+        );
+        promoted = next;
+      }
+    }
+
+    await conn.commit();
+
+    // Notify the removed player and any promoted waitlist player, outside the transaction
+    const gameLabel = game.title || `${game.sport_type} game`;
+    const [[removedUser]] = await pool.execute('SELECT push_token FROM Users WHERE id = ?', [targetUserId]);
+    sendPushNotifications([{
+      user_id: targetUserId,
+      to: removedUser?.push_token ?? null,
+      title: 'Removed from a game',
+      body: `The host removed you from ${gameLabel}.`,
+      data: { screen: 'games' },
+    }]);
+    if (promoted) {
+      sendPushNotifications([{
+        user_id: promoted.user_id,
+        to: promoted.push_token,
+        title: '🎉 You\'re in!',
+        body: `A spot opened in ${gameLabel}. You're now joined!`,
         data: { gameId },
       }]);
     }

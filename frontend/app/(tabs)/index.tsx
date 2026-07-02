@@ -43,7 +43,11 @@ import { useMapSearch } from './map/useMapSearch';
 import { MapSearchDropdown } from './map/MapSearchDropdown';
 import { CourtPickerSheet } from './map/CourtPickerSheet';
 import { AddFab } from './map/AddFab';
+import { SearchAreaChip } from './map/SearchAreaChip';
+import { haversineKm } from '../../utils/geo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SEARCH_AREA_THRESHOLD_KM = 2;
 
 const { width } = Dimensions.get('window');
 
@@ -343,6 +347,7 @@ function HomeScreen() {
     courts, games, loading, myAvatar, myUsername,
     userLocation, setUserLocation, initialRegion,
     pendingPan, clearPendingPan, setGames,
+    fetchCourts, lastCourtsFetchCenter,
   } = useMapData(token);
 
   const {
@@ -357,6 +362,8 @@ function HomeScreen() {
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [currentDelta, setCurrentDelta] = useState(0.05);
+  const [currentCenter, setCurrentCenter] = useState({ latitude: initialRegion.latitude, longitude: initialRegion.longitude });
+  const [searchingArea, setSearchingArea] = useState(false);
   const [showCourtPicker, setShowCourtPicker] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [sportFilter, setSportFilter] = useState('all');
@@ -374,7 +381,19 @@ function HomeScreen() {
       latitude: initialRegion.latitude,
       longitude: initialRegion.longitude,
     }));
+    setCurrentCenter({ latitude: initialRegion.latitude, longitude: initialRegion.longitude });
   }, [initialRegion.latitude, initialRegion.longitude]);
+
+  const distFromLastCourtsFetch = lastCourtsFetchCenter
+    ? haversineKm(currentCenter.latitude, currentCenter.longitude, lastCourtsFetchCenter.lat, lastCourtsFetchCenter.lng)
+    : 0;
+  const showSearchArea = distFromLastCourtsFetch > SEARCH_AREA_THRESHOLD_KM;
+
+  const handleSearchThisArea = async () => {
+    setSearchingArea(true);
+    await fetchCourts(currentCenter.latitude, currentCenter.longitude);
+    setSearchingArea(false);
+  };
 
   // Pan to newly created game
   React.useEffect(() => {
@@ -491,7 +510,10 @@ function HomeScreen() {
         initialRegion={mapRegion}
         showsUserLocation
         showsMyLocationButton={false}
-        onRegionChangeComplete={(r: Region) => setCurrentDelta(r.latitudeDelta)}
+        onRegionChangeComplete={(r: Region) => {
+          setCurrentDelta(r.latitudeDelta);
+          setCurrentCenter({ latitude: r.latitude, longitude: r.longitude });
+        }}
         onPress={(e: any) => {
           if (isSelectingLocation) {
             const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -710,6 +732,12 @@ function HomeScreen() {
                 </ScrollView>
               </View>
             )}
+
+            {showSearchArea && activeFilter !== 'games' && (
+              <View style={styles.searchAreaWrap}>
+                <SearchAreaChip loading={searchingArea} onPress={handleSearchThisArea} />
+              </View>
+            )}
           </View>
         )}
       </SafeAreaView>
@@ -804,6 +832,7 @@ const styles = StyleSheet.create({
 
   filtersWrapper: { marginTop: 10, paddingHorizontal: 5 },
   sportFiltersWrapper: { marginTop: 6, paddingHorizontal: 5 },
+  searchAreaWrap: { alignItems: 'center', marginTop: 10 },
   filtersScroll: { paddingHorizontal: 15, paddingBottom: 5 },
 
   filterChip: { backgroundColor: 'rgba(255, 255, 255, 0.9)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: '#E5E5EA' },
@@ -855,6 +884,7 @@ function ExpoGoMapScreen() {
     courts, games, loading, myAvatar, myUsername,
     userLocation, setUserLocation, initialRegion,
     pendingPan, clearPendingPan, setGames,
+    fetchCourts, lastCourtsFetchCenter,
   } = useMapData(token);
 
   const {
@@ -873,12 +903,26 @@ function ExpoGoMapScreen() {
   const [showCourtPicker, setShowCourtPicker] = useState(false);
   const [panTarget, setPanTarget] = useState<{ latitude: number; longitude: number } | null>(null);
   const [latDelta, setLatDelta] = useState(0.1);
+  const [currentCenter, setCurrentCenter] = useState({ lat: initialRegion.latitude, lng: initialRegion.longitude });
+  const [searchingArea, setSearchingArea] = useState(false);
   const [clusterZoomTarget, setClusterZoomTarget] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Keep region in sync when location arrives
   React.useEffect(() => {
     setRegion(initialRegion);
+    setCurrentCenter({ lat: initialRegion.latitude, lng: initialRegion.longitude });
   }, [initialRegion.latitude, initialRegion.longitude]);
+
+  const distFromLastCourtsFetch = lastCourtsFetchCenter
+    ? haversineKm(currentCenter.lat, currentCenter.lng, lastCourtsFetchCenter.lat, lastCourtsFetchCenter.lng)
+    : 0;
+  const showSearchArea = distFromLastCourtsFetch > SEARCH_AREA_THRESHOLD_KM;
+
+  const handleSearchThisArea = async () => {
+    setSearchingArea(true);
+    await fetchCourts(currentCenter.lat, currentCenter.lng);
+    setSearchingArea(false);
+  };
 
   // Pan to newly created game (parity fix: was missing on Expo Go)
   React.useEffect(() => {
@@ -1060,6 +1104,12 @@ function ExpoGoMapScreen() {
         </View>
       )}
 
+      {!searchExpanded && showSearchArea && filterType !== 'games' && (
+        <View style={emStyles.searchAreaWrap}>
+          <SearchAreaChip loading={searchingArea} onPress={handleSearchThisArea} />
+        </View>
+      )}
+
       <View style={{ flex: 1 }}>
         {loading ? (
           <View style={emStyles.center}><ActivityIndicator size="large" color={Colors.accent} /></View>
@@ -1073,7 +1123,7 @@ function ExpoGoMapScreen() {
             clusterZoomTarget={clusterZoomTarget}
             onMarkerPress={handleMarkerPress}
             onMapPress={handleMapPress}
-            onZoom={setLatDelta}
+            onZoom={(delta, center) => { setLatDelta(delta); setCurrentCenter(center); }}
           />
         )}
 
@@ -1139,6 +1189,7 @@ const emStyles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 4 },
   pinBanner: { backgroundColor: Colors.accent, paddingVertical: 10, alignItems: 'center' },
   pinBannerText: { color: Colors.bg, fontWeight: '800', fontSize: 15 },
+  searchAreaWrap: { alignItems: 'center', paddingBottom: 10 },
   filterRow: { paddingBottom: 10 },
   typeChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface },
   typeChipActive: { backgroundColor: Colors.accentFaint, borderColor: Colors.accent },

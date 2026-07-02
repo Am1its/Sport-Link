@@ -6,12 +6,33 @@ const { isValidUsername } = require('../utils/validators');
 
 const router = express.Router();
 
+// community_skill is the average PeerRatings.skill for this user within this sport
+// (peer-submitted, anonymous), shown alongside the self-reported skill_level. Requires
+// at least 3 ratings before surfacing — otherwise a couple of ratings could be
+// misleadingly precise or easily gamed.
 const fetchSportPreferences = async (userId) => {
   const [rows] = await pool.execute(
-    'SELECT sport_type, skill_level, is_favorite FROM SportPreferences WHERE user_id = ? ORDER BY is_favorite DESC, sport_type ASC',
-    [userId]
+    `SELECT sp.sport_type, sp.skill_level, sp.is_favorite,
+            cs.community_skill, cs.rating_count AS community_rating_count
+     FROM SportPreferences sp
+     LEFT JOIN (
+       SELECT g.sport_type, pr.ratee_id,
+              ROUND(AVG(pr.skill), 1) AS community_skill,
+              COUNT(*) AS rating_count
+       FROM PeerRatings pr
+       JOIN Games g ON g.id = pr.game_id
+       WHERE pr.ratee_id = ? AND pr.skill IS NOT NULL
+       GROUP BY g.sport_type, pr.ratee_id
+       HAVING COUNT(*) >= 3
+     ) cs ON cs.sport_type = sp.sport_type
+     WHERE sp.user_id = ?
+     ORDER BY sp.is_favorite DESC, sp.sport_type ASC`,
+    [userId, userId]
   );
-  return rows;
+  return rows.map(r => ({
+    ...r,
+    community_skill: r.community_skill != null ? Number(r.community_skill) : null,
+  }));
 };
 
 const fetchUser = async (userId) => {

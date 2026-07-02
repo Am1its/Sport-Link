@@ -2,6 +2,8 @@ export type SportPref = {
   sport_type: string;
   skill_level: number;
   is_favorite: boolean;
+  community_skill?: number | null;
+  community_rating_count?: number | null;
 };
 
 export type Region = {
@@ -61,6 +63,7 @@ export type Participant = {
   username: string;
   avatar: string | null;
   role: 'host' | 'player';
+  attendance_rate?: number | null;
 };
 
 export type UserProfile = {
