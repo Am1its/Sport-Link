@@ -21,6 +21,7 @@ const dmRoutes            = require('./routes/dm');
 const activityRoutes      = require('./routes/activity');
 const geocodeRoutes       = require('./routes/geocode');
 const shareRoutes         = require('./routes/share');
+const adminRoutes         = require('./routes/admin');
 
 const { SPORT_LABELS, SPORT_EMOJI } = require('./utils/sportLabels');
 
@@ -435,6 +436,7 @@ app.use('/api/courts',        courtsRoutes);
 app.use('/api/dm',            dmRoutes);
 app.use('/api/activity',      activityRoutes);
 app.use('/api/geocode',       geocodeRoutes);
+app.use('/api/admin',         adminRoutes);
 app.use('/share',             shareRoutes);
 
 httpServer.listen(PORT, () => {

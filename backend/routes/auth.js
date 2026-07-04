@@ -3,12 +3,17 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const pool = require('../db');
+const authMiddleware = require('../middleware/authMiddleware');
 const { isValidEmail, isValidUsername, isValidPassword } = require('../utils/validators');
 
 const router = express.Router();
 
 const signToken = (user) =>
-  jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '90d' });
+  jwt.sign(
+    { id: user.id, username: user.username, token_version: user.token_version ?? 0 },
+    process.env.JWT_SECRET,
+    { expiresIn: '90d' }
+  );
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -32,7 +37,7 @@ router.post('/register', async (req, res) => {
       [cleanUsername, cleanEmail, password_hash]
     );
     const user = { id: result.insertId, username: cleanUsername, onboarding_complete: false };
-    res.status(201).json({ success: true, token: signToken(user), user });
+    res.status(201).json({ success: true, token: signToken({ ...user, token_version: 0 }), user });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY')
       return res.status(409).json({ success: false, message: 'Username or email already taken' });
@@ -58,7 +63,7 @@ router.post('/login', async (req, res) => {
     if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
     const user = { id: dbUser.id, username: dbUser.username, onboarding_complete: !!dbUser.onboarding_complete };
-    res.json({ success: true, token: signToken(user), user });
+    res.json({ success: true, token: signToken({ ...user, token_version: dbUser.token_version }), user });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -101,27 +106,47 @@ router.post('/google', async (req, res) => {
         .toLowerCase()
         .slice(0, 20) || 'player';
 
-      // Ensure username uniqueness
+      // Ensure username uniqueness by retrying on a duplicate-key error rather than a
+      // check-then-insert loop, which races under concurrent signups with the same name.
       let username = baseUsername;
       let suffix = 1;
-      while (true) {
-        const [existing] = await pool.execute('SELECT id FROM Users WHERE username = ?', [username]);
-        if (!existing[0]) break;
-        username = `${baseUsername}${suffix++}`;
+      let result;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        try {
+          [result] = await pool.execute(
+            'INSERT INTO Users (username, email, google_id, onboarding_complete) VALUES (?, ?, ?, FALSE)',
+            [username, email, googleId]
+          );
+          break;
+        } catch (err) {
+          if (err.code === 'ER_DUP_ENTRY' && err.sqlMessage?.toLowerCase().includes("key 'users.username'")) {
+            username = `${baseUsername}${suffix++}`;
+            continue;
+          }
+          throw err;
+        }
       }
-
-      const [result] = await pool.execute(
-        'INSERT INTO Users (username, email, google_id, onboarding_complete) VALUES (?, ?, ?, FALSE)',
-        [username, email, googleId]
-      );
+      if (!result) throw new Error('Could not generate a unique username after 20 attempts');
       dbUser = { id: result.insertId, username, onboarding_complete: false };
     }
 
     const user = { id: dbUser.id, username: dbUser.username, onboarding_complete: !!dbUser.onboarding_complete };
-    res.json({ success: true, token: signToken(user), user });
+    res.json({ success: true, token: signToken({ ...user, token_version: dbUser.token_version ?? 0 }), user });
   } catch (err) {
     console.error('Google auth error:', err.message, JSON.stringify(err.response?.data));
     res.status(500).json({ success: false, message: 'Google sign-in failed' });
+  }
+});
+
+// POST /api/auth/logout-all — invalidate every previously-issued token for this user
+// (including the one used for this request) by bumping token_version.
+router.post('/logout-all', authMiddleware, async (req, res) => {
+  try {
+    await pool.execute('UPDATE Users SET token_version = token_version + 1 WHERE id = ?', [req.user.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

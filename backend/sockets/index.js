@@ -9,11 +9,16 @@ const { isUserInGame }  = require('../utils/gameUtils');
  */
 function registerSockets(io, pool) {
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('No token'));
     try {
-      socket.user = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const [[row]] = await pool.execute('SELECT token_version FROM Users WHERE id = ?', [decoded.id]);
+      if (!row || row.token_version !== (decoded.token_version ?? 0)) {
+        return next(new Error('Invalid token'));
+      }
+      socket.user = decoded;
       next();
     } catch {
       next(new Error('Invalid token'));

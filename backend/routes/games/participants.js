@@ -71,6 +71,17 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'You are the host of this game' });
     }
 
+    const [[blocked]] = await conn.execute(
+      `SELECT 1 FROM BlockedUsers
+       WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)
+       LIMIT 1`,
+      [userId, game.host_id, game.host_id, userId]
+    );
+    if (blocked) {
+      await conn.rollback();
+      return res.status(403).json({ success: false, message: 'Blocked' });
+    }
+
     const [[already]] = await conn.execute(
       'SELECT id FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]
     );

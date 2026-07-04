@@ -163,6 +163,17 @@ router.get('/:id', async (req, res) => {
     `, params);
 
     if (!row) return res.status(404).json({ success: false, message: 'Game not found' });
+
+    if (userId && userId !== row.host_id) {
+      const [[blocked]] = await pool.execute(
+        `SELECT 1 FROM BlockedUsers
+         WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)
+         LIMIT 1`,
+        [userId, row.host_id, row.host_id, userId]
+      );
+      if (blocked) return res.status(403).json({ success: false, message: 'Blocked' });
+    }
+
     res.json({ success: true, game: { ...toMapGame(row), host_username: row.host_username, status: row.status } });
   } catch (err) {
     console.error(err);

@@ -7,7 +7,7 @@ const router = express.Router();
 
 async function requireCourtManager(placeId, userId) {
   const [[claim]] = await pool.execute(
-    'SELECT user_id FROM CourtClaims WHERE place_id = ? AND user_id = ?',
+    "SELECT user_id FROM CourtClaims WHERE place_id = ? AND user_id = ? AND status = 'approved'",
     [placeId, userId]
   );
   return !!claim;
@@ -179,12 +179,14 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
     );
 
     const [[claim]] = await pool.execute(
-      `SELECT cc.user_id, u.username, u.avatar FROM CourtClaims cc
+      `SELECT cc.user_id, cc.status, u.username, u.avatar FROM CourtClaims cc
        JOIN Users u ON u.id = cc.user_id WHERE cc.place_id = ?`,
       [placeId]
     );
 
-    const isManager = !!(claim && claim.user_id === req.user.id);
+    // Manager powers (owner review responses, announcements) require an approved claim —
+    // a pending claim still shows the "Managed by" badge but can't act as manager yet.
+    const isManager = !!(claim && claim.user_id === req.user.id && claim.status === 'approved');
 
     const [announcements] = await pool.execute(
       `SELECT ca.id, ca.message, ca.created_at, u.username
@@ -204,6 +206,7 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
       reviews,
       announcements,
       claimed_by: claim ? { id: claim.user_id, username: claim.username, avatar: claim.avatar } : null,
+      claim_pending: !!(claim && claim.status !== 'approved'),
       is_manager: isManager,
     });
   } catch (err) {
@@ -335,7 +338,7 @@ router.post('/:placeId/claim', authMiddleware, async (req, res) => {
       'INSERT INTO CourtClaims (place_id, user_id) VALUES (?, ?)',
       [placeId, userId]
     );
-    res.json({ success: true });
+    res.json({ success: true, message: 'Claim submitted — pending manual approval' });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY')
       return res.status(409).json({ success: false, message: 'Court already claimed' });
