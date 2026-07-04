@@ -11,6 +11,7 @@ import ReAnimated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { Springs } from '../../constants/motion';
 import { usePressAnimation } from '../../hooks/useAnimations';
+import { DirectionsButton } from '../../components/DirectionsButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 
@@ -289,6 +290,15 @@ function BottomCard({ court, userId, token, onJoined }: {
           <Text style={[styles.joinButtonText, { color: Colors.accent }]}>View Details</Text>
         </TouchableOpacity>
       )}
+      <DirectionsButton
+        lat={court.geometry.location.lat}
+        lng={court.geometry.location.lng}
+        label={court.name}
+        style={[styles.joinButton, { marginTop: 8, backgroundColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: Colors.border }]}
+        textStyle={[styles.joinButtonText, { color: Colors.text }]}
+        iconColor={Colors.text}
+        iconSize={16}
+      />
     </View>
   );
 }
