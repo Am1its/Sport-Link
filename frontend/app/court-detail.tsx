@@ -22,15 +22,17 @@ import { API } from '../constants/endpoints';
 import { BackButton } from '../components/BackButton';
 import { DirectionsButton } from '../components/DirectionsButton';
 
+// Mock courts (no Google Places data) only populate lat/lng/photo_refs — everything
+// else is optional so the compiler enforces the same guarding every access already does.
 type PlacesData = {
-  name: string;
-  address: string | null;
-  phone: string | null;
-  website: string | null;
-  google_rating: number | null;
-  google_rating_count: number | null;
-  open_now: boolean | null;
-  weekday_hours: string[];
+  name?: string;
+  address?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  google_rating?: number | null;
+  google_rating_count?: number | null;
+  open_now?: boolean | null;
+  weekday_hours?: string[];
   photo_refs: string[];
   lat: number | null;
   lng: number | null;
