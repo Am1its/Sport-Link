@@ -16,6 +16,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, UnauthorizedError } from '../../utils/api';
 import { isPastGame, parseGameTime } from '../../utils/time';
+import { DirectionsButton } from '../../components/DirectionsButton';
 import { SPORT_COLORS, SPORT_ICONS, sportLabel } from '../../constants/sports';
 import { Colors, Spacing, Radius, Type, Shadow } from '../../constants/theme';
 import { GamesSkeleton } from '../../components/SkeletonLoader';
@@ -327,6 +328,17 @@ function MyGameCard({
                     </View>
                   )}
                 </>
+              )}
+              {game.latitude != null && game.longitude != null && (
+                <DirectionsButton
+                  lat={game.latitude}
+                  lng={game.longitude}
+                  label={game.title ?? game.sport_type}
+                  style={[styles.btnIcon, { borderColor: Colors.border, backgroundColor: Colors.surface2 }]}
+                  showLabel={false}
+                  iconColor={Colors.text}
+                  iconSize={15}
+                />
               )}
             </View>
           )}
