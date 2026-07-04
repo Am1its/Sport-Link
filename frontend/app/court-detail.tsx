@@ -20,6 +20,7 @@ import { Colors, Spacing, Radius, Shadow } from '../constants/theme';
 import { Springs } from '../constants/motion';
 import { API } from '../constants/endpoints';
 import { BackButton } from '../components/BackButton';
+import { DirectionsButton } from '../components/DirectionsButton';
 
 type PlacesData = {
   name: string;
@@ -31,6 +32,8 @@ type PlacesData = {
   open_now: boolean | null;
   weekday_hours: string[];
   photo_refs: string[];
+  lat: number | null;
+  lng: number | null;
 };
 
 type Review = {
@@ -453,6 +456,20 @@ export default function CourtDetailScreen() {
                 <Ionicons name="location-outline" size={16} color={Colors.textMuted} />
                 <Text style={styles.infoText}>{placesData?.address ?? vicinity}</Text>
               </View>
+            )}
+
+            {/* Directions */}
+            {placesData?.lat != null && placesData?.lng != null && (
+              <DirectionsButton
+                lat={placesData.lat}
+                lng={placesData.lng}
+                label={displayName}
+                style={styles.infoRow}
+                textStyle={[styles.infoText, { color: Colors.accent }]}
+                iconColor={Colors.accent}
+                iconSize={16}
+                labelText="Get Directions"
+              />
             )}
 
             {/* Phone */}
