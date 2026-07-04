@@ -10,12 +10,13 @@ const { israelNowString, parseIsraelTime } = require('../../utils/israelTime');
 // Authenticated: sorted by sport preference match + skill proximity.
 // Unauthenticated: sorted by created_at DESC.
 router.get('/', async (req, res) => {
-  const { lat, lng, radius_km, q, date_from, date_to, neighborhood } = req.query;
+  const { lat, lng, radius_km, q, date_from, date_to, neighborhood, include_photos } = req.query;
   const useRadius       = lat && lng && radius_km;
   const searchTerm      = typeof q === 'string' ? q.trim() : '';
   const useSearch       = searchTerm.length >= 2;
   const useDateFilter   = date_from && date_to;
   const useNeighborhood = typeof neighborhood === 'string' && neighborhood.trim().length > 0;
+  const stripPhotos     = include_photos === '0';
 
   const userId = optionalUserId(req);
 
@@ -66,6 +67,7 @@ router.get('/', async (req, res) => {
 
     const [rows] = await pool.execute(`
       SELECT g.*, COUNT(CASE WHEN COALESCE(gp.status, 'joined') = 'joined' THEN gp.user_id END) AS participant_count
+        ${stripPhotos ? ', NULL AS photo, NULL AS post_game_photo' : ''}
         ${userId ? ", CAST(EXISTS(SELECT 1 FROM GameParticipants WHERE game_id = g.id AND user_id = ? AND status = 'joined') AS UNSIGNED) AS is_joined" : ''}
         ${useRadius ? `, ${haversineExpr} AS distance_km` : ''}
       FROM Games g

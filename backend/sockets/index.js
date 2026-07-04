@@ -53,12 +53,33 @@ function registerSockets(io, pool) {
       }
     });
 
-    // DM typing indicator — route to receiver's personal room
-    socket.on(SOCKET_EVENTS.DM_TYPING, ({ to }) => {
+    // Game chat typing indicator — broadcast to everyone else in the game room
+    socket.on(SOCKET_EVENTS.GAME_TYPING, async (gameId) => {
+      const id = parseInt(gameId);
+      if (isNaN(id)) return;
+      if (!(await isUserInGame(id, socket.user.id))) return;
+      socket.to(`game_${id}`).emit(SOCKET_EVENTS.GAME_TYPING, { from: socket.user.id });
+    });
+
+    // DM typing indicator — route to receiver's personal room, unless mutually blocked.
+    // Block status is cached per-socket (cleared on reconnect) since typing fires per keystroke.
+    socket.on(SOCKET_EVENTS.DM_TYPING, async ({ to }) => {
       const receiverId = parseInt(to);
-      if (!isNaN(receiverId) && receiverId !== socket.user.id) {
-        io.to(`user_${receiverId}`).emit(SOCKET_EVENTS.DM_TYPING, { from: socket.user.id });
+      if (isNaN(receiverId) || receiverId === socket.user.id) return;
+
+      if (!socket.blockCheckCache) socket.blockCheckCache = new Map();
+      let blocked = socket.blockCheckCache.get(receiverId);
+      if (blocked === undefined) {
+        const [[row]] = await pool.execute(
+          `SELECT 1 FROM BlockedUsers WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1`,
+          [socket.user.id, receiverId, receiverId, socket.user.id]
+        );
+        blocked = !!row;
+        socket.blockCheckCache.set(receiverId, blocked);
       }
+      if (blocked) return;
+
+      io.to(`user_${receiverId}`).emit(SOCKET_EVENTS.DM_TYPING, { from: socket.user.id });
     });
   });
 }

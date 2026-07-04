@@ -13,18 +13,19 @@ router.get('/', async (req, res) => {
 
   try {
     if (reverse === '1' && lat && lng) {
-      const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-        params: { latlng: `${lat},${lng}`, key: API_KEY, language: 'en' },
+      // The Geocoding API is not enabled on this project's key (CLAUDE.md rule 14) —
+      // approximate a "neighborhood" from the nearest Places result's vicinity string
+      // (e.g. "Ben Saruq Street 13, Tel Aviv-Yafo" -> "Ben Saruq Street 13") instead.
+      const response = await axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
+        params: { location: `${lat},${lng}`, radius: 300, key: API_KEY, language: 'en' },
       });
-      const result = response.data.results?.[0];
+      const result = (response.data.results ?? []).find(r =>
+        r.vicinity && !(r.types || []).every(t => t === 'locality' || t === 'political')
+      );
       if (!result) return res.json({ success: true, neighborhood: null });
 
-      const comps = result.address_components ?? [];
-      const neighborhood =
-        comps.find(c => c.types.includes('neighborhood'))?.long_name ||
-        comps.find(c => c.types.includes('sublocality_level_1'))?.long_name ||
-        comps.find(c => c.types.includes('sublocality'))?.long_name ||
-        null;
+      const segments = result.vicinity.split(',').map(s => s.trim()).filter(Boolean);
+      const neighborhood = segments.length > 1 ? segments.slice(0, -1).join(', ') : segments[0] || null;
       return res.json({ success: true, neighborhood });
     }
 

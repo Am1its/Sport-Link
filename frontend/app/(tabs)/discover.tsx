@@ -154,9 +154,16 @@ export default function DiscoverScreen() {
   }, [token, radiusKm, dateFilter, neighborhoodFilter]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRun   = useRef(true);
 
-  // Debounce search: re-fetch 400ms after the user stops typing
+  // Debounce search/filter changes: re-fetch 400ms after the user stops typing.
+  // Skipped on the very first run — the focus effect below already covers the initial load,
+  // so without this guard every screen entry fired two identical requests.
   useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
     debounceRef.current = setTimeout(() => fetchGames(), 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search, fetchGames]);

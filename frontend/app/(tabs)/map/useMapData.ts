@@ -63,16 +63,13 @@ export function useMapData(token: string | null) {
       const run = async () => {
         try {
           const [gamesRes, meRes] = await Promise.all([
-            apiFetch(API.GAMES, { token }),
+            apiFetch(`${API.GAMES}?include_photos=0`, { token }),
             apiFetch(API.ME, { token }),
           ]);
           const gamesData = await gamesRes.json();
           const meData = await meRes.json();
           if (gamesData.success) {
-            setGames(gamesData.games.map((g: any) => {
-              const { photo: _p, post_game_photo: _pp, ...rest } = g;
-              return rest;
-            }));
+            setGames(gamesData.games);
           }
           if (meData.success) {
             setMyAvatar(meData.user.avatar ?? null);

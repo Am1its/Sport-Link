@@ -8,6 +8,7 @@ const SOCKET_EVENTS = {
   JOIN_GAME:    'join_game',
   SEND_MESSAGE: 'send_message',
   NEW_MESSAGE:  'new_message',
+  GAME_TYPING:  'game_typing',
 
   // Direct messages
   NEW_DM:       'new_dm',

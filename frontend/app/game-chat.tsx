@@ -52,6 +52,8 @@ export default function GameChatScreen() {
   const [avatarCache, setAvatarCache] = useState<Record<number, string | null>>({});
   const seenUserIds = useRef<Set<number>>(new Set());
   const socketRef   = useRef<Socket | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingEmit   = useRef<number>(0);
 
   const { play } = useSound();
   const { dot0Style, dot1Style, dot2Style, visible: typingVisible, show: showTyping, hide: hideTyping } = useTypingIndicator();
@@ -148,11 +150,20 @@ export default function GameChatScreen() {
       });
       AsyncStorage.setItem(`chat_last_read_${id}`, new Date().toISOString());
       fetchAvatars([msg.user_id]);
+      if (msg.user_id !== user?.id) hideTyping();
       play('ding');
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     });
 
+    socket.on(SOCKET_EVENTS.GAME_TYPING, ({ from }: { from: number }) => {
+      if (from === user?.id) return;
+      showTyping();
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => hideTyping(), 3000);
+    });
+
     return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       socket.disconnect();
       socketRef.current = null;
     };
@@ -266,6 +277,11 @@ export default function GameChatScreen() {
             onChangeText={(text) => {
               setInput(text);
               sendOpacity.value = withTiming(text.length > 0 ? 1 : 0.35, { duration: 150 });
+              const now = Date.now();
+              if (text.length > 0 && now - lastTypingEmit.current > 2000 && socketRef.current?.connected) {
+                socketRef.current.emit(SOCKET_EVENTS.GAME_TYPING, id);
+                lastTypingEmit.current = now;
+              }
             }}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}

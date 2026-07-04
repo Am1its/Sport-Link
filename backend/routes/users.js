@@ -44,17 +44,21 @@ const fetchUser = async (userId) => {
        u.avatar,
        u.current_streak,
        u.longest_streak,
-       (SELECT COUNT(*) FROM Games            WHERE host_id  = u.id) AS games_hosted,
-       (SELECT COUNT(*) FROM GameParticipants WHERE user_id  = u.id) AS games_joined,
+       (SELECT COUNT(*) FROM Games WHERE host_id = u.id AND status != 'cancelled') AS games_hosted,
+       (
+         SELECT COUNT(*) FROM GameParticipants gp2
+         JOIN Games g2 ON g2.id = gp2.game_id
+         WHERE gp2.user_id = u.id AND gp2.status = 'joined' AND g2.status != 'cancelled'
+       ) AS games_joined,
        ${KARMA_SQL} AS karma,
        (
-         SELECT g2.sport_type
-         FROM GameParticipants gp2
-         JOIN Games g2 ON g2.id = gp2.game_id
-         WHERE gp2.user_id = u.id
-         GROUP BY g2.sport_type
-         ORDER BY COUNT(*) DESC
-         LIMIT 1
+         SELECT sport_type FROM (
+           SELECT sport_type FROM Games WHERE host_id = u.id AND status != 'cancelled'
+           UNION ALL
+           SELECT g3.sport_type FROM Games g3
+           JOIN GameParticipants gp3 ON gp3.game_id = g3.id
+           WHERE gp3.user_id = u.id AND gp3.status = 'joined' AND g3.status != 'cancelled'
+         ) ts GROUP BY sport_type ORDER BY COUNT(*) DESC LIMIT 1
        ) AS top_sport
      FROM Users u WHERE u.id = ?`,
     [userId]
@@ -89,7 +93,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 // GET /api/users/avatars?ids=1,2,3
 router.get('/avatars', authMiddleware, async (req, res) => {
   try {
-    const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
+    const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean).slice(0, 50);
     if (ids.length === 0) return res.json({ success: true, avatars: [] });
     const placeholders = ids.map(() => '?').join(',');
     const [rows] = await pool.execute(
@@ -102,25 +106,50 @@ router.get('/avatars', authMiddleware, async (req, res) => {
   }
 });
 
+// The karma subqueries scan Ratings/PeerRatings per user on every request. Block lists are
+// per-viewer, so instead of re-running the full scan per request, cache a larger unfiltered
+// pool (top 100 by karma) for a few minutes and apply each viewer's block filter in JS.
+const LEADERBOARD_CACHE_MS  = 5 * 60 * 1000;
+const LEADERBOARD_POOL_SIZE = 100;
+let leaderboardCache = { data: null, expiresAt: 0 };
+
+const getLeaderboardPool = async () => {
+  if (leaderboardCache.data && Date.now() < leaderboardCache.expiresAt) return leaderboardCache.data;
+  const [rows] = await pool.execute(`
+    SELECT
+      u.id,
+      u.username,
+      u.avatar,
+      (SELECT COUNT(*) FROM Games WHERE host_id = u.id AND status != 'cancelled') AS games_hosted,
+      (
+        SELECT COUNT(*) FROM GameParticipants gp
+        JOIN Games g ON g.id = gp.game_id
+        WHERE gp.user_id = u.id AND gp.status = 'joined' AND g.status != 'cancelled'
+      ) AS games_joined,
+      ${KARMA_SQL} AS karma
+    FROM Users u
+    ORDER BY karma DESC
+    LIMIT ${LEADERBOARD_POOL_SIZE}
+  `);
+  leaderboardCache = { data: rows, expiresAt: Date.now() + LEADERBOARD_CACHE_MS };
+  return rows;
+};
+
 // GET /api/users/leaderboard — top 20 by karma (excludes blocked users)
 router.get('/leaderboard', authMiddleware, async (req, res) => {
   const userId = req.user.id;
   try {
-    const [rows] = await pool.execute(`
-      SELECT
-        u.id,
-        u.username,
-        u.avatar,
-        (SELECT COUNT(*) FROM Games            WHERE host_id = u.id) AS games_hosted,
-        (SELECT COUNT(*) FROM GameParticipants WHERE user_id = u.id) AS games_joined,
-        ${KARMA_SQL} AS karma
-      FROM Users u
-      WHERE u.id NOT IN (SELECT blocked_id FROM BlockedUsers WHERE blocker_id = ?)
-        AND u.id NOT IN (SELECT blocker_id FROM BlockedUsers WHERE blocked_id = ?)
-      ORDER BY karma DESC
-      LIMIT 20
-    `, [userId, userId]);
-    res.json({ success: true, leaderboard: rows });
+    const pool_ = await getLeaderboardPool();
+    const [blockRows] = await pool.execute(
+      'SELECT blocker_id, blocked_id FROM BlockedUsers WHERE blocker_id = ? OR blocked_id = ?',
+      [userId, userId]
+    );
+    const blockedIds = new Set();
+    blockRows.forEach(r => {
+      blockedIds.add(r.blocker_id === userId ? r.blocked_id : r.blocker_id);
+    });
+    const leaderboard = pool_.filter(r => !blockedIds.has(r.id)).slice(0, 20);
+    res.json({ success: true, leaderboard });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Server error' });
