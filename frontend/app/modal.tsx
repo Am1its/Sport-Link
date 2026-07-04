@@ -19,7 +19,7 @@ const PENDING_MAP_PAN_KEY = 'pending_map_pan';
 import { reverseGeocode } from '../utils/geocode';
 import { getAvatarColor } from '../utils/avatar';
 import { SPORT_COLORS } from '../constants/sports';
-import { Colors, Spacing, Radius, Shadow, Type } from '../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Type, LEVEL_COLORS } from '../constants/theme';
 import { API } from '../constants/endpoints';
 import { Springs } from '../constants/motion';
 import { usePressAnimation, useFieldShake } from '../hooks/useAnimations';
@@ -43,11 +43,11 @@ const SPORTS = [
 ] as const;
 
 const LEVEL_META = [
-  { n: 1, label: 'Beginner',  color: '#4ADE80' },
-  { n: 2, label: 'Casual',    color: '#A3E635' },
-  { n: 3, label: 'Mid',       color: '#FACC15' },
-  { n: 4, label: 'Advanced',  color: '#FB923C' },
-  { n: 5, label: 'Pro',       color: '#F87171' },
+  { n: 1, label: 'Beginner',  color: LEVEL_COLORS[0] },
+  { n: 2, label: 'Casual',    color: LEVEL_COLORS[1] },
+  { n: 3, label: 'Mid',       color: LEVEL_COLORS[2] },
+  { n: 4, label: 'Advanced',  color: LEVEL_COLORS[3] },
+  { n: 5, label: 'Pro',       color: LEVEL_COLORS[4] },
 ];
 
 function SectionLabel({ children }: { children: string }) {

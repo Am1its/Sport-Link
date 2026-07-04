@@ -316,7 +316,7 @@ export default function DiscoverScreen() {
             </View>
             <Text style={styles.emptyTitle}>No games found</Text>
             <Text style={styles.emptySub}>
-              {search || sportFilter !== 'all' || radiusKm !== null
+              {search || sportFilter !== 'all' || radiusKm !== null || dateFilter !== 'any' || neighborhoodFilter
                 ? 'Try adjusting your filters'
                 : 'Create one on the map!'}
             </Text>

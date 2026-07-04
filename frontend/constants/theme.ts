@@ -40,7 +40,20 @@ export const Colors = {
   orange:  '#FF8C00',
   yellow:  '#FFD700',
   purple:  '#A78BFA',
+
+  // Light-background map UI (index.tsx renders on a light basemap by design —
+  // these mirror the dark palette's roles but for that inverted context)
+  lightBg:          '#f0f0f0',
+  lightChipBg:      'rgba(255, 255, 255, 0.9)',
+  lightChipBorder:  '#E5E5EA',
+  lightOverlayBg:   'rgba(255, 255, 255, 0.95)',
+  lightRatingBg:    '#FFF9C4',
+  lightRatingText:  '#FBC02D',
+  lightPlaceholder: '#999999',
 } as const;
+
+// Skill-level colors (1-5), shared by modal.tsx's LEVEL_META
+export const LEVEL_COLORS = ['#4ADE80', '#A3E635', '#FACC15', '#FB923C', '#F87171'] as const;
 
 export const Spacing = {
   xs:   4,

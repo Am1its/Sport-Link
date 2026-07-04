@@ -84,7 +84,7 @@ function SportChip({ pref, index }: { pref: SportPref; index: number }) {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { token, logout } = useAuth();
+  const { token, logout, updateUser } = useAuth();
 
   const [stats, setStats]               = useState<Stats | null>(null);
   const [isEditing, setIsEditing]       = useState(false);
@@ -168,6 +168,7 @@ export default function ProfileScreen() {
       const data = await res.json();
       if (!data.success) return Alert.alert('Error', data.message);
       setStats(prev => prev ? { ...prev, ...data.user } : data.user);
+      if (data.user?.username) updateUser({ username: data.user.username });
       setIsEditing(false);
     } catch {
       Alert.alert('Error', 'Could not connect to server');

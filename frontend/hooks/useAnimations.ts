@@ -2,8 +2,9 @@ import { useEffect, useCallback, useState } from 'react';
 import {
   useSharedValue, useAnimatedStyle,
   withSpring, withTiming, withSequence, withDelay, withRepeat,
-  runOnJS, Easing,
+  Easing,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 export function usePressAnimation(config?: {
   scaleDown?: number;
@@ -77,7 +78,7 @@ export function useSuccessBurst() {
   const trigger = useCallback((onComplete?: () => void) => {
     progress.value = 0;
     progress.value = withTiming(1, { duration: 400 }, (finished) => {
-      if (finished && onComplete) runOnJS(onComplete)();
+      if (finished && onComplete) scheduleOnRN(onComplete);
     });
   }, [progress]);
 

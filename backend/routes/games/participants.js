@@ -4,6 +4,17 @@ const pool = require('../../db');
 const authMiddleware = require('../../middleware/authMiddleware');
 const sendPushNotifications = require('../../utils/sendPushNotification');
 
+// Waitlist positions are stored, not computed at read time — whenever a slot in the
+// waitlist opens up (someone ahead leaves, is removed, or is promoted to joined),
+// shift everyone behind them down by one so positions stay a compact 1..N with no gaps.
+async function renumberWaitlist(conn, gameId, vacatedPosition) {
+  if (vacatedPosition == null) return;
+  await conn.execute(
+    "UPDATE GameParticipants SET waitlist_position = waitlist_position - 1 WHERE game_id = ? AND status = 'waitlist' AND waitlist_position > ?",
+    [gameId, vacatedPosition]
+  );
+}
+
 // GET /api/games/:id/participants — host + joined players with avatars
 router.get('/:id/participants', authMiddleware, async (req, res) => {
   const gameId = parseInt(req.params.id);
@@ -166,7 +177,7 @@ router.delete('/:id/leave', authMiddleware, async (req, res) => {
     }
 
     const [[participation]] = await conn.execute(
-      'SELECT id, status FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]
+      'SELECT id, status, waitlist_position FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, userId]
     );
     if (!participation) {
       await conn.rollback();
@@ -179,7 +190,7 @@ router.delete('/:id/leave', authMiddleware, async (req, res) => {
     let promoted = null;
     if (participation.status === 'joined') {
       const [[next]] = await conn.execute(
-        "SELECT gp.id, gp.user_id, u.push_token FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.status = 'waitlist' ORDER BY gp.waitlist_position ASC LIMIT 1",
+        "SELECT gp.id, gp.user_id, gp.waitlist_position, u.push_token FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.status = 'waitlist' ORDER BY gp.waitlist_position ASC LIMIT 1",
         [gameId]
       );
       if (next) {
@@ -187,8 +198,11 @@ router.delete('/:id/leave', authMiddleware, async (req, res) => {
           "UPDATE GameParticipants SET status = 'joined', waitlist_position = NULL WHERE id = ?",
           [next.id]
         );
+        await renumberWaitlist(conn, gameId, next.waitlist_position);
         promoted = next;
       }
+    } else {
+      await renumberWaitlist(conn, gameId, participation.waitlist_position);
     }
 
     await conn.commit();
@@ -243,7 +257,7 @@ router.delete('/:id/participants/:userId', authMiddleware, async (req, res) => {
     }
 
     const [[participation]] = await conn.execute(
-      'SELECT id, status FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, targetUserId]
+      'SELECT id, status, waitlist_position FROM GameParticipants WHERE game_id = ? AND user_id = ?', [gameId, targetUserId]
     );
     if (!participation) {
       await conn.rollback();
@@ -256,7 +270,7 @@ router.delete('/:id/participants/:userId', authMiddleware, async (req, res) => {
     let promoted = null;
     if (participation.status === 'joined') {
       const [[next]] = await conn.execute(
-        "SELECT gp.id, gp.user_id, u.push_token FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.status = 'waitlist' ORDER BY gp.waitlist_position ASC LIMIT 1",
+        "SELECT gp.id, gp.user_id, gp.waitlist_position, u.push_token FROM GameParticipants gp JOIN Users u ON u.id = gp.user_id WHERE gp.game_id = ? AND gp.status = 'waitlist' ORDER BY gp.waitlist_position ASC LIMIT 1",
         [gameId]
       );
       if (next) {
@@ -264,8 +278,11 @@ router.delete('/:id/participants/:userId', authMiddleware, async (req, res) => {
           "UPDATE GameParticipants SET status = 'joined', waitlist_position = NULL WHERE id = ?",
           [next.id]
         );
+        await renumberWaitlist(conn, gameId, next.waitlist_position);
         promoted = next;
       }
+    } else {
+      await renumberWaitlist(conn, gameId, participation.waitlist_position);
     }
 
     await conn.commit();

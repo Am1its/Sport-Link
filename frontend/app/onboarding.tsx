@@ -4,8 +4,9 @@ import {
   ScrollView, ActivityIndicator, Alert, Image, useWindowDimensions,
 } from 'react-native';
 import ReAnimated, {
-  useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS,
+  useSharedValue, useAnimatedStyle, withSpring, withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -165,7 +166,7 @@ export default function OnboardingScreen() {
     stepTranslateX.value = withTiming(outX, { duration: 200 }, () => {
       stepTranslateX.value = inX;
       stepOpacity.value = 0;
-      runOnJS(setStep)(next);
+      scheduleOnRN(setStep, next);
     });
   }, [SCREEN_WIDTH, setStep]);
 

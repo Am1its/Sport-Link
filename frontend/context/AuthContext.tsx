@@ -10,6 +10,7 @@ type AuthState = {
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
   setOnboardingComplete: () => Promise<void>;
+  updateUser: (partial: Partial<User>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState>({} as AuthState);
@@ -56,8 +57,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(updated);
   };
 
+  // Keeps the AsyncStorage snapshot (taken at login) in sync with server-side profile
+  // edits — e.g. a username change — so stale fallbacks elsewhere in the app (chat,
+  // avatars) don't show the old value until the next re-login.
+  const updateUser = async (partial: Partial<User>) => {
+    if (!user) return;
+    const updated = { ...user, ...partial };
+    await AsyncStorage.setItem('user', JSON.stringify(updated));
+    setUser(updated);
+  };
+
   return (
-    <AuthContext.Provider value={{ token, user, isLoading, login, logout, setOnboardingComplete }}>
+    <AuthContext.Provider value={{ token, user, isLoading, login, logout, setOnboardingComplete, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

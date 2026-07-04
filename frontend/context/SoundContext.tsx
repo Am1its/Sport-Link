@@ -1,13 +1,25 @@
 import React, { createContext, useContext } from 'react';
 import { useSounds, SoundName } from '../hooks/useSounds';
 
-type SoundContextValue = { play: (name: SoundName) => Promise<void> };
+type SoundContextValue = {
+  play: (name: SoundName) => Promise<void>;
+  soundsEnabled: boolean;
+  setSoundsEnabled: (enabled: boolean) => Promise<void>;
+};
 
-const SoundContext = createContext<SoundContextValue>({ play: async () => {} });
+const SoundContext = createContext<SoundContextValue>({
+  play: async () => {},
+  soundsEnabled: true,
+  setSoundsEnabled: async () => {},
+});
 
 export function SoundProvider({ children }: { children: React.ReactNode }) {
-  const { play } = useSounds();
-  return <SoundContext.Provider value={{ play }}>{children}</SoundContext.Provider>;
+  const { play, soundsEnabled, setSoundsEnabled } = useSounds();
+  return (
+    <SoundContext.Provider value={{ play, soundsEnabled, setSoundsEnabled }}>
+      {children}
+    </SoundContext.Provider>
+  );
 }
 
 export function useSound() {

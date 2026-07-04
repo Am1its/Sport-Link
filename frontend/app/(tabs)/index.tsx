@@ -6,8 +6,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import ReAnimated, {
   useSharedValue, useAnimatedStyle,
-  withSpring, withTiming, withDelay, runOnJS,
+  withSpring, withTiming, withDelay,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { Springs } from '../../constants/motion';
 import { usePressAnimation } from '../../hooks/useAnimations';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -445,7 +446,7 @@ function HomeScreen() {
     } else if (isCardVisible) {
       cardY.value = withSpring(200, Springs.snappy);
       cardOpacity.value = withTiming(0, { duration: 150 }, (finished) => {
-        if (finished) runOnJS(setIsCardVisible)(false);
+        if (finished) scheduleOnRN(setIsCardVisible, false);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -625,7 +626,7 @@ function HomeScreen() {
                   <TextInput
                     style={styles.searchInput}
                     placeholder="Search location..."
-                    placeholderTextColor="#999"
+                    placeholderTextColor={Colors.lightPlaceholder}
                     value={searchQuery}
                     onChangeText={handleSearchChange}
                     autoFocus
@@ -805,7 +806,7 @@ function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f0f0' },
+  container: { flex: 1, backgroundColor: Colors.lightBg },
   map: { width: '100%', height: '100%' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
 
@@ -820,7 +821,7 @@ const styles = StyleSheet.create({
   clusterText: { color: Colors.bg, fontWeight: '900', fontSize: 14 },
 
   headerContainer: { position: 'absolute', top: 0, width: '100%' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.95)', marginHorizontal: 20, marginTop: 15, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.lightOverlayBg, marginHorizontal: 20, marginTop: 15, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
   searchInput: { flex: 1, fontSize: 15, color: Colors.bg, paddingVertical: 4 },
   headerTitle: { fontSize: 22, fontWeight: '900', color: Colors.bg },
   gameCountBadge: { backgroundColor: Colors.accentFaint, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: Colors.accentBorder },
@@ -835,7 +836,7 @@ const styles = StyleSheet.create({
   searchAreaWrap: { alignItems: 'center', marginTop: 10 },
   filtersScroll: { paddingHorizontal: 15, paddingBottom: 5 },
 
-  filterChip: { backgroundColor: 'rgba(255, 255, 255, 0.9)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: '#E5E5EA' },
+  filterChip: { backgroundColor: Colors.lightChipBg, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginRight: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, borderWidth: 1, borderColor: Colors.lightChipBorder },
   filterChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   filterText: { color: Colors.surface2, fontSize: 14, fontWeight: 'bold' },
   filterTextActive: { color: Colors.bg },
@@ -852,8 +853,8 @@ const styles = StyleSheet.create({
   sportBadgeText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600' },
   urgentBadge: { backgroundColor: Colors.errorFaint, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: Colors.errorBorder },
   urgentBadgeText: { color: Colors.error, fontSize: 11, fontWeight: '800' },
-  ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9C4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, height: 25 },
-  ratingText: { fontSize: 14, fontWeight: '700', marginLeft: 4, color: '#FBC02D' },
+  ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.lightRatingBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, height: 25 },
+  ratingText: { fontSize: 14, fontWeight: '700', marginLeft: 4, color: Colors.lightRatingText },
   levelBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.blueFaint, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, height: 25 },
   levelBadgeText: { fontSize: 14, fontWeight: '700', color: Colors.blue },
   cardAddress: { fontSize: 14, color: Colors.textMuted, marginBottom: 10, lineHeight: 22 },
@@ -871,7 +872,7 @@ const styles = StyleSheet.create({
   joinButtonText: { fontSize: 16, fontWeight: 'bold', color: Colors.bg },
   fab: { position: 'absolute', bottom: 30, right: 25, backgroundColor: Colors.bg, width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.accent, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
 
-  recenterBtn: { position: 'absolute', bottom: 105, right: 30, backgroundColor: 'rgba(255,255,255,0.95)', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 },
+  recenterBtn: { position: 'absolute', bottom: 105, right: 30, backgroundColor: Colors.lightOverlayBg, width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 },
 });
 
 // ─── Expo Go map (Leaflet WebView) ───────────────────────────────────────────
@@ -1199,7 +1200,7 @@ const emStyles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   fab: { position: 'absolute', bottom: 30, right: 25, backgroundColor: Colors.bg, width: 65, height: 65, borderRadius: 32.5, justifyContent: 'center', alignItems: 'center', shadowColor: Colors.accent, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
-  recenterBtn: { position: 'absolute', bottom: 105, right: 30, backgroundColor: 'rgba(255,255,255,0.95)', width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 },
+  recenterBtn: { position: 'absolute', bottom: 105, right: 30, backgroundColor: Colors.lightOverlayBg, width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 6 },
   cardWrap: { position: 'absolute', bottom: 30, alignSelf: 'center', width: '90%' },
   cardClose: { position: 'absolute', top: -10, right: -6, width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface2, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 },
 });

@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius, Type } from '../constants/theme';
+import { useSound } from '../context/SoundContext';
 
 const SETTINGS = [
   {
@@ -53,6 +54,7 @@ export default function NotificationsSettingsScreen() {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [saved, setSaved] = useState(false);
+  const { soundsEnabled, setSoundsEnabled } = useSound();
 
   useEffect(() => {
     AsyncStorage.getItem(NOTIF_KEY).then((raw) => {
@@ -102,6 +104,25 @@ export default function NotificationsSettingsScreen() {
               />
             </View>
           ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>App</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={[styles.iconWrap, { backgroundColor: Colors.purple + '22' }]}>
+              <Ionicons name="volume-high-outline" size={20} color={Colors.purple} />
+            </View>
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Sound Effects</Text>
+              <Text style={styles.rowDesc}>Chimes and taps throughout the app</Text>
+            </View>
+            <Switch
+              value={soundsEnabled}
+              onValueChange={setSoundsEnabled}
+              trackColor={{ false: Colors.surface2, true: Colors.accentBorder }}
+              thumbColor={soundsEnabled ? Colors.accent : Colors.textMuted}
+            />
+          </View>
         </View>
 
         <Text style={styles.hint}>

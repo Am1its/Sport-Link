@@ -3,6 +3,7 @@ import { StatusBar } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Sentry from '@sentry/react-native';
+import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { SoundProvider } from '../context/SoundContext';
 import { registerPushToken } from '../utils/registerPushToken';
@@ -55,6 +56,10 @@ function RootLayout() {
   return (
     <SoundProvider>
       <AuthProvider>
+        {/* App is animation-heavy (Sprint 15/16) — ReduceMotion.System is Reanimated's
+            default anyway, but declaring it explicitly documents the intent and guards
+            against a future call site accidentally overriding it. */}
+        <ReducedMotionConfig mode={ReduceMotion.System} />
         <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" translucent={false} />
         <AppServices />
         <Stack screenOptions={{ headerShown: false }}>

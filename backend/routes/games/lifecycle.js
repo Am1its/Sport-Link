@@ -47,6 +47,11 @@ router.post('/:id/boost', authMiddleware, async (req, res) => {
     await pool.execute('UPDATE Games SET boosted_at = NOW() WHERE id = ?', [gameId]);
 
     if (game.latitude && game.longitude) {
+      // A user's "location" for targeting purposes is any game they've hosted or joined —
+      // matches the pattern already used in /users/suggestions. Previously this fell back to
+      // the boosted game's OWN coordinates for anyone who'd never hosted, which put every
+      // non-host user at distance 0 and defeated the "nearby" filter entirely; users with no
+      // location signal at all are now correctly excluded instead of defaulted in.
       const [targets] = await pool.execute(`
         SELECT DISTINCT u.id, u.push_token
         FROM SportPreferences sp
@@ -54,32 +59,22 @@ router.post('/:id/boost', authMiddleware, async (req, res) => {
         WHERE sp.sport_type = ?
           AND u.id != ?
           AND u.id NOT IN (SELECT user_id FROM GameParticipants WHERE game_id = ?)
-          AND (
-            6371 * ACOS(GREATEST(-1, LEAST(1,
-              COS(RADIANS(?)) * COS(RADIANS(
-                COALESCE(
-                  (SELECT latitude FROM Games WHERE host_id = u.id ORDER BY created_at DESC LIMIT 1),
-                  ?
-                )
-              )) *
-              COS(RADIANS(
-                COALESCE(
-                  (SELECT longitude FROM Games WHERE host_id = u.id ORDER BY created_at DESC LIMIT 1),
-                  ?
-                )
-              ) - RADIANS(?)) +
-              SIN(RADIANS(?)) * SIN(RADIANS(
-                COALESCE(
-                  (SELECT latitude FROM Games WHERE host_id = u.id ORDER BY created_at DESC LIMIT 1),
-                  ?
-                )
-              ))
-            ))) <= 20
+          AND EXISTS (
+            SELECT 1 FROM (
+              SELECT latitude, longitude FROM Games WHERE host_id = u.id
+              UNION ALL
+              SELECT g2.latitude, g2.longitude FROM Games g2
+              JOIN GameParticipants gp2 ON gp2.game_id = g2.id AND gp2.user_id = u.id
+            ) coords
+            WHERE (6371 * ACOS(GREATEST(-1, LEAST(1,
+              COS(RADIANS(?)) * COS(RADIANS(coords.latitude)) *
+              COS(RADIANS(coords.longitude) - RADIANS(?)) +
+              SIN(RADIANS(?)) * SIN(RADIANS(coords.latitude))
+            )))) <= 20
           )
         LIMIT 50
       `, [game.sport_type, userId, gameId,
-          game.latitude, game.latitude, game.longitude, game.longitude,
-          game.latitude, game.latitude]);
+          game.latitude, game.longitude, game.latitude]);
 
       if (targets.length > 0) {
         const label = game.title || game.location_desc || game.sport_type;

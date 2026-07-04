@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -16,6 +16,7 @@ export type SoundName = keyof typeof SOUND_FILES;
 export function useSounds() {
   const players = useRef<Partial<Record<SoundName, AudioPlayer>>>({});
   const enabledRef = useRef(true);
+  const [soundsEnabled, setSoundsEnabledState] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -25,8 +26,10 @@ export function useSounds() {
       if (!Constants.isDevice) return;
 
       const stored = await AsyncStorage.getItem('sounds_enabled');
-      enabledRef.current = stored !== 'false';
-      if (!enabledRef.current || !mounted) return;
+      const enabled = stored !== 'false';
+      enabledRef.current = enabled;
+      if (mounted) setSoundsEnabledState(enabled);
+      if (!enabled || !mounted) return;
 
       await setAudioModeAsync({ playsInSilentMode: false });
       if (!mounted) return;
@@ -55,5 +58,13 @@ export function useSounds() {
     } catch {}
   }, []);
 
-  return { play };
+  // Updates the live ref (so play() reflects it immediately, not just after restart)
+  // alongside the persisted setting and the state that drives the settings toggle UI.
+  const setSoundsEnabled = useCallback(async (enabled: boolean) => {
+    enabledRef.current = enabled;
+    setSoundsEnabledState(enabled);
+    await AsyncStorage.setItem('sounds_enabled', enabled ? 'true' : 'false');
+  }, []);
+
+  return { play, soundsEnabled, setSoundsEnabled };
 }
