@@ -129,14 +129,26 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
 
   let placesData = null;
 
-  if (apiKey && apiKey !== 'YOUR_API_KEY_HERE' && !placeId.startsWith('mock_')) {
+  if (placeId.startsWith('mock_')) {
+    // Mock courts have no Google Places data, but their lat/lng is known statically —
+    // return just that (plus an empty photo_refs, since the frontend does
+    // `placesData.photo_refs.length` without an optional-chain guard).
+    const mock = MOCK_COURTS.find(c => c.place_id === placeId);
+    if (mock) {
+      placesData = {
+        lat: mock.geometry.location.lat,
+        lng: mock.geometry.location.lng,
+        photo_refs: [],
+      };
+    }
+  } else if (apiKey && apiKey !== 'YOUR_API_KEY_HERE') {
     try {
       const { data } = await axios.get(
         'https://maps.googleapis.com/maps/api/place/details/json',
         {
           params: {
             place_id: placeId,
-            fields: 'name,formatted_address,opening_hours,photos,rating,user_ratings_total,formatted_phone_number,website',
+            fields: 'name,formatted_address,opening_hours,photos,rating,user_ratings_total,formatted_phone_number,website,geometry',
             key: apiKey,
           },
         }
@@ -153,6 +165,8 @@ router.get('/:placeId', authMiddleware, async (req, res) => {
           open_now: r.opening_hours?.open_now ?? null,
           weekday_hours: r.opening_hours?.weekday_text ?? [],
           photo_refs: (r.photos ?? []).slice(0, 6).map(p => p.photo_reference),
+          lat: r.geometry?.location?.lat ?? null,
+          lng: r.geometry?.location?.lng ?? null,
         };
       }
     } catch (err) {

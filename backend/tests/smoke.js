@@ -97,6 +97,17 @@ async function main() {
     assert.ok(Array.isArray(data.leaderboard));
   });
 
+  await test('GET /api/courts/mock_sportek_01 returns lat/lng in places', async () => {
+    const token = mkToken(1);
+    const res = await fetch(`${BASE_URL}/api/courts/mock_sportek_01`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(typeof data.places.lat, 'number');
+    assert.strictEqual(typeof data.places.lng, 'number');
+  });
+
   await test('join/leave/waitlist: promotion + renumbering keep positions compact', async () => {
     const gameId = await insertFixtureGame({ maxPlayers: 2 });
     const userIds = await insertFixtureUsers(4);
