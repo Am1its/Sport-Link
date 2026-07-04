@@ -23,6 +23,7 @@
         "NSCameraUsageDescription": "SportLink uses your camera to set a profile photo.",
         "NSPhotoLibraryUsageDescription": "SportLink accesses your photo library to set a profile photo or game cover.",
         "NSUserNotificationsUsageDescription": "SportLink sends you notifications about your games and friend activity.",
+        "LSApplicationQueriesSchemes": ["waze", "comgooglemaps"],
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
