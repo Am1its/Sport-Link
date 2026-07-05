@@ -1,16 +1,15 @@
 import React, { useState, useCallback, ComponentProps, useRef } from 'react';
 import {
   StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity,
-  Dimensions, ScrollView, Animated, Image, TextInput, Pressable,
+  Dimensions, ScrollView, Animated, Image, TextInput,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import ReAnimated, {
   useSharedValue, useAnimatedStyle,
-  withSpring, withTiming, withDelay,
+  withSpring, withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Springs } from '../../constants/motion';
-import { usePressAnimation } from '../../hooks/useAnimations';
 import { DirectionsButton } from '../../components/DirectionsButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
@@ -47,6 +46,7 @@ import { CourtPickerSheet } from './map/CourtPickerSheet';
 import { AddFab } from './map/AddFab';
 import { SearchAreaChip } from './map/SearchAreaChip';
 import { clusterGames, SEARCH_AREA_THRESHOLD_KM, type ClusterItem } from './map/clusterGames';
+import { FilterChip } from './map/FilterChip';
 import { haversineKm } from '../../utils/geo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -257,50 +257,6 @@ function BottomCard({ court, userId, token, onJoined }: {
         iconSize={16}
       />
     </View>
-  );
-}
-
-function FilterChip({
-  label, isActive, onPress, chipStyle, textStyle, activeChipStyle, activeTextStyle, index,
-}: {
-  label: string;
-  isActive: boolean;
-  onPress: () => void;
-  chipStyle: any;
-  textStyle: any;
-  activeChipStyle: any;
-  activeTextStyle: any;
-  index: number;
-}) {
-  const { animatedStyle, onPressIn, onPressOut } = usePressAnimation({
-    scaleDown: 0.94, scaleUp: 1.0, stiffness: 400, damping: 18,
-  });
-  const translateX = useSharedValue(-30);
-  const chipOpacity = useSharedValue(0);
-
-  React.useEffect(() => {
-    const delay = Math.min(index * 60, 300);
-    translateX.value = withDelay(delay, withSpring(0, Springs.bouncy));
-    chipOpacity.value = withDelay(delay, withTiming(1, { duration: 200 }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const staggerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    opacity: chipOpacity.value,
-  }));
-
-  return (
-    <ReAnimated.View style={[staggerStyle, animatedStyle]}>
-      <Pressable
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        onPress={() => { Haptics.selectionAsync(); onPress(); }}
-        style={[chipStyle, isActive && activeChipStyle]}
-      >
-        <Text style={[textStyle, isActive && activeTextStyle]}>{label}</Text>
-      </Pressable>
-    </ReAnimated.View>
   );
 }
 
