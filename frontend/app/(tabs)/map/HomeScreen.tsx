@@ -11,6 +11,7 @@ import ReAnimated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { Springs } from '../../../constants/motion';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
@@ -33,9 +34,19 @@ import { BottomCard } from './BottomCard';
 import { FilterChip } from './FilterChip';
 import { clusterGames, SEARCH_AREA_THRESHOLD_KM } from './clusterGames';
 
-const maps = require('react-native-maps');
-const MapViewComponent: React.ComponentType<any> = maps.default;
-const MarkerComponent: React.ComponentType<any> = maps.Marker;
+// Expo Router evaluates every file under app/(tabs)/ as a potential route candidate —
+// including this one — independent of index.tsx's own conditional require() for the
+// screen switch. That means this module's top-level code always runs, even in Expo Go,
+// so the react-native-maps require must guard itself here (matching the original
+// pre-split file's pattern) rather than relying on index.tsx to prevent it from loading.
+const isExpoGo = Constants.appOwnership === 'expo';
+let MapViewComponent: React.ComponentType<any> = View as any;
+let MarkerComponent: React.ComponentType<any> = View as any;
+if (!isExpoGo) {
+  const maps = require('react-native-maps');
+  MapViewComponent = maps.default;
+  MarkerComponent = maps.Marker;
+}
 
 const { width } = Dimensions.get('window');
 
