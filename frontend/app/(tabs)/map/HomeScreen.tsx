@@ -57,7 +57,11 @@ const getSportStyle = (type: string): { icon: IconName; color: string } => ({
   color: SPORT_COLORS[type] ?? Colors.accent,
 });
 
-export default function HomeScreen() {
+// Named export, not default: a default export here would make Expo Router register this
+// file as its own tab, since it lives under app/(tabs)/ (see rule 30 — any file under
+// app/ with a default export becomes a routable screen, tab-registered if nested inside
+// a Tabs group). Every other file in this directory already avoids this the same way.
+export function HomeScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
   const mapRef = useRef<any>(null);

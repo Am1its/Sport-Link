@@ -27,7 +27,8 @@ import { clusterGames, SEARCH_AREA_THRESHOLD_KM } from './clusterGames';
 import { haversineKm } from '../../../utils/geo';
 import { BottomCard } from './BottomCard';
 
-export default function ExpoGoMapScreen() {
+// Named export, not default — see the matching comment in HomeScreen.tsx.
+export function ExpoGoMapScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
 

@@ -263,10 +263,10 @@ function MyGameCard({
               {game.is_host ? (
                 <>
                   <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.blueBorder, backgroundColor: Colors.blueFaint }]} onPress={onChat}>
-                    <Ionicons name="chatbubble-outline" size={15} color={Colors.blue} />
+                    <Ionicons name="chatbubble-outline" size={13} color={Colors.blue} />
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.purple + '55', backgroundColor: Colors.purple + '15' }]} onPress={onViewParticipants}>
-                    <Ionicons name="people-outline" size={15} color={Colors.purple} />
+                    <Ionicons name="people-outline" size={13} color={Colors.purple} />
                   </TouchableOpacity>
                 </>
               ) : (
@@ -284,10 +284,10 @@ function MyGameCard({
               {game.is_host ? (
                 <>
                   <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.border, backgroundColor: Colors.surface2 }]} onPress={onEdit}>
-                    <Ionicons name="pencil-outline" size={15} color={Colors.text} />
+                    <Ionicons name="pencil-outline" size={13} color={Colors.text} />
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.btnIcon, { borderColor: Colors.errorBorder, backgroundColor: Colors.errorFaint }]} onPress={onDelete}>
-                    <Ionicons name="trash-outline" size={15} color={Colors.error} />
+                    <Ionicons name="trash-outline" size={13} color={Colors.error} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.btnGhost, boostedAt
@@ -337,7 +337,7 @@ function MyGameCard({
                   style={[styles.btnIcon, { borderColor: Colors.border, backgroundColor: Colors.surface2 }]}
                   showLabel={false}
                   iconColor={Colors.text}
-                  iconSize={15}
+                  iconSize={13}
                 />
               )}
             </View>
@@ -649,11 +649,11 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaText: { ...Type.meta, color: Colors.textMuted },
 
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: Spacing.md },
+  actionRow: { flexDirection: 'row', gap: 6, marginTop: Spacing.md, flexWrap: 'wrap' },
 
-  btnGhost:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, height: 32, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.blueBorder, backgroundColor: Colors.blueFaint, paddingHorizontal: 10 },
-  btnGhostText: { fontWeight: '700', fontSize: 12, color: Colors.blue },
-  btnIcon:      { width: 32, height: 32, borderRadius: Radius.md, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  btnGhost:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, height: 28, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.blueBorder, backgroundColor: Colors.blueFaint, paddingHorizontal: 8 },
+  btnGhostText: { fontWeight: '700', fontSize: 11, color: Colors.blue },
+  btnIcon:      { width: 28, height: 28, borderRadius: Radius.md, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
 
   btnPrimary:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.accent, height: 36, borderRadius: Radius.md },
   btnPrimaryText: { color: Colors.bg, fontWeight: '800', fontSize: 13 },
