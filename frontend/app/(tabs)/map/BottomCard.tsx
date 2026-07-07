@@ -204,8 +204,8 @@ export function BottomCard({ court, userId, token, onJoined }: {
         lng={court.geometry.location.lng}
         label={court.name}
         style={[styles.joinButton, { marginTop: 8, backgroundColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: Colors.border }]}
-        textStyle={[styles.joinButtonText, { color: Colors.text }]}
-        iconColor={Colors.text}
+        textStyle={[styles.joinButtonText, { color: Colors.bg }]}
+        iconColor={Colors.bg}
         iconSize={16}
       />
     </View>
