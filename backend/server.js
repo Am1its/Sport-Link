@@ -39,10 +39,13 @@ app.set('trust proxy', 1);
 app.use(cors({ origin: ALLOWED_ORIGINS }));
 app.use(express.json({ limit: '10mb' }));
 
-// Strict rate limit for auth endpoints (brute-force protection)
+// Strict rate limit for auth endpoints (brute-force protection). Raised from 10 to 50/min
+// since this is keyed by IP with no custom keyGenerator — a room full of presentation
+// attendees on the same venue WiFi share one public IP via NAT, so a low limit here
+// throttles the whole room, not one person.
 app.use('/api/auth', rateLimit({
   windowMs: 60_000,
-  max: 10,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests — please try again later.' },
