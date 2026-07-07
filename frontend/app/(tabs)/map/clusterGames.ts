@@ -32,12 +32,19 @@ export function clusterGames(items: MapItem[], latDelta: number): ClusterItem[] 
     const sportCounts: Record<string, number> = {};
     cell.forEach(i => { sportCounts[i.sport_type] = (sportCounts[i.sport_type] ?? 0) + 1; });
     const dominantSport = Object.entries(sportCounts).sort((a, b) => b[1] - a[1])[0][0];
+    const isCluster = cell.length > 1;
     return {
       ...cell[0],
       sport_type: dominantSport,
-      place_id: `cluster_${cell.map(c => c.place_id).join('_')}`,
+      // Only prefix place_id for genuine multi-game clusters. The Leaflet/Expo Go map
+      // (ExpoGoMapScreen's handleMarkerPress) has no direct access to _isCluster over the
+      // WebView bridge — it infers "is this a cluster?" purely from placeId.startsWith
+      // ('cluster_'). Prefixing every grid cell's id (even a lone game) made every game
+      // misidentified as a cluster whenever latDelta >= 0.015, forcing a zoom-in tap
+      // instead of opening it directly.
+      place_id: isCluster ? `cluster_${cell.map(c => c.place_id).join('_')}` : cell[0].place_id,
       geometry: { location: { lat: avgLat, lng: avgLng } },
-      _isCluster: cell.length > 1,
+      _isCluster: isCluster,
       _clusterCount: cell.length,
       _clusterItems: cell,
     };

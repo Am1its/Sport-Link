@@ -257,6 +257,7 @@ export function HomeScreen() {
             <MarkerComponent
               key={item.place_id}
               coordinate={{ latitude: lat, longitude: lng }}
+              tracksViewChanges={false}
               onPress={(e: any) => { e.stopPropagation(); if (!isSelectingLocation) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedCourt(item); } }}
             >
               <View style={styles.markerWrapper}>
@@ -284,6 +285,7 @@ export function HomeScreen() {
               <MarkerComponent
                 key={item.place_id}
                 coordinate={{ latitude: lat, longitude: lng }}
+              tracksViewChanges={false}
                 onPress={(e: any) => {
                   e.stopPropagation();
                   if (!isSelectingLocation) {
@@ -309,6 +311,7 @@ export function HomeScreen() {
             <MarkerComponent
               key={item.place_id}
               coordinate={{ latitude: lat, longitude: lng }}
+              tracksViewChanges={false}
               onPress={(e: any) => { e.stopPropagation(); if (!isSelectingLocation) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedCourt(item); } }}
             >
               <View style={styles.markerWrapper}>
