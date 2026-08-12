@@ -51,10 +51,13 @@ app.use('/api/auth', rateLimit({
   message: { success: false, message: 'Too many requests — please try again later.' },
 }));
 
-// General rate limit for all other routes
+// General rate limit for all other routes. Raised from 300 to 1500/min for the same reason
+// as the /api/auth limiter above: keyed by IP with no custom keyGenerator, so a room full of
+// presentation attendees on shared venue WiFi (one NAT'd IP) would otherwise share this quota
+// between everyone, not get it per person.
 app.use(rateLimit({
   windowMs: 60_000,
-  max: 300,
+  max: 1500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests — please try again later.' },
