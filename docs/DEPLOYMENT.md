@@ -94,7 +94,10 @@ EXPO_PUBLIC_API_URL=https://sport-link-production.up.railway.app
 EXPO_PUBLIC_GOOGLE_CLIENT_ID=393613161940-b7l3pahi9lbodrgq7vn537424b8h9b6b.apps.googleusercontent.com
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=393613161940-tlkf5mb8gfi3fp9e93ni7eijn6t18qpd.apps.googleusercontent.com
 EXPO_PUBLIC_SENTRY_DSN=https://f1294303fea3d52643849fe316ccc848@o4511548367241216.ingest.de.sentry.io/4511548370976848
+EXPO_PUBLIC_CARTO_API_KEY=your_carto_basemap_api_key
 ```
+
+`EXPO_PUBLIC_CARTO_API_KEY` is required for the Expo Go Leaflet map (`components/map/ExpoGoMapScreen.tsx` / `LeafletMap.tsx`) — CartoDB's Voyager basemap tiles return a watermarked placeholder without one. Get a free key (no account needed, 5M tile requests/month) at carto.com/basemaps/apikey/.
 
 For local dev, change `EXPO_PUBLIC_API_URL` to `http://<your-lan-ip>:3000`.
 

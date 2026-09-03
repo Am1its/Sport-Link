@@ -489,9 +489,9 @@ const styles = StyleSheet.create({
   bioInputFocused: { borderColor: Colors.accent },
   charCount:       { color: Colors.textHint, fontSize: 12, textAlign: 'right', marginBottom: 28 },
 
-  sportsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  sportsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   sportTile:      { width: '30%', aspectRatio: 1.1, backgroundColor: Colors.surface, borderRadius: Radius.xl, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5 },
-  selectedSportsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16, marginBottom: 32 },
+  selectedSportsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: -8, marginBottom: 24 },
   selectedChip:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: 1.5 },
   selectedChipText:  { ...Type.label, fontSize: 12 },
   sportCheck:     { position: 'absolute', top: 7, right: 7, width: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },

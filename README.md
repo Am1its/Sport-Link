@@ -177,6 +177,7 @@ EXPO_PUBLIC_GOOGLE_CLIENT_ID=your_google_web_client_id
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your_google_ios_client_id
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your_google_android_client_id  # optional, needed for Android Google Sign-In
 EXPO_PUBLIC_SENTRY_DSN=your_sentry_dsn
+EXPO_PUBLIC_CARTO_API_KEY=your_carto_basemap_api_key  # required for the Expo Go Leaflet map — free key at carto.com/basemaps/apikey/
 ```
 
 ### 5. Run

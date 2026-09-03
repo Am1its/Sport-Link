@@ -18,13 +18,15 @@ const detectSportType = (name = '') => {
   if (n.match(/basket|כדורסל/))                  return 'basketball';
   if (n.match(/tennis|טניס/))                    return 'tennis';
   if (n.match(/volley|כדורעף/))                  return 'volleyball';
+  // Must run before the football check below — Hebrew footvolley names ("כדורגל חוף")
+  // contain the football substring ("כדורגל"), so the more specific pattern has to win first.
+  if (n.match(/footvolley|foot volley|כדורגל[- ]?חוף/)) return 'footvolley';
   if (n.match(/football|soccer|כדורגל|כדור-גל/)) return 'football';
   if (n.match(/yoga|יוגה/))                      return 'yoga';
   if (n.match(/gym|fitness|כושר|חדר כושר/))      return 'gym';
   if (n.match(/studio|סטודיו/))                  return 'studio';
   if (n.match(/padel|פאדל|פדל/))                 return 'padel';
   if (n.match(/swim|pool|בריכה|שחייה/))          return 'swimming';
-  if (n.match(/footvolley|foot volley|כדורגל[- ]?חוף/)) return 'footvolley';
   if (n.match(/hik|trail|מסלול|טיול/))           return 'hiking';
   return null;
 };
