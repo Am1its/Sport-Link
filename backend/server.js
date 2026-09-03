@@ -99,7 +99,7 @@ app.get('/game/:id', async (req, res) => {
       [gameId]
     );
 
-    const BASE_URL = process.env.PUBLIC_URL || `https://sport-link-production.up.railway.app`;
+    const BASE_URL = process.env.PUBLIC_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://sport-link-production.up.railway.app');
     const deepLink = `sportlink://game/${gameId}`;
     const pageUrl  = `${BASE_URL}/game/${gameId}`;
 
@@ -227,7 +227,7 @@ app.get('/invite/:userId', async (req, res) => {
       [userId]
     );
 
-    const BASE_URL = process.env.PUBLIC_URL || 'https://sport-link-production.up.railway.app';
+    const BASE_URL = process.env.PUBLIC_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://sport-link-production.up.railway.app');
     const deepLink = `sportlink://invite/${userId}`;
     const pageUrl  = `${BASE_URL}/invite/${userId}`;
 

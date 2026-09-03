@@ -3,13 +3,13 @@ import { Text, View, ActivityIndicator, Alert, TouchableOpacity, Animated, Style
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { apiFetch, UnauthorizedError } from '../../../utils/api';
-import { Colors } from '../../../constants/theme';
-import AvatarCircle from '../../../components/AvatarCircle';
-import { DirectionsButton } from '../../../components/DirectionsButton';
-import type { MapItem, Participant } from '../../../types';
-import { API } from '../../../constants/endpoints';
-import { ROUTES } from '../../../constants/routes';
+import { apiFetch, UnauthorizedError } from '../../utils/api';
+import { Colors } from '../../constants/theme';
+import AvatarCircle from '../../components/AvatarCircle';
+import { DirectionsButton } from '../../components/DirectionsButton';
+import type { MapItem, Participant } from '../../types';
+import { API } from '../../constants/endpoints';
+import { ROUTES } from '../../constants/routes';
 
 export function BottomCard({ court, userId, token, onJoined }: {
   court: MapItem;

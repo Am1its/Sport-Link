@@ -22,6 +22,10 @@ const detectSportType = (name = '') => {
   if (n.match(/yoga|יוגה/))                      return 'yoga';
   if (n.match(/gym|fitness|כושר|חדר כושר/))      return 'gym';
   if (n.match(/studio|סטודיו/))                  return 'studio';
+  if (n.match(/padel|פאדל|פדל/))                 return 'padel';
+  if (n.match(/swim|pool|בריכה|שחייה/))          return 'swimming';
+  if (n.match(/footvolley|foot volley|כדורגל[- ]?חוף/)) return 'footvolley';
+  if (n.match(/hik|trail|מסלול|טיול/))           return 'hiking';
   return null;
 };
 
@@ -40,6 +44,9 @@ const MOCK_COURTS = [
   { place_id: 'mock_gordon_03',  name: 'מגרשי כדורעף חופים - חוף גורדון', sport_type: 'volleyball', venue_type: 'court',   geometry: { location: { lat: 32.08370, lng: 34.76810 } }, vicinity: 'חוף גורדון, תל אביב-יפו',             rating: 4.7 },
   { place_id: 'mock_gym_04',     name: 'Holmes Place Tel Aviv',             sport_type: 'gym',        venue_type: 'gym',     geometry: { location: { lat: 32.07200, lng: 34.77500 } }, vicinity: 'דיזנגוף, תל אביב-יפו',               rating: 4.4 },
   { place_id: 'mock_yoga_05',    name: 'Yoga Studio Florentin',             sport_type: 'yoga',       venue_type: 'studio',  geometry: { location: { lat: 32.05900, lng: 34.77100 } }, vicinity: 'פלורנטין, תל אביב-יפו',              rating: 4.9 },
+  { place_id: 'mock_football_06',name: 'מגרש כדורגל בלומפילד - יד אליהו',   sport_type: 'football',   venue_type: 'court',   geometry: { location: { lat: 32.05840, lng: 34.78990 } }, vicinity: 'יד אליהו, תל אביב-יפו',              rating: 4.5 },
+  { place_id: 'mock_padel_07',   name: 'Padel Club Tel Aviv',                sport_type: 'padel',      venue_type: 'court',   geometry: { location: { lat: 32.08890, lng: 34.79210 } }, vicinity: 'הירקון, תל אביב-יפו',                rating: 4.7 },
+  { place_id: 'mock_pool_08',    name: 'בריכת גורדון - שחייה',               sport_type: 'swimming',   venue_type: 'court',   geometry: { location: { lat: 32.08540, lng: 34.76680 } }, vicinity: 'חוף גורדון, תל אביב-יפו',            rating: 4.6 },
 ];
 
 // GET /api/courts/nearby
@@ -53,7 +60,7 @@ router.get('/nearby', async (req, res) => {
   }
 
   try {
-    const [hebrewRes, englishRes, gymRes, studioRes] = await Promise.all([
+    const [hebrewRes, englishRes, gymRes, studioRes, padelRes, swimRes] = await Promise.all([
       axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
         params: { location: `${lat},${lng}`, radius, keyword: 'מגרש', key: apiKey },
       }),
@@ -66,6 +73,12 @@ router.get('/nearby', async (req, res) => {
       axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
         params: { location: `${lat},${lng}`, radius, keyword: 'yoga studio dance', key: apiKey },
       }),
+      axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
+        params: { location: `${lat},${lng}`, radius, keyword: 'padel פאדל', key: apiKey },
+      }),
+      axios.get('https://maps.googleapis.com/maps/api/place/nearbysearch/json', {
+        params: { location: `${lat},${lng}`, radius, keyword: 'swimming pool בריכת שחייה', key: apiKey },
+      }),
     ]);
 
     const seen = new Set();
@@ -74,6 +87,8 @@ router.get('/nearby', async (req, res) => {
       ...englishRes.data.results,
       ...gymRes.data.results,
       ...studioRes.data.results,
+      ...padelRes.data.results,
+      ...swimRes.data.results,
     ]
       .filter((p) => {
         if (seen.has(p.place_id)) return false;

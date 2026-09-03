@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
   avatarInner:   { flex: 1, borderRadius: 46, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface },
   avatarImage:   { width: '100%', height: '100%' },
   avatarLetter:  { fontSize: 40, fontWeight: '900' },
-  avatarEditOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  avatarEditOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
 
   name: { ...Type.name, color: Colors.text },
   bio:  { fontSize: 14, color: Colors.textMuted, marginTop: 5, textAlign: 'center', lineHeight: 20 },

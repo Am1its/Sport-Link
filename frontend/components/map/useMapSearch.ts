@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Keyboard } from 'react-native';
-import { searchPlaces, GeoResult } from '../../../utils/geocode';
+import { searchPlaces, GeoResult } from '../../utils/geocode';
 
 const RECENT_SEARCHES_KEY = 'map_recent_searches';
 

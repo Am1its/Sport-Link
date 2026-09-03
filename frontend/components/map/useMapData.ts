@@ -3,9 +3,9 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
-import { apiFetch } from '../../../utils/api';
-import { API } from '../../../constants/endpoints';
-import type { MapItem } from '../../../types';
+import { apiFetch } from '../../utils/api';
+import { API } from '../../constants/endpoints';
+import type { MapItem } from '../../types';
 
 export const PENDING_MAP_PAN_KEY = 'pending_map_pan';
 

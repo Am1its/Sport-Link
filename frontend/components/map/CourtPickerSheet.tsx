@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../../constants/theme';
-import { SPORT_COLORS, SPORT_ICONS } from '../../../constants/sports';
-import type { MapItem } from '../../../types';
-import { ROUTES } from '../../../constants/routes';
+import { Colors } from '../../constants/theme';
+import { SPORT_COLORS, SPORT_ICONS } from '../../constants/sports';
+import type { MapItem } from '../../types';
+import { ROUTES } from '../../constants/routes';
 import type { ComponentProps } from 'react';
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];

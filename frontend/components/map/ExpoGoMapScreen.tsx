@@ -8,23 +8,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
-import { useAuth } from '../../../context/AuthContext';
-import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../../constants/sports';
-import { Colors } from '../../../constants/theme';
-import { getAvatarColor } from '../../../utils/avatar';
-import LeafletMap, { LeafletMarker } from '../../../components/LeafletMap';
-import type { MapItem } from '../../../types';
+import { useAuth } from '../../context/AuthContext';
+import { SPORT_COLORS, SPORT_ICONS, SPORT_FILTER_ITEMS } from '../../constants/sports';
+import { Colors } from '../../constants/theme';
+import { getAvatarColor } from '../../utils/avatar';
+import LeafletMap, { LeafletMarker } from '../../components/LeafletMap';
+import type { MapItem } from '../../types';
 
 import { useMapData } from './useMapData';
-import { isPastGame } from '../../../utils/time';
-import { ROUTES } from '../../../constants/routes';
+import { isPastGame } from '../../utils/time';
+import { ROUTES } from '../../constants/routes';
 import { useMapSearch } from './useMapSearch';
 import { MapSearchDropdown } from './MapSearchDropdown';
 import { CourtPickerSheet } from './CourtPickerSheet';
 import { AddFab } from './AddFab';
 import { SearchAreaChip } from './SearchAreaChip';
 import { clusterGames, SEARCH_AREA_THRESHOLD_KM } from './clusterGames';
-import { haversineKm } from '../../../utils/geo';
+import { haversineKm } from '../../utils/geo';
 import { BottomCard } from './BottomCard';
 
 // Named export, not default — see the matching comment in HomeScreen.tsx.

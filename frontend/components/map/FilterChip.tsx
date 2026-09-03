@@ -5,8 +5,8 @@ import ReAnimated, {
   useSharedValue, useAnimatedStyle,
   withSpring, withTiming, withDelay,
 } from 'react-native-reanimated';
-import { Springs } from '../../../constants/motion';
-import { usePressAnimation } from '../../../hooks/useAnimations';
+import { Springs } from '../../constants/motion';
+import { usePressAnimation } from '../../hooks/useAnimations';
 
 export function FilterChip({
   label, isActive, onPress, chipStyle, textStyle, activeChipStyle, activeTextStyle, index,

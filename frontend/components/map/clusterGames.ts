@@ -1,4 +1,4 @@
-import type { MapItem } from '../../../types';
+import type { MapItem } from '../../types';
 
 export const SEARCH_AREA_THRESHOLD_KM = 2;
 

@@ -14,7 +14,7 @@ export const SPORT_COLORS: Record<string, string> = {
   basketball: '#FF8C00',
   tennis:     '#CCFF00',
   volleyball: '#FFD700',
-  football:   '#FFFFFF',
+  football:   '#16A34A',
   yoga:       '#A78BFA',
   gym:        '#FB923C',
   studio:     '#F472B6',

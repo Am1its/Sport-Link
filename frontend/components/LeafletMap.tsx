@@ -24,6 +24,8 @@ type Props = {
   onZoom?: (latDelta: number, center: { lat: number; lng: number }) => void;
 };
 
+const CARTO_API_KEY = process.env.EXPO_PUBLIC_CARTO_API_KEY;
+
 const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
 <html>
 <head>
@@ -54,7 +56,7 @@ const buildHtml = (lat: number, lng: number) => `<!DOCTYPE html>
     document.getElementById('offline').style.display = 'block';
   } else {
     var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([${lat}, ${lng}], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}', { maxZoom: 19 }).addTo(map);
     var markerLayer = L.layerGroup().addTo(map);
     var userLayer = L.layerGroup().addTo(map);
 

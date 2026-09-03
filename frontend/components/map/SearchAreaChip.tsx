@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius, Shadow } from '../../../constants/theme';
+import { Colors, Radius, Shadow } from '../../constants/theme';
 
 export function SearchAreaChip({ onPress, loading }: { onPress: () => void; loading: boolean }) {
   return (

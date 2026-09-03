@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ReAnimated from 'react-native-reanimated';
 import type { AnimatedStyle } from 'react-native-reanimated';
 import type { ViewStyle } from 'react-native';
-import { Colors } from '../../../constants/theme';
+import { Colors } from '../../constants/theme';
 
 type Props = {
   isOpen: boolean;

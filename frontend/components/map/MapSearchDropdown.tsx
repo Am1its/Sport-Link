@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/theme';
-import type { GeoResult } from '../../../utils/geocode';
+import { Colors } from '../../constants/theme';
+import type { GeoResult } from '../../utils/geocode';
 
 type Props = {
   searchQuery: string;

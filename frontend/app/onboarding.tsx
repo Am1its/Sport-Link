@@ -80,8 +80,7 @@ function SportTile({
             : { borderColor: Colors.border },
         ]}
       >
-        <MaterialCommunityIcons name={icon as any} size={28} color={selected ? color : Colors.textMuted} />
-        <Text style={[styles.sportTileLabel, selected && { color }]}>{label}</Text>
+        <MaterialCommunityIcons name={icon as any} size={30} color={selected ? color : Colors.textMuted} />
         {selected && (
           <View style={[styles.sportCheck, { backgroundColor: color }]}>
             <Ionicons name="checkmark" size={10} color={Colors.bg} />
@@ -350,6 +349,20 @@ export default function OnboardingScreen() {
                   ))}
                 </View>
 
+                {selectedSports.length > 0 && (
+                  <View style={styles.selectedSportsRow}>
+                    {selectedSports.map(key => {
+                      const sport = SPORTS.find(s => s.key === key);
+                      const color = SPORT_COLORS[key];
+                      return (
+                        <View key={key} style={[styles.selectedChip, { borderColor: color, backgroundColor: color + '22' }]}>
+                          <Text style={[styles.selectedChipText, { color }]}>{sport?.label}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
                 <View style={styles.navRow}>
                   <TouchableOpacity style={styles.backBtn} onPress={() => goToStep('bio', 'back')}>
                     <Ionicons name="arrow-back" size={18} color={Colors.text} />
@@ -476,9 +489,11 @@ const styles = StyleSheet.create({
   bioInputFocused: { borderColor: Colors.accent },
   charCount:       { color: Colors.textHint, fontSize: 12, textAlign: 'right', marginBottom: 28 },
 
-  sportsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 32 },
-  sportTile:      { width: '30%', aspectRatio: 1.1, backgroundColor: Colors.surface, borderRadius: Radius.xl, justifyContent: 'center', alignItems: 'center', gap: 6, borderWidth: 1.5 },
-  sportTileLabel: { ...Type.label, color: Colors.textMuted, textAlign: 'center' },
+  sportsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  sportTile:      { width: '30%', aspectRatio: 1.1, backgroundColor: Colors.surface, borderRadius: Radius.xl, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5 },
+  selectedSportsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16, marginBottom: 32 },
+  selectedChip:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: 1.5 },
+  selectedChipText:  { ...Type.label, fontSize: 12 },
   sportCheck:     { position: 'absolute', top: 7, right: 7, width: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
 
   levelsContainer: { gap: 10, marginBottom: 32 },

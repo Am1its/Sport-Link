@@ -7,12 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "sportlink",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1C1C1E"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.am1its.sportlink",
@@ -50,7 +44,6 @@
         "foregroundImage": "./assets/icon.png"
       },
       "versionCode": 1,
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
@@ -98,10 +91,7 @@
     },
     "extra": {
       "privacyPolicyUrl": "https://sport-link-production.up.railway.app/privacy",
-      "termsUrl": "https://sport-link-production.up.railway.app/terms",
-      "eas": {
-        "projectId": "sportlink"
-      }
+      "termsUrl": "https://sport-link-production.up.railway.app/terms"
     }
   }
 }

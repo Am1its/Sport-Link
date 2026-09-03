@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import type { ColorValue } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,7 +12,7 @@ import { API_BASE } from '../../constants/api';
 import { API } from '../../constants/endpoints';
 import { SOCKET_EVENTS } from '../../constants/events';
 
-function AnimatedTabIcon({ name, color, focused }: { name: React.ComponentProps<typeof Ionicons>['name']; color: string; focused: boolean }) {
+function AnimatedTabIcon({ name, color, focused }: { name: React.ComponentProps<typeof Ionicons>['name']; color: ColorValue; focused: boolean }) {
   const scale = useSharedValue(1);
 
   useEffect(() => {
