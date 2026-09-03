@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   filterChipTextActive: { color: Colors.accent },
 
   list:        { paddingHorizontal: 20, paddingBottom: 50, paddingTop: 4 },
-  resultCount: { fontSize: 12, color: Colors.textHint, fontStyle: 'italic', textAlign: 'center', marginVertical: 12 },
+  resultCount: { fontSize: 12, color: Colors.textSub, fontStyle: 'italic', textAlign: 'center', marginVertical: 12 },
 
   card:    { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: 16, padding: 14, marginBottom: 10, gap: 12 },
   cardLeft: {},
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   moreChips: { fontSize: 10, color: Colors.textMuted, alignSelf: 'center' },
 
   metaRow:        { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 2 },
-  sharedLabel:    { fontSize: 11, color: Colors.textHint, fontStyle: 'italic' },
+  sharedLabel:    { fontSize: 11, color: Colors.textSub, fontStyle: 'italic' },
   gamesPlayed:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
   gamesPlayedText: { fontSize: 11, color: Colors.accent, fontWeight: '700' },
 

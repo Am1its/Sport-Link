@@ -9,6 +9,7 @@ import { SoundProvider } from '../context/SoundContext';
 import { registerPushToken } from '../utils/registerPushToken';
 import { setUnauthorizedHandler } from '../utils/api';
 import { navigateFromNotification } from '../utils/notificationNav';
+import { Colors } from '../constants/theme';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -60,7 +61,7 @@ function RootLayout() {
             default anyway, but declaring it explicitly documents the intent and guards
             against a future call site accidentally overriding it. */}
         <ReducedMotionConfig mode={ReduceMotion.System} />
-        <StatusBar barStyle="light-content" backgroundColor="#1C1C1E" translucent={false} />
+        <StatusBar barStyle="light-content" backgroundColor={Colors.bg} translucent={false} />
         <AppServices />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />

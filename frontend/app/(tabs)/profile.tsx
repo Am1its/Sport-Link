@@ -320,7 +320,7 @@ export default function ProfileScreen() {
             <Text style={styles.name}>{username}</Text>
             {stats?.bio
               ? <Text style={styles.bio}>{stats.bio}</Text>
-              : <Text style={[styles.bio, { color: Colors.textHint, fontStyle: 'italic' }]}>No bio yet</Text>}
+              : <Text style={[styles.bio, { color: Colors.textSub, fontStyle: 'italic' }]}>No bio yet</Text>}
             <TouchableOpacity style={styles.editProfileBtn} onPress={enterEditMode}>
               <Ionicons name="pencil-outline" size={13} color={Colors.accent} />
               <Text style={styles.editProfileBtnText}>Edit Profile</Text>

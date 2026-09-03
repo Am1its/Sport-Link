@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 15, fontWeight: '700', color: Colors.text, marginBottom: 2 },
   rowDesc: { ...Type.meta, color: Colors.textMuted },
 
-  hint: { marginTop: Spacing.lg, color: Colors.textHint, fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  hint: { marginTop: Spacing.lg, color: Colors.textSub, fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
   saveBtn: { marginTop: Spacing.xxxl, backgroundColor: Colors.accent, height: 54, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
   saveBtnText: { color: Colors.bg, ...Type.btnPrimary },

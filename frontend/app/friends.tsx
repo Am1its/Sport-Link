@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: Colors.text, fontSize: 15 },
 
   emptyText: { color: Colors.textMuted, fontSize: 16, marginTop: 14, fontWeight: '600' },
-  emptySubtext: { color: Colors.textHint, fontSize: 13, marginTop: 6 },
+  emptySubtext: { color: Colors.textSub, fontSize: 13, marginTop: 6 },
   addFriendBtn: { marginTop: 20, backgroundColor: Colors.accent, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.pill },
   addFriendBtnText: { color: Colors.bg, fontWeight: '800', fontSize: 15 },
 });

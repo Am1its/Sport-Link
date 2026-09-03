@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
   confirmRow:       { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 2 },
   confirmText:      { fontSize: 13, fontWeight: '700', color: Colors.accent },
 
-  noReviews: { textAlign: 'center', color: Colors.textHint, fontStyle: 'italic', marginTop: 10, marginBottom: 20 },
+  noReviews: { textAlign: 'center', color: Colors.textSub, fontStyle: 'italic', marginTop: 10, marginBottom: 20 },
 
   reviewCard:   { marginHorizontal: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 14, marginBottom: 10, ...Shadow.card },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },

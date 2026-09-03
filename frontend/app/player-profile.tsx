@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   avatarLetter:  { fontSize: 42, fontWeight: '900' },
   username:  { ...Type.name, color: Colors.text, marginBottom: 6 },
   bio:       { ...Type.body, color: Colors.textSub, textAlign: 'center', paddingHorizontal: 40 },
-  bioEmpty:  { ...Type.body, color: Colors.textHint, textAlign: 'center' },
+  bioEmpty:  { ...Type.body, color: Colors.textSub, textAlign: 'center' },
 
   // Stats bar
   statsBar:    { flexDirection: 'row', marginHorizontal: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: 6 },

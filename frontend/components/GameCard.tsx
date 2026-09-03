@@ -58,7 +58,7 @@ export function GameCard({
   const fillStyle = useAnimatedStyle(() => ({
     width: `${fillWidth.value * 100}%` as any,
   }));
-  const color  = SPORT_COLORS[game.sport_type] ?? '#0FEA95';
+  const color  = SPORT_COLORS[game.sport_type] ?? Colors.accent;
   const icon   = SPORT_ICONS[game.sport_type]  ?? 'map-marker';
   const isOwn  = game.host_id === userId;
   const spotsLeft = game.max_players != null

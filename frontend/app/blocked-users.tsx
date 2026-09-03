@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   center:          { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
   emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   emptyText:       { fontSize: 16, fontWeight: '700', color: Colors.textMuted, marginBottom: 6 },
-  emptySub:        { fontSize: 13, color: Colors.textHint, textAlign: 'center' },
+  emptySub:        { fontSize: 13, color: Colors.textSub, textAlign: 'center' },
 
   list: { paddingHorizontal: Spacing.xl, paddingBottom: 30 },
   row:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.surface, borderRadius: Radius.lg, marginBottom: 8, ...Shadow.card },

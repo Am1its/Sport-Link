@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   sportIcon: { width: 40, height: 40, borderRadius: Radius.md, justifyContent: 'center', alignItems: 'center' },
 
   list: { paddingHorizontal: Spacing.xl, paddingBottom: 50 },
-  anonymousNote: { fontSize: 12, color: Colors.textHint, textAlign: 'center', marginVertical: 14, marginHorizontal: Spacing.xl, fontStyle: 'italic' },
+  anonymousNote: { fontSize: 12, color: Colors.textSub, textAlign: 'center', marginVertical: 14, marginHorizontal: Spacing.xl, fontStyle: 'italic' },
 
   // Player card
   card:       { backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: 14, marginBottom: 12, ...Shadow.card },
@@ -267,8 +267,8 @@ const styles = StyleSheet.create({
   skillRight:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
   skillNum:    { fontSize: 12, color: Colors.yellow, fontWeight: '800', marginLeft: 4 },
 
-  raterCount:  { fontSize: 11, color: Colors.textHint, marginTop: 6, textAlign: 'right', fontStyle: 'italic' },
-  noRatings:   { fontSize: 13, color: Colors.textHint, fontStyle: 'italic', borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
+  raterCount:  { fontSize: 11, color: Colors.textSub, marginTop: 6, textAlign: 'right', fontStyle: 'italic' },
+  noRatings:   { fontSize: 13, color: Colors.textSub, fontStyle: 'italic', borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10 },
 
   // Locked state
   lockCircle:  { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surface, ...Shadow.card, justifyContent: 'center', alignItems: 'center' },
