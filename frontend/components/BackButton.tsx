@@ -37,6 +37,8 @@ export function BackButton({
         }}
         style={styles.pressable}
         hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
       >
         <Ionicons name="chevron-back" size={20} color={iconColor} />
       </Pressable>
