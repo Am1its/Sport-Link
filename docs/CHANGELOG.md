@@ -4,6 +4,42 @@ All notable changes to SportLink are documented here, ordered from most recent t
 
 ---
 
+## [Pre-exhibition hardening] — September 3, 2026
+
+**Goal:** Full live-device rehearsal ahead of the 2026-09-08 exhibition. Found and fixed a chain of real bugs across infrastructure, the Expo SDK, and the app itself — none of which were visible from code review alone, only from actually running the app on real devices.
+
+### Production outage: Railway trial expired
+The production backend (`sport-link-production.up.railway.app`) went down mid-rehearsal — Railway's free trial had expired, pausing all deployments. Fixed by upgrading to the Hobby plan. Root-caused via `railway status`/`railway logs`, not guessing.
+
+**Landmine found while fixing it:** this account has two separate Railway projects — an empty, broken one (`SportLink`, created by an earlier session, linked from the repo root) and the real one (`endearing-light` → service `Sport-Link`, with the actual MySQL database, linked from `backend/`). The repo-root Railway CLI link was silently pointing at the wrong, dead-end project. Relinked root to the correct service so this can't happen again. **Lesson: always check which directory a `railway` command is run from on this project — root and `backend/` used to have different links.**
+
+### Expo SDK 54 → 57 upgrade
+Discovered that current App Store Expo Go only supports the latest published SDK on iOS — the app was frozen at SDK 54, so **any iPhone with an auto-updated Expo Go could not open the project at all**, while Android's Expo Go client (which can fetch older SDK runtimes on demand) worked fine. This is a strict iOS Expo Go limitation, not a bug in the app. Upgraded `expo`, `react`, `react-native`, `react-native-reanimated`, `expo-router`, and all `expo-*`/community packages to SDK 57 via `npx expo install expo@57 --fix`. Fixed 3 real breaking changes surfaced by the bump: `app.json`'s `newArchEnabled`/`splash`/`android.edgeToEdgeEnabled` fields are now invalid (New Architecture and edge-to-edge are default/mandatory as of this SDK), `StyleSheet.absoluteFillObject` was renamed to `absoluteFill`, and the tab bar icon's `color` prop needed widening from `string` to `ColorValue`.
+
+### Expo Router phantom-tabs crash (map/ directory)
+The SDK bump exposed that a long-held project belief — "a named export instead of `default` keeps a helper file under `app/` from becoming a phantom tab" — was **never actually true** on expo-router 57 (confirmed by reading its own source: every file in a directory with no `_layout.tsx` gets unconditionally pushed into the route tree; a missing default export only triggers a `console.warn`, it doesn't exclude the file). This made every file in `app/(tabs)/map/` — including non-component files like `clusterGames.ts` — render as an extra, unlabeled tab that crashed on tap ("Element type is invalid... `WrappedScreenComponent`"). **Fix:** moved the whole directory to `frontend/components/map/`, outside `app/` entirely — the only exclusion expo-router's own source actually guarantees. See `CLAUDE.md` rule 31 for the corrected, verified explanation (previous versions of that rule were wrong).
+
+### CartoDB Voyager tiles started requiring an API key
+Every CartoDB basemap endpoint — including legacy/unauthenticated ones — began returning a watermarked "API KEY REQUIRED" placeholder tile (with HTTP 200, so it looked like success). Got a free CARTO API key (no account needed, carto.com/basemaps/apikey/, 5M requests/month) and appended it via `?key=` (not `?api_key=`, which silently still returns the watermark) to the tile URL, stored as `EXPO_PUBLIC_CARTO_API_KEY`.
+
+### Court sport-type detection gaps
+`detectSportType()` in `backend/routes/courts.js` only recognized 7 of the app's 12 sports — padel, swimming, footvolley, and hiking were silently tagged `null` and vanished from sport-filtered map/discover views, even when Google Places returned a real result for them. Also added dedicated Places search queries for padel courts and swimming pools (previously not searched for at all). A follow-up bug in the fix itself — footvolley's Hebrew regex was unreachable because the football check ran first and always matched first, since footvolley's Hebrew name contains the football substring — was caught by a code-review pass and fixed by reordering.
+
+### Onboarding + accessibility + design-token cleanup
+- Sport-selection tiles on the onboarding "What do you play?" step were cutting off multi-word sport names (wrapped text overflowing a tile sized for one line); redesigned to icon-only tiles with a readable "selected sports" chip summary below the grid.
+- `SPORT_COLORS.football` was `'#FFFFFF'` (pure white) by mistake, rendering as an invisible icon; fixed to a proper green.
+- Added `accessibilityLabel`/`accessibilityRole` to the shared `BackButton` component (used across ~10+ screens) — the app had zero accessibility labels anywhere before this.
+- Bumped 10 spots using `Colors.textHint` for genuinely readable content (empty states, result/rater counts) to `Colors.textSub` — the former measured ~1.9:1 contrast against the dark background, well under the WCAG AA 4.5:1 minimum for body text. Left placeholder text and decorative icons on `textHint`, which are legitimately exempt.
+- Removed 2 remaining raw-hex literals (`GameCard.tsx`, `_layout.tsx`) that duplicated existing `Colors.accent`/`Colors.bg` token values.
+
+### Demo data seeded
+8 demo users (real photo avatars via a public placeholder-avatar service, Tel-Aviv-flavored bios, one sport preference each), 13 games across 10 sports/neighborhoods, ~10 friendships, and chat activity in both game-chat and DMs — all created through the app's own public REST API (registration → profile update → game creation → join → friend request/accept → messages), not direct DB writes, so it went through the same validation real users hit.
+
+### Multi-device access: the Expo account "sign-in wall"
+Discovered that `@expo/cli` (bumped 54.0.23 → 57.0.21 as part of the SDK upgrade) enforces an identity match between whoever's dev server signed the manifest and whoever's Expo Go app is opening it — a real security feature (prevents a device on shared WiFi from spoofing a dev server), but new behavior that didn't exist on the SDK 54-era CLI, which is why this never came up before. Tried and ruled out: `--offline`, full anonymous mode on both sides, removing a stale/invalid `eas.projectId` from `app.json`, and `--tunnel`. The one config that reliably works: **CLI and every connecting device's Expo Go logged into the same Expo account.** Since real exhibition attendees can't be asked to log into a personal account, the plan is a throwaway demo Expo account whose credentials are shown on a slide/card at the table.
+
+---
+
 ## [Expo Go QR Map] — June 2026
 
 **Goal:** Make the app fully usable via Expo Go QR scan (no dev build, no Apple account required). Needed for live class presentation where attendees scan a QR code.

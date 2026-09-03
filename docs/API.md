@@ -128,7 +128,7 @@ Remove friend or reject/cancel request.
 ## Courts — `/api/courts`
 
 ### `GET /api/courts/nearby?lat=&lng=&radius=`
-Nearby courts via Google Places (4 parallel queries) or mock fallback.
+Nearby courts via Google Places (6 parallel queries — Hebrew/English court keywords, gym, yoga/studio, padel, swimming pools) or mock fallback. `detectSportType()` classifies each result into one of the 12 sports by name pattern; note the footvolley check must run before the football check since Hebrew footvolley names ("כדורגל חוף") contain the football substring.
 
 ### `GET /api/courts/photo?ref=<photoRef>&maxwidth=600`
 Proxy for Google Places photos. Streams image with 24h cache header.
